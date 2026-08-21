@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Indispensable pour une SPA avec React Router : sans ça, un rafraîchissement
+# de page sur une route comme /histoire/xxx ou un lien direct partagé
+# renvoie une 404 Netlify au lieu de laisser React Router gérer la route.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
