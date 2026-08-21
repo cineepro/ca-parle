@@ -1,6 +1,7 @@
 // src/router/ProtectedRoute.tsx — Ça Parle
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { isAuthenticated, loading } = useAuth();
@@ -20,5 +21,5 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         return <Navigate to="/login" replace />;
     }
 
-    return <>{children}</>;
+    return <AppLayout>{children}</AppLayout>;
 };

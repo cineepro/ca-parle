@@ -14,6 +14,8 @@ import ProfilePage from '@/pages/ProfilePage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
+import TrendingPage from '@/pages/TrendingPage';
+import MessagesPage from '@/pages/MessagesPage';
 
 export const AppRouter = () => {
     return (
@@ -79,6 +81,22 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <NotificationsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/tendances"
+                    element={
+                        <ProtectedRoute>
+                            <TrendingPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/messages"
+                    element={
+                        <ProtectedRoute>
+                            <MessagesPage />
                         </ProtectedRoute>
                     }
                 />

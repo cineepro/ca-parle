@@ -5,6 +5,31 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# ⚠️ CRUCIAL pour tuer l'ancien Service Worker Kinema+ : ces fichiers ne
+# doivent JAMAIS être mis en cache (ni par le navigateur, ni par le CDN
+# Netlify), sinon le navigateur pourrait continuer à croire qu'il a déjà
+# la dernière version et ne jamais redemander le vrai contenu du kill
+# switch. Sans ce header, tout le mécanisme de public/sw.js peut échouer
+# silencieusement pendant des jours/semaines selon le cache HTTP du client.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type = "application/javascript; charset=utf-8"
+
+# index.html ne doit pas non plus être mis en cache longtemps : c'est lui
+# qui référence les fichiers JS/CSS hashés à chaque nouveau build.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 # Indispensable pour une SPA avec React Router : sans ça, un rafraîchissement
 # de page sur une route comme /histoire/xxx ou un lien direct partagé
 # renvoie une 404 Netlify au lieu de laisser React Router gérer la route.
