@@ -1,0 +1,39 @@
+// src/api/constants.ts — Ça Parle
+// Source de vérité unique pour la base de données et les IDs de
+// collections. Regroupé ici (et non dans auth.ts) car la majorité de ces
+// collections n'ont rien à voir avec l'authentification — seule USERS en
+// est réellement une, et elle est PARTAGÉE avec Kinema+.
+export const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID || '';
+
+export const COLLECTIONS = {
+    // Partagée avec Kinema+
+    USERS: import.meta.env.VITE_APPWRITE_COLLECTION_USERS || '',
+
+    // Propres à Ça Parle
+    STORIES: import.meta.env.VITE_APPWRITE_COLLECTION_STORIES || '',
+    STORY_UPDATES: import.meta.env.VITE_APPWRITE_COLLECTION_STORY_UPDATES || '',
+    COMMENTS: import.meta.env.VITE_APPWRITE_COLLECTION_COMMENTS || '',
+    REACTIONS: import.meta.env.VITE_APPWRITE_COLLECTION_REACTIONS || '',
+    PREDICTIONS: import.meta.env.VITE_APPWRITE_COLLECTION_PREDICTIONS || '',
+    PREDICTION_VOTES: import.meta.env.VITE_APPWRITE_COLLECTION_PREDICTION_VOTES || '',
+    STORY_VERSIONS: import.meta.env.VITE_APPWRITE_COLLECTION_STORY_VERSIONS || '',
+    VERSION_VOTES: import.meta.env.VITE_APPWRITE_COLLECTION_VERSION_VOTES || '',
+    REFERENCES: import.meta.env.VITE_APPWRITE_COLLECTION_REFERENCES || '',
+    STORY_REFERENCES: import.meta.env.VITE_APPWRITE_COLLECTION_STORY_REFERENCES || '',
+    FOLLOWS: import.meta.env.VITE_APPWRITE_COLLECTION_FOLLOWS || '',
+    NOTIFICATIONS: import.meta.env.VITE_APPWRITE_COLLECTION_NOTIFICATIONS || '',
+    REPORTS: import.meta.env.VITE_APPWRITE_COLLECTION_REPORTS || '',
+    BADGES: import.meta.env.VITE_APPWRITE_COLLECTION_BADGES || '',
+    USER_BADGES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_BADGES || '',
+    CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES || '',
+} as const;
+
+// IDs des Appwrite Functions appelées depuis le client (celles déclenchées
+// par événement — on-story-created, on-comment-created, on-reaction-write
+// — n'ont PAS besoin d'être ici : elles ne sont jamais appelées par le
+// client, seulement par Appwrite lui-même).
+export const FUNCTIONS = {
+    RESOLVE_PREDICTION: import.meta.env.VITE_APPWRITE_FUNCTION_RESOLVE_PREDICTION || '',
+    MODERATE_CONTENT: import.meta.env.VITE_APPWRITE_FUNCTION_MODERATE_CONTENT || '',
+    INCREMENT_VIEW: import.meta.env.VITE_APPWRITE_FUNCTION_INCREMENT_VIEW || '',
+} as const;

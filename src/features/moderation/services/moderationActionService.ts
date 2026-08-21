@@ -5,6 +5,7 @@
 // L'ancienne version écrivait directement en base depuis le client — ce
 // qui aurait permis à n'importe qui de se passer pour modérateur.
 import { callFunction } from '@/api/functionsClient';
+import { FUNCTIONS } from '@/api/constants';
 
 export type ModerationAction =
     | 'hide_story' | 'delete_story'
@@ -13,6 +14,6 @@ export type ModerationAction =
 
 export const moderationActionService = {
     async runAction(action: ModerationAction, targetId: string, reportId?: string): Promise<void> {
-        await callFunction('moderate-content', { action, targetId, reportId });
+        await callFunction(FUNCTIONS.MODERATE_CONTENT, { action, targetId, reportId });
     },
 };

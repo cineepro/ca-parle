@@ -1,6 +1,6 @@
 // src/features/predictions/services/predictionService.ts — Ça Parle
 import { databases } from '@/api/appwrite';
-import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
+import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';
 import type { Models } from 'appwrite';
 import { callFunction } from '@/api/functionsClient';
@@ -101,6 +101,6 @@ export const predictionService = {
     // (infalsifiable), puis met à jour la fiabilité de tous les votants,
     // attribue les badges et envoie les notifications.
     async resolve(predictionId: string, correctOptionIndex: number): Promise<void> {
-        await callFunction('resolve-prediction', { predictionId, correctOptionIndex });
+        await callFunction(FUNCTIONS.RESOLVE_PREDICTION, { predictionId, correctOptionIndex });
     },
 };

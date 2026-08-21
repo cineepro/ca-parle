@@ -128,7 +128,8 @@ export const storyService = {
     async incrementView(storyId: string): Promise<void> {
         try {
             const { callFunction } = await import('@/api/functionsClient');
-            await callFunction('increment-view', { storyId });
+            const { FUNCTIONS } = await import('@/api/constants');
+            await callFunction(FUNCTIONS.INCREMENT_VIEW, { storyId });
         } catch {
             // Non bloquant — une vue ratée n'est pas grave.
         }
