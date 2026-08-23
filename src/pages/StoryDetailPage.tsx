@@ -3,7 +3,7 @@
 // "Tu y crois ?", commentaires et chronologie seront branchés à l'étape
 // suivante (features reactions/comments/predictions).
 import { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { storyService, type Story } from '@/features/stories/services/storyService';
 import { StoryTypeBadge } from '@/features/stories/components/StoryTypeBadge';
 import { StoryStatusBadge } from '@/features/stories/components/StoryStatusBadge';
@@ -17,14 +17,19 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { storyReferenceService } from '@/features/references/services/storyReferenceService';
 import { ReferenceChip } from '@/features/references/components/ReferenceChip';
 import type { Reference } from '@/features/references/services/referenceService';
+import { ReportButton } from '@/features/moderation/components/ReportButton';
+import { ShareButton } from '@/features/stories/components/ShareButton';
+import { conversationService } from '@/features/messaging/services/conversationService';
 
 export default function StoryDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [story, setStory] = useState<Story | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [references, setReferences] = useState<Reference[]>([]);
+    const [startingChat, setStartingChat] = useState(false);
     const viewCounted = useRef(false);
 
     useEffect(() => {
@@ -40,7 +45,7 @@ export default function StoryDetailPage() {
 
                 if (!viewCounted.current) {
                     viewCounted.current = true;
-                    storyService.incrementView(id, result.viewCount);
+                    storyService.incrementView(id);
                 }
             } catch {
                 setError('Cette histoire est introuvable.');
@@ -72,6 +77,19 @@ export default function StoryDetailPage() {
         );
     }
 
+    const canMessageAuthor = user && !story.isAnonymous && story.authorId !== user.$id;
+
+    const handleMessageAuthor = async () => {
+        if (!user || startingChat) return;
+        setStartingChat(true);
+        try {
+            const conversation = await conversationService.findOrCreateDirect(user.$id, story.authorId);
+            navigate(`/messages/${conversation.$id}`);
+        } finally {
+            setStartingChat(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-8">
             <div className="max-w-2xl mx-auto space-y-4">
@@ -80,13 +98,26 @@ export default function StoryDetailPage() {
                 <div className="bg-white rounded-3xl p-6">
                     <div className="flex items-center justify-between mb-3">
                         <StoryTypeBadge type={story.type} />
-                        <StoryStatusBadge status={story.status} />
+                        <div className="flex items-center gap-3">
+                            <StoryStatusBadge status={story.status} />
+                            <ReportButton targetType="story" targetId={story.$id} />
+                        </div>
                     </div>
 
                     <h1 className="text-2xl font-bold text-gray-800 mb-2 leading-snug">{story.title}</h1>
 
-                    <p className="text-sm text-gray-400 mb-4">
+                    <p className="text-sm text-gray-400 mb-4 flex items-center gap-2">
                         {story.isAnonymous ? '🕵️ Publié anonymement' : `Par ${story.authorName || 'Utilisateur'}`}
+                        {canMessageAuthor && (
+                            <button
+                                type="button"
+                                onClick={handleMessageAuthor}
+                                disabled={startingChat}
+                                className="text-[#FF4757] font-medium hover:underline disabled:opacity-50"
+                            >
+                                {startingChat ? 'Ouverture...' : '✉️ Message'}
+                            </button>
+                        )}
                     </p>
 
                     {references.length > 0 && (
@@ -99,6 +130,9 @@ export default function StoryDetailPage() {
 
                     <div className="flex items-center gap-4 mt-6 mb-4 text-sm text-gray-400">
                         <span>👀 {story.viewCount} vues</span>
+                        <span className="ml-auto">
+                            <ShareButton storyId={story.$id} title={story.title} />
+                        </span>
                     </div>
 
                     <div className="pt-4 border-t border-gray-100">
@@ -115,7 +149,7 @@ export default function StoryDetailPage() {
                 </div>
 
                 <div className="bg-white rounded-3xl p-6">
-                    <CommentThread storyId={story.$id} storyCommentsCount={story.commentsCount} />
+                    <CommentThread storyId={story.$id} />
                 </div>
             </div>
         </div>

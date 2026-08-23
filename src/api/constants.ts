@@ -26,6 +26,8 @@ export const COLLECTIONS = {
     BADGES: import.meta.env.VITE_APPWRITE_COLLECTION_BADGES || '',
     USER_BADGES: import.meta.env.VITE_APPWRITE_COLLECTION_USER_BADGES || '',
     CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES || '',
+    CONVERSATIONS: import.meta.env.VITE_APPWRITE_COLLECTION_CONVERSATIONS || '',
+    MESSAGES: import.meta.env.VITE_APPWRITE_COLLECTION_MESSAGES || '',
 } as const;
 
 // IDs des Appwrite Functions appelées depuis le client (celles déclenchées

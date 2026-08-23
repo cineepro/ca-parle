@@ -16,6 +16,7 @@ import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import MessagesPage from '@/pages/MessagesPage';
+import ConversationPage from '@/pages/ConversationPage';
 
 export const AppRouter = () => {
     return (
@@ -97,6 +98,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <MessagesPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/messages/:id"
+                    element={
+                        <ProtectedRoute>
+                            <ConversationPage />
                         </ProtectedRoute>
                     }
                 />
