@@ -1,8 +1,4 @@
 // src/features/reputation/services/reputationService.ts — Ça Parle
-// Écriture (recalcul du score, incrémentation des compteurs) désormais
-// gérée côté serveur par les Functions `on-story-created`,
-// `on-comment-created` et `resolve-prediction`. Ce service ne fait plus
-// que LIRE les stats déjà calculées par le serveur.
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 
@@ -34,5 +30,24 @@ export const reputationService = {
         } catch {
             return null;
         }
+    },
+
+    async incrementCounter(userId: string, field: 'commentsCount' | 'revelationsCount' | 'storiesCount'): Promise<void> {
+        try {
+            const userDoc: any = await databases.getDocument(DATABASE_ID, COLLECTIONS.USERS, userId);
+            const currentValue = userDoc[field] || 0;
+            await databases.updateDocument(DATABASE_ID, COLLECTIONS.USERS, userId, {
+                [field]: currentValue + 1,
+            });
+        } catch (error) {
+            console.warn(`L'incrémentation de ${field} a échoué:`, error);
+        }
+    },
+
+    // À ajouter dans l'objet reputationService de reputationService.ts :
+
+// Alias pour la compatibilité : fait la même chose que getStats
+    async recompute(userId: string): Promise<ReputationStats | null> {
+        return await this.getStats(userId);
     },
 };

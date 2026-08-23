@@ -109,6 +109,15 @@ export const storyService = {
         ]);
     },
 
+    // ➕ AJOUTER CETTE MÉTHODE ICI :
+    async getMostReacted(limit = 30) {
+        return await databases.listDocuments<Story>(DATABASE_ID, COLLECTIONS.STORIES, [
+            Query.equal('moderationStatus', 'visible'),
+            Query.orderDesc('reactionsCount'),
+            Query.limit(limit),
+        ]);
+    },
+
     async getStoryById(storyId: string) {
         return await databases.getDocument<Story>(DATABASE_ID, COLLECTIONS.STORIES, storyId);
     },

@@ -59,6 +59,15 @@ export const commentService = {
         return result.documents;
     },
 
+    // ➕ AJOUT : Récupération d'un commentaire unique par son ID
+    async getById(commentId: string): Promise<Comment> {
+        return await databases.getDocument<Comment>(
+            DATABASE_ID,
+            COLLECTIONS.COMMENTS,
+            commentId
+        );
+    },
+
     // Pas de collection dédiée aux likes pour l'instant (MVP) : on
     // incrémente directement. Limite connue : un utilisateur peut liker
     // plusieurs fois en rechargeant. À corriger via une collection

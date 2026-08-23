@@ -65,13 +65,9 @@ export const useComments = (storyId: string, storyCommentsCount: number, storyCo
             } catch { /* non bloquant */ }
 
             // Compteurs de réputation de l'auteur du commentaire.
-            reputationService.incrementCounter(user.$id, 'commentsCount').then(() => {
-                if (type === 'revelation') {
-                    reputationService.incrementCounter(user.$id, 'revelationsCount').then(() => refreshReputation(user.$id));
-                } else {
-                    refreshReputation(user.$id);
-                }
-            });
+            // Vos Appwrite Functions se chargent du recalcul et des badges en arrière-plan.
+// On rafraîchit simplement les stats côté client :
+refreshReputation(user.$id);
 
             // Notifications : réponse à un commentaire OU nouveau commentaire
             // sur l'histoire (pas les deux, pour éviter de spammer l'auteur

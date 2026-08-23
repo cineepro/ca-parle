@@ -18,6 +18,7 @@ export const useCreateStory = () => {
         type: StoryType;
         categoryId: string;
         isAnonymous: boolean;
+        referenceIds?: string[]; // 👈 Ajouté ici
     }) => {
         if (!user) {
             setError('Tu dois être connecté pour publier.');
@@ -37,8 +38,7 @@ export const useCreateStory = () => {
                 authorName: user.name,
             });
 
-            // Compteurs de réputation (best-effort, non bloquant pour la
-            // navigation même si ça échoue).
+            // Compteurs de réputation (best-effort)
             reputationService.incrementCounter(user.$id, 'storiesCount').then(() => {
                 if (data.type === 'revelation') {
                     reputationService.incrementCounter(user.$id, 'revelationsCount').then(() => refreshReputation(user.$id));
