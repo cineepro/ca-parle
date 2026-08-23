@@ -5,6 +5,7 @@ import { useReputation } from '@/features/reputation/hooks/useReputation';
 import { ReputationCard } from '@/features/reputation/components/ReputationCard';
 import { BadgeGrid } from '@/features/reputation/components/BadgeGrid';
 import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBanner';
+import { InviteButton } from '@/features/stories/components/InviteButton';
 
 export default function ProfilePage() {
     const { user } = useAuth();
@@ -27,12 +28,28 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                     <Link to="/accueil" className="text-gray-400 hover:text-gray-600">←</Link>
                     <h1 className="text-xl font-bold text-gray-800">Mon profil</h1>
+                    <span className="ml-auto"><InviteButton /></span>
                 </div>
 
                 <PhoneReminderBanner />
 
                 <ReputationCard stats={stats} name={user?.name} />
                 <BadgeGrid catalog={catalog} earnedKeys={earnedKeys} />
+
+                <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
+                    <Link to="/documentation" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        📖 Comment ça marche
+                        <span className="text-gray-300">›</span>
+                    </Link>
+                    <Link to="/privacy" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        🔒 Politique de confidentialité
+                        <span className="text-gray-300">›</span>
+                    </Link>
+                    <Link to="/terms" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        📄 Conditions d'utilisation
+                        <span className="text-gray-300">›</span>
+                    </Link>
+                </div>
             </div>
         </div>
     );

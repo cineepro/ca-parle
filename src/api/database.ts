@@ -1,12 +1,37 @@
 // src/api/database.ts — Ça Parle
 import { databases } from './appwrite';
-import { DATABASE_ID, COLLECTIONS } from './auth';
+import { DATABASE_ID, COLLECTIONS } from './constants';
+import { Query } from 'appwrite';
+import type { Models } from 'appwrite';
+
+// ➕ 1. AJOUT : Interface pour le type de document User
+export interface UserProfile extends Models.Document {
+    userId: string;
+    name: string;
+    email: string;
+    phone?: string;
+    avatarUrl?: string;
+    followers: number;
+    following: number;
+    isVerified: boolean;
+    isCreative: boolean;
+    balance: number;
+    bio?: string;
+    gossipLevel: number;
+    reputationScore: number;
+    reliabilityIndex: number;
+    storiesCount: number;
+    revelationsCount: number;
+    commentsCount: number;
+    predictionsCorrect: number;
+    predictionsTotal: number;
+    defaultAnonymous: boolean;
+    isModerator: boolean;
+    isBanned: boolean;
+    createdAt: string;
+}
 
 export const dbService = {
-    // Crée le document "users" — appelé uniquement après vérification
-    // d'email réussie (voir authService.login), exactement comme sur
-    // Kinema+. Le champ `phone` est optionnel : on ne le passe que s'il a
-    // été saisi au moment de l'inscription.
     async createUserProfile(data: {
         userId: string;
         name: string;
@@ -29,7 +54,6 @@ export const dbService = {
                 isVerified: false,
                 isCreative: false,
                 balance: 0,
-                // Champs Ça Parle
                 bio: '',
                 gossipLevel: 1,
                 reputationScore: 0,
@@ -48,12 +72,20 @@ export const dbService = {
     },
 
     async getUserProfile(userId: string) {
-        return await databases.getDocument(DATABASE_ID, COLLECTIONS.USERS, userId);
+        return await databases.getDocument<UserProfile>(DATABASE_ID, COLLECTIONS.USERS, userId);
     },
 
-    // Utilisé par la bannière de rappel pour les anciens comptes Kinema+
-    // qui n'ont pas encore renseigné leur numéro.
     async updateUserPhone(userId: string, phone: string): Promise<void> {
         await databases.updateDocument(DATABASE_ID, COLLECTIONS.USERS, userId, { phone });
+    },
+
+    // ✏️ 2. REMPLACEMENT : Méthode searchUsers typée
+    async searchUsers(query: string, excludeUserId?: string, limit = 10): Promise<UserProfile[]> {
+        if (!query.trim()) return [];
+        const result = await databases.listDocuments<UserProfile>(DATABASE_ID, COLLECTIONS.USERS, [
+            Query.search('name', query),
+            Query.limit(limit),
+        ]);
+        return result.documents.filter((u) => u.$id !== excludeUserId && !u.isBanned);
     },
 };

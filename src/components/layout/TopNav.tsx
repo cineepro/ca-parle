@@ -35,6 +35,12 @@ export const TopNav = () => {
                             {link.label}
                         </Link>
                     ))}
+                    <Link
+                        to="/publier"
+                        className="flex items-center gap-1.5 bg-[#FF4757] text-white px-3.5 py-1.5 rounded-full text-sm font-semibold hover:bg-[#e63e4d] transition-colors ml-1"
+                    >
+                        ✍️ Publier
+                    </Link>
                 </nav>
 
                 <div className="flex items-center gap-3">

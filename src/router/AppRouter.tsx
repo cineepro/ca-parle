@@ -17,6 +17,10 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import MessagesPage from '@/pages/MessagesPage';
 import ConversationPage from '@/pages/ConversationPage';
+import TermsPage from '@/pages/TermsPage';
+import PrivacyPage from '@/pages/PrivacyPage';
+import DocumentationPage from '@/pages/DocumentationPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
 export const AppRouter = () => {
     return (
@@ -27,6 +31,9 @@ export const AppRouter = () => {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/documentation" element={<DocumentationPage />} />
 
                 {/* Protégées */}
                 <Route
@@ -112,7 +119,7 @@ export const AppRouter = () => {
 
                 {/* Défaut */}
                 <Route path="/" element={<Navigate to="/accueil" replace />} />
-                <Route path="*" element={<Navigate to="/accueil" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>
     );
