@@ -10,4 +10,7 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
         },
     },
+    build: {
+        sourcemap: true, // Génère les sourcemaps pour lever le faux positif de minification
+    },
 });
