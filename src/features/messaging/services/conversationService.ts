@@ -19,12 +19,12 @@ function buildDirectKey(userIdA: string, userIdB: string): string {
 }
 
 export const conversationService = {
+    // Retrouve la conversation existante entre deux personnes via
+    // directKey, ou en crée une nouvelle. Les permissions du document sont
+    // posées ICI, à la création : seuls les deux participants pourront
+    // jamais lire ou modifier cette conversation, quoi que dise la
+    // permission de la collection.
     async findOrCreateDirect(userIdA: string, userIdB: string): Promise<Conversation> {
-        // 🛡️ Garde de sécurité : Empêche les appels avec des IDs invalides
-        if (!userIdA || !userIdB) {
-            throw new Error('Les identifiants des deux utilisateurs sont requis.');
-        }
-
         const directKey = buildDirectKey(userIdA, userIdB);
 
         const existing = await databases.listDocuments<Conversation>(DATABASE_ID, COLLECTIONS.CONVERSATIONS, [
@@ -33,10 +33,7 @@ export const conversationService = {
         ]);
         if (existing.documents.length > 0) return existing.documents[0];
 
-        // 🛡️ Nettoyage des IDs pour garantir des permissions valides
-        const validUserIds = [userIdA, userIdB].filter((id) => typeof id === 'string' && id.trim().length > 0);
-
-        const permissions = validUserIds.flatMap((id) => [
+        const permissions = [userIdA, userIdB].flatMap((id) => [
             Permission.read(Role.user(id)),
             Permission.update(Role.user(id)),
         ]);
@@ -58,10 +55,13 @@ export const conversationService = {
         );
     },
 
+    // Fonctionne même sans index dédié sur participantIds (Query.contains
+    // est la requête correcte pour "ce tableau contient cette valeur" sur
+    // un attribut array — Query.equal ne fonctionne PAS sur les attributs
+    // array et renvoie une erreur 400 côté Appwrite).
     async listForUser(userId: string): Promise<Conversation[]> {
-        if (!userId) return [];
         const result = await databases.listDocuments<Conversation>(DATABASE_ID, COLLECTIONS.CONVERSATIONS, [
-            Query.equal('participantIds', userId),
+            Query.contains('participantIds', userId),
             Query.orderDesc('lastMessageAt'),
             Query.limit(50),
         ]);
