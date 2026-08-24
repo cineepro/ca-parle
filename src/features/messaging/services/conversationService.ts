@@ -1,4 +1,4 @@
-// src/features/messaging/services/conversationService.ts — Ça Parle
+// src/features/messaging/services/conversationService.ts — Ça Parles
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query, Permission, Role } from 'appwrite';
