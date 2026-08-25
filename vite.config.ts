@@ -11,6 +11,6 @@ export default defineConfig({
         },
     },
     build: {
-        sourcemap: true, // Génère les sourcemaps pour lever le faux positif de minification
+        sourcemap: true,
     },
 });
