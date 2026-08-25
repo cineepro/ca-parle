@@ -5,7 +5,7 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Headers anti-cache Service Worker & index.html
+# Headers anti-cache Service Worker
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -18,10 +18,24 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     Content-Type = "application/javascript; charset=utf-8"
 
+# Non-cache par défaut sur TOUTES les routes. Nécessaire car /index.html
+# seul ne suffit pas : les visiteurs demandent /, /login, /accueil, etc.,
+# jamais littéralement /index.html — c'est la redirection SPA plus bas qui
+# sert son contenu pour ces chemins, et Netlify applique les règles de
+# cache sur le chemin DEMANDÉ, pas sur le chemin de destination.
 [[headers]]
-  for = "/index.html"
+  for = "/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Exception : fichiers sous /assets/, nommés avec un hash de leur contenu
+# (ex: index-B2RrHHP0.js) — leur contenu ne change jamais sans que leur nom
+# change aussi. Cache "pour toujours" sans risque, plus performant. Cette
+# règle plus spécifique prend le dessus sur la règle générale ci-dessus.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
 # 1. Redirection 301 stricte de kinemao.netlify.app vers le domaine propre kinemaplus.com
 [[redirects]]
