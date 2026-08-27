@@ -1,9 +1,10 @@
 // src/features/messaging/services/messageService.ts — Ça Parle
 import { databases, client } from '@/api/appwrite';
-import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
-import { ID, Query, Permission, Role } from 'appwrite';
+import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
+import { Query } from 'appwrite';
 import type { Models } from 'appwrite';
-import { conversationService, type Conversation } from './conversationService';
+import { callFunction } from '@/api/functionsClient';
+import type { Conversation } from './conversationService';
 
 export interface Message extends Models.Document {
     conversationId: string;
@@ -14,50 +15,16 @@ export interface Message extends Models.Document {
 }
 
 export const messageService = {
-    // Permissions posées à la création : lecture pour tous les participants
-    // de la conversation, modification réservée à l'expéditeur (utile plus
-    // tard pour éditer/supprimer son propre message).
-    async send(conversation: Conversation, senderId: string, content: string): Promise<Message> {
-        const permissions = [
-            ...conversation.participantIds.map((id) => Permission.read(Role.user(id))),
-            Permission.update(Role.user(senderId)),
-        ];
-
-        const message = await databases.createDocument<Message>(
-            DATABASE_ID,
-            COLLECTIONS.MESSAGES,
-            ID.unique(),
-            {
-                conversationId: conversation.$id,
-                senderId,
-                content,
-                readBy: [senderId],
-                createdAt: new Date().toISOString(),
-            },
-            permissions
-        );
-
-        await conversationService.updateLastMessage(conversation.$id, content, senderId);
-
-        // Notifie l'autre (ou les autres, si groupe un jour) participant(s).
-        try {
-            const { notificationService } = await import('@/features/notifications/services/notificationService');
-            const preview = content.length > 60 ? `${content.slice(0, 60)}…` : content;
-            await Promise.allSettled(
-                conversation.participantIds
-                    .filter((id) => id !== senderId)
-                    .map((id) =>
-                        notificationService.create({
-                            userId: id,
-                            title: '💬 Nouveau message',
-                            message: preview,
-                            url: `/messages/${conversation.$id}`,
-                        })
-                    )
-            );
-        } catch { /* non bloquant */ }
-
-        return message;
+    // Délégué à la Function serveur `send-message` : le message doit être
+    // lisible par TOUS les participants de la conversation, pas seulement
+    // par l'expéditeur — même contrainte de permissions que pour
+    // start-conversation, impossible à poser depuis le client.
+    async send(conversation: Conversation, _senderId: string, content: string): Promise<Message> {
+        const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
+            conversationId: conversation.$id,
+            content,
+        });
+        return result.message;
     },
 
     async getByConversation(conversationId: string, limit = 100): Promise<Message[]> {
