@@ -21,6 +21,7 @@ import TermsPage from '@/pages/TermsPage';
 import PrivacyPage from '@/pages/PrivacyPage';
 import DocumentationPage from '@/pages/DocumentationPage';
 import NotFoundPage from '@/pages/NotFoundPage';
+import UnsubscribePage from '@/pages/UnsubscribePage';
 
 export const AppRouter = () => {
     return (
@@ -34,6 +35,7 @@ export const AppRouter = () => {
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/documentation" element={<DocumentationPage />} />
+                <Route path="/unsubscribe" element={<UnsubscribePage />} />
 
                 {/* Protégées */}
                 <Route
