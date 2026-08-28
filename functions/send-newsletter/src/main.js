@@ -46,6 +46,13 @@ export default async ({ req, res, log, error }) => {
         }
     }
 
+    // Version texte brut à partir du HTML — un email sans alternative texte
+    // (HTML only) est lui-même un signal négatif pour beaucoup de filtres
+    // anti-spam.
+    function stripHtml(html) {
+        return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    }
+
     try {
         const callerUser = await databases.getDocument(DATABASE_ID, COLLECTION_USERS, callerId);
         if (!callerUser.isModerator) {
@@ -76,6 +83,7 @@ export default async ({ req, res, log, error }) => {
             if (!callerEmail) {
                 return res.json({ success: false, error: "Impossible de trouver un email pour ton compte, même via Appwrite Auth." }, 400);
             }
+            const link = unsubscribeLink(callerId);
             await resend.emails.send({
                 from: FROM_EMAIL,
                 to: callerEmail,
@@ -84,8 +92,13 @@ export default async ({ req, res, log, error }) => {
                     <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
                     <p style="font-size:12px;color:#999;">
                         Ceci est un email de test — seul toi le reçois.
-                        <a href="${unsubscribeLink(callerId)}">Se désabonner</a>
+                        <a href="${link}">Se désabonner</a>
                     </p>`,
+                text: `${stripHtml(htmlBody)}\n\nSe désabonner : ${link}`,
+                headers: {
+                    'List-Unsubscribe': `<${link}>`,
+                    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                },
             });
             return res.json({ success: true, sent: 1, failed: 0, total: 1, testOnly: true });
         }
@@ -124,17 +137,25 @@ export default async ({ req, res, log, error }) => {
 
         for (let i = 0; i < validRecipients.length; i += BATCH_SIZE) {
             const batch = validRecipients.slice(i, i + BATCH_SIZE);
-            const emails = batch.map((r) => ({
-                from: FROM_EMAIL,
-                to: r.email,
-                subject,
-                html: `${htmlBody}
-                    <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
-                    <p style="font-size:12px;color:#999;">
-                        Tu reçois cet email car tu es inscrit(e) sur Ça Parle.
-                        <a href="${unsubscribeLink(r.id)}">Se désabonner</a>
-                    </p>`,
-            }));
+            const emails = batch.map((r) => {
+                const link = unsubscribeLink(r.id);
+                return {
+                    from: FROM_EMAIL,
+                    to: r.email,
+                    subject,
+                    html: `${htmlBody}
+                        <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
+                        <p style="font-size:12px;color:#999;">
+                            Tu reçois cet email car tu es inscrit(e) sur Ça Parle.
+                            <a href="${link}">Se désabonner</a>
+                        </p>`,
+                    text: `${stripHtml(htmlBody)}\n\nSe désabonner : ${link}`,
+                    headers: {
+                        'List-Unsubscribe': `<${link}>`,
+                        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                    },
+                };
+            });
 
             try {
                 await resend.batch.send(emails);
