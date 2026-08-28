@@ -6,31 +6,45 @@ import { Button } from '@/components/ui/button';
 export const NewsletterComposer = () => {
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
-    const [sending, setSending] = useState(false);
-    const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
+    const [sendingTest, setSendingTest] = useState(false);
+    const [sendingAll, setSendingAll] = useState(false);
+    const [result, setResult] = useState<{ sent: number; failed: number; total: number; testOnly?: boolean } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
 
-    const handleSend = async () => {
-        setSending(true);
+    const buildHtml = () =>
+        body
+            .split('\n')
+            .map((line) => `<p>${line}</p>`)
+            .join('');
+
+    const handleTest = async () => {
+        setSendingTest(true);
         setError(null);
         setResult(null);
         try {
-            // Le contenu est envoyé tel quel comme HTML (retours à la ligne
-            // convertis en <br> pour un rendu simple sans avoir à écrire
-            // du HTML à la main).
-            const html = body
-                .split('\n')
-                .map((line) => `<p>${line}</p>`)
-                .join('');
-            const res = await newsletterService.send(subject, html);
+            const res = await newsletterService.send(subject, buildHtml(), true);
+            setResult(res);
+        } catch (err: any) {
+            setError(err.message || "Échec de l'envoi du test.");
+        } finally {
+            setSendingTest(false);
+        }
+    };
+
+    const handleSendAll = async () => {
+        setSendingAll(true);
+        setError(null);
+        setResult(null);
+        try {
+            const res = await newsletterService.send(subject, buildHtml(), false);
             setResult(res);
             setSubject('');
             setBody('');
         } catch (err: any) {
             setError(err.message || "Échec de l'envoi.");
         } finally {
-            setSending(false);
+            setSendingAll(false);
             setConfirmOpen(false);
         }
     };
@@ -59,25 +73,41 @@ export const NewsletterComposer = () => {
 
             {result && (
                 <p className="text-sm text-green-600">
-                    ✅ Envoyé à {result.sent} personnes sur {result.total} ({result.failed} échec{result.failed !== 1 ? 's' : ''}).
+                    {result.testOnly
+                        ? '✅ Email de test envoyé — vérifie ta boîte mail.'
+                        : `✅ Envoyé à ${result.sent} personnes sur ${result.total} (${result.failed} échec${result.failed !== 1 ? 's' : ''}).`}
                 </p>
             )}
 
-            {!confirmOpen ? (
+            <div className="flex flex-wrap gap-2">
                 <Button
-                    onClick={() => setConfirmOpen(true)}
+                    onClick={handleTest}
+                    isLoading={sendingTest}
+                    variant="secondary"
                     disabled={!subject.trim() || !body.trim()}
                 >
-                    Envoyer à tous les utilisateurs
+                    🧪 M'envoyer un test
                 </Button>
-            ) : (
+
+                {!confirmOpen ? (
+                    <Button
+                        onClick={() => setConfirmOpen(true)}
+                        disabled={!subject.trim() || !body.trim()}
+                    >
+                        Envoyer à tous les utilisateurs
+                    </Button>
+                ) : null}
+            </div>
+
+            {confirmOpen && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
                     <p className="text-sm text-amber-800">
                         Confirmer l'envoi à <strong>tous</strong> les utilisateurs abonnés ? Cette action est irréversible.
+                        Pense à faire d'abord "M'envoyer un test" si ce n'est pas déjà fait.
                     </p>
                     <div className="flex gap-2">
-                        <Button onClick={handleSend} isLoading={sending} variant="danger">
-                            Oui, envoyer
+                        <Button onClick={handleSendAll} isLoading={sendingAll} variant="danger">
+                            Oui, envoyer à tous
                         </Button>
                         <Button onClick={() => setConfirmOpen(false)} variant="secondary">
                             Annuler

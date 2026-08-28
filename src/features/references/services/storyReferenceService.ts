@@ -23,6 +23,7 @@ export const storyReferenceService = {
 
         await databases.createDocument(DATABASE_ID, COLLECTIONS.STORY_REFERENCES, ID.unique(), {
             storyId, referenceId,
+            createdAt: new Date().toISOString(),
         });
         await referenceService.incrementStoriesCount(referenceId);
     },

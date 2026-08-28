@@ -3,8 +3,8 @@ import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
 
 export const newsletterService = {
-    async send(subject: string, htmlBody: string): Promise<{ sent: number; failed: number; total: number }> {
-        return await callFunction(FUNCTIONS.SEND_NEWSLETTER, { subject, htmlBody });
+    async send(subject: string, htmlBody: string, testOnly = false): Promise<{ sent: number; failed: number; total: number; testOnly?: boolean }> {
+        return await callFunction(FUNCTIONS.SEND_NEWSLETTER, { subject, htmlBody, testOnly });
     },
 
     async unsubscribe(userId: string, token: string): Promise<void> {

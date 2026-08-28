@@ -36,12 +36,41 @@ export default async ({ req, res, log, error }) => {
         }
 
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { subject, htmlBody } = body;
+        const { subject, htmlBody, testOnly } = body;
         if (!subject || !htmlBody) {
             return res.json({ success: false, error: 'subject et htmlBody requis.' }, 400);
         }
 
         const resend = new Resend(RESEND_API_KEY);
+
+        // Génère un lien de désabonnement signé pour chaque destinataire
+        // (protège contre le désabonnement forcé d'un tiers au hasard).
+        function unsubscribeLink(userId) {
+            const token = crypto.createHmac('sha256', UNSUB_SECRET).update(userId).digest('hex');
+            return `${APP_URL}/unsubscribe?userId=${userId}&token=${token}`;
+        }
+
+        // Mode test : envoie UNIQUEMENT à l'appelant lui-même, quel que soit
+        // le nombre réel d'utilisateurs. Permet de vérifier le rendu et le
+        // lien de désabonnement sans jamais risquer un envoi accidentel à
+        // toute la liste pendant qu'on teste.
+        if (testOnly) {
+            if (!callerUser.email) {
+                return res.json({ success: false, error: "Ton profil n'a pas d'email enregistré." }, 400);
+            }
+            await resend.emails.send({
+                from: FROM_EMAIL,
+                to: callerUser.email,
+                subject: `[TEST] ${subject}`,
+                html: `${htmlBody}
+                    <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
+                    <p style="font-size:12px;color:#999;">
+                        Ceci est un email de test — seul toi le reçois.
+                        <a href="${unsubscribeLink(callerId)}">Se désabonner</a>
+                    </p>`,
+            });
+            return res.json({ success: true, sent: 1, failed: 0, total: 1, testOnly: true });
+        }
 
         // Récupère tous les utilisateurs non désabonnés (pagination).
         const recipients = [];
@@ -57,13 +86,6 @@ export default async ({ req, res, log, error }) => {
             recipients.push(...result.documents);
             offset += pageSize;
             hasMore = result.documents.length === pageSize;
-        }
-
-        // Génère un lien de désabonnement signé pour chaque destinataire
-        // (protège contre le désabonnement forcé d'un tiers au hasard).
-        function unsubscribeLink(userId) {
-            const token = crypto.createHmac('sha256', UNSUB_SECRET).update(userId).digest('hex');
-            return `${APP_URL}/unsubscribe?userId=${userId}&token=${token}`;
         }
 
         // Resend accepte jusqu'à 100 emails par appel batch.

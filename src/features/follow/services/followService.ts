@@ -28,6 +28,7 @@ export const followService = {
         if (existing) return;
         await databases.createDocument(DATABASE_ID, COLLECTIONS.FOLLOWS, ID.unique(), {
             followerId, followingId, followingType,
+            createdAt: new Date().toISOString(),
         });
     },
 
