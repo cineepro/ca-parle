@@ -6,7 +6,7 @@
 // Envoie par lots de 100 (limite batch Resend) à tous les utilisateurs qui
 // n'ont pas désactivé la newsletter, avec un lien de désabonnement propre
 // à chacun.
-import { Client, Databases, Query } from 'node-appwrite';
+import { Client, Databases, Users, Query } from 'node-appwrite';
 import { Resend } from 'resend';
 import crypto from 'crypto';
 
@@ -22,12 +22,29 @@ export default async ({ req, res, log, error }) => {
         .setKey(process.env.APPWRITE_API_KEY);
 
     const databases = new Databases(client);
+    const users = new Users(client); // Source fiable des emails (Appwrite Auth),
+                                       // utilisée en repli quand le document
+                                       // `users` (base de données) n'a pas
+                                       // d'email synchronisé.
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     const FROM_EMAIL = process.env.FROM_EMAIL; // ex: "Ça Parle <news@news.kinemaplus.com>"
     const APP_URL = process.env.APP_URL; // ex: "https://kinemaplus.com"
     const UNSUB_SECRET = process.env.UNSUB_SECRET; // chaîne secrète, générée une fois
+
+    // Récupère l'email d'un utilisateur, avec repli sur Appwrite Auth si le
+    // document `users` n'a pas ce champ rempli (comptes anciens/mal
+    // synchronisés).
+    async function resolveEmail(userId, dbEmail) {
+        if (dbEmail) return dbEmail;
+        try {
+            const authUser = await users.get(userId);
+            return authUser.email || null;
+        } catch {
+            return null;
+        }
+    }
 
     try {
         const callerUser = await databases.getDocument(DATABASE_ID, COLLECTION_USERS, callerId);
@@ -55,12 +72,13 @@ export default async ({ req, res, log, error }) => {
         // lien de désabonnement sans jamais risquer un envoi accidentel à
         // toute la liste pendant qu'on teste.
         if (testOnly) {
-            if (!callerUser.email) {
-                return res.json({ success: false, error: "Ton profil n'a pas d'email enregistré." }, 400);
+            const callerEmail = await resolveEmail(callerId, callerUser.email);
+            if (!callerEmail) {
+                return res.json({ success: false, error: "Impossible de trouver un email pour ton compte, même via Appwrite Auth." }, 400);
             }
             await resend.emails.send({
                 from: FROM_EMAIL,
-                to: callerUser.email,
+                to: callerEmail,
                 subject: `[TEST] ${subject}`,
                 html: `${htmlBody}
                     <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
@@ -88,26 +106,35 @@ export default async ({ req, res, log, error }) => {
             hasMore = result.documents.length === pageSize;
         }
 
+        // Résout l'email de chaque destinataire, avec repli Auth pour ceux
+        // dont le document `users` n'a pas ce champ.
+        const resolved = await Promise.all(
+            recipients.map(async (u) => ({ id: u.$id, email: await resolveEmail(u.$id, u.email) }))
+        );
+        const missingEmailCount = resolved.filter((r) => !r.email).length;
+        if (missingEmailCount > 0) {
+            log(`${missingEmailCount} utilisateur(s) sans email trouvable (ni base, ni Auth) — exclus de l'envoi.`);
+        }
+
         // Resend accepte jusqu'à 100 emails par appel batch.
         const BATCH_SIZE = 100;
         let sent = 0;
         let failed = 0;
+        const validRecipients = resolved.filter((r) => !!r.email);
 
-        for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-            const batch = recipients.slice(i, i + BATCH_SIZE);
-            const emails = batch
-                .filter((u) => !!u.email)
-                .map((u) => ({
-                    from: FROM_EMAIL,
-                    to: u.email,
-                    subject,
-                    html: `${htmlBody}
-                        <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
-                        <p style="font-size:12px;color:#999;">
-                            Tu reçois cet email car tu es inscrit(e) sur Ça Parle.
-                            <a href="${unsubscribeLink(u.$id)}">Se désabonner</a>
-                        </p>`,
-                }));
+        for (let i = 0; i < validRecipients.length; i += BATCH_SIZE) {
+            const batch = validRecipients.slice(i, i + BATCH_SIZE);
+            const emails = batch.map((r) => ({
+                from: FROM_EMAIL,
+                to: r.email,
+                subject,
+                html: `${htmlBody}
+                    <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
+                    <p style="font-size:12px;color:#999;">
+                        Tu reçois cet email car tu es inscrit(e) sur Ça Parle.
+                        <a href="${unsubscribeLink(r.id)}">Se désabonner</a>
+                    </p>`,
+            }));
 
             try {
                 await resend.batch.send(emails);
@@ -118,7 +145,7 @@ export default async ({ req, res, log, error }) => {
             }
         }
 
-        return res.json({ success: true, sent, failed, total: recipients.length });
+        return res.json({ success: true, sent, failed, total: recipients.length, missingEmail: missingEmailCount });
     } catch (err) {
         error(err.message);
         return res.json({ success: false, error: err.message }, 500);
