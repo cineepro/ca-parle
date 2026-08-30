@@ -28,7 +28,12 @@ export const COLLECTIONS = {
     CATEGORIES: import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES || '',
     CONVERSATIONS: import.meta.env.VITE_APPWRITE_COLLECTION_CONVERSATIONS || '',
     MESSAGES: import.meta.env.VITE_APPWRITE_COLLECTION_MESSAGES || '',
+    VANESSA_KNOWLEDGE: import.meta.env.VITE_APPWRITE_COLLECTION_VANESSA_KNOWLEDGE || '',
 } as const;
+
+// Compte utilisateur de Vanessa (l'IA de Ça Parle) — un vrai compte
+// Appwrite Auth + document `users`, créé une fois via scripts/setupVanessa.mjs.
+export const VANESSA_USER_ID = import.meta.env.VITE_APPWRITE_VANESSA_USER_ID || '';
 
 // IDs des Appwrite Functions appelées depuis le client (celles déclenchées
 // par événement — on-story-created, on-comment-created, on-reaction-write
@@ -42,4 +47,5 @@ export const FUNCTIONS = {
     SEND_MESSAGE: import.meta.env.VITE_APPWRITE_FUNCTION_SEND_MESSAGE || '',
     SEND_NEWSLETTER: import.meta.env.VITE_APPWRITE_FUNCTION_SEND_NEWSLETTER || '',
     UNSUBSCRIBE_NEWSLETTER: import.meta.env.VITE_APPWRITE_FUNCTION_UNSUBSCRIBE_NEWSLETTER || '',
+    MANAGE_VANESSA_KNOWLEDGE: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_VANESSA_KNOWLEDGE || '',
 } as const;

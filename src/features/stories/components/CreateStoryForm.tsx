@@ -1,5 +1,6 @@
 // src/features/stories/components/CreateStoryForm.tsx — Ça Parle
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useCreateStory } from '../hooks/useCreateStory';
 import { CATEGORIES } from '@/config/categories';
 import type { StoryType } from '../services/storyService';
@@ -16,8 +17,11 @@ const TYPE_OPTIONS: { value: StoryType; label: string; icon: string }[] = [
 
 export const CreateStoryForm = () => {
     const { createStory, loading, error } = useCreateStory();
-    const [title, setTitle] = useState('');
-    const [content, setContent] = useState('');
+    // Pré-rempli automatiquement si on arrive depuis le bouton "Publier
+    // cette histoire" suggéré par Vanessa dans la messagerie.
+    const [searchParams] = useSearchParams();
+    const [title, setTitle] = useState(searchParams.get('title') || '');
+    const [content, setContent] = useState(searchParams.get('content') || '');
     const [type, setType] = useState<StoryType>('ragot');
     const [categoryId, setCategoryId] = useState(CATEGORIES[1]?.slug || 'people');
     const [isAnonymous, setIsAnonymous] = useState(false);

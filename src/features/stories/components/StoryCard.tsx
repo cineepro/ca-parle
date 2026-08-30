@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import type { Story } from '../services/storyService';
 import { StoryTypeBadge } from './StoryTypeBadge';
 import { StoryStatusBadge } from './StoryStatusBadge';
+import { ShareButton } from './ShareButton';
+import { VANESSA_USER_ID } from '@/api/constants';
 
 const timeAgo = (dateStr: string): string => {
     const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -33,7 +35,10 @@ export const StoryCard = ({ story }: { story: Story }) => {
 
             <div className="flex items-center justify-between text-xs text-gray-400">
                 <div className="flex items-center gap-3">
-                    <span>{story.isAnonymous ? '🕵️ Anonyme' : story.authorName || 'Utilisateur'}</span>
+                    <span>
+                        {story.isAnonymous ? '🕵️ Anonyme' : story.authorName || 'Utilisateur'}
+                        {story.authorId === VANESSA_USER_ID && <span className="ml-1 text-purple-500">🔮 IA</span>}
+                    </span>
                     <span>·</span>
                     <span>{timeAgo(story.$createdAt)}</span>
                 </div>
@@ -44,6 +49,9 @@ export const StoryCard = ({ story }: { story: Story }) => {
                 <span>👀 {story.viewCount}</span>
                 <span>🔥 {story.reactionsCount}</span>
                 <span>💬 {story.commentsCount}</span>
+                <span className="ml-auto">
+                    <ShareButton storyId={story.$id} title={story.title} />
+                </span>
             </div>
         </Link>
     );

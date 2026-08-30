@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useModerationQueue } from '@/features/moderation/hooks/useModerationQueue';
 import { ModerationQueueItem } from '@/features/moderation/components/ModerationQueueItem';
 import { NewsletterComposer } from '@/features/newsletter/components/NewsletterComposer';
+import { VanessaKnowledgeManager } from '@/features/vanessa/components/VanessaKnowledgeManager';
 
 export default function ModerationPage() {
     const { items, loading, refresh } = useModerationQueue();
@@ -17,6 +18,7 @@ export default function ModerationPage() {
                 </div>
 
                 <NewsletterComposer />
+                <VanessaKnowledgeManager />
 
                 {loading ? (
                     <p className="text-sm text-gray-400 text-center py-8">Chargement...</p>

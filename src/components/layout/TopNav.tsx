@@ -2,6 +2,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
+import { VanessaButton } from '@/features/vanessa/components/VanessaButton';
 
 const DESKTOP_LINKS = [
     { to: '/accueil', icon: '🏠', label: 'Accueil' },
@@ -44,6 +45,7 @@ export const TopNav = () => {
                 </nav>
 
                 <div className="flex items-center gap-3">
+                    <VanessaButton />
                     <NotificationBell />
 
                     {/* Profil + modération + déconnexion, desktop uniquement
