@@ -93,8 +93,10 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
 export default async ({ req, res, log, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
     if (!callerId) {
+        log('❌ Pas de x-appwrite-user-id — appelant non authentifié.');
         return res.json({ success: false, error: 'Authentification requise.' }, 401);
     }
+    log(`▶️ Appel par ${callerId}`);
 
     const client = new Client()
         .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
@@ -110,17 +112,34 @@ export default async ({ req, res, log, error }) => {
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+    // Vérifie tout de suite que les variables essentielles sont bien
+    // définies — cause n°1 des échecs après un changement de config.
+    const missingVars = [];
+    if (!DATABASE_ID) missingVars.push('DATABASE_ID');
+    if (!COLLECTION_CONVERSATIONS) missingVars.push('COLLECTION_CONVERSATIONS');
+    if (!COLLECTION_MESSAGES) missingVars.push('COLLECTION_MESSAGES');
+    if (!COLLECTION_NOTIFICATIONS) missingVars.push('COLLECTION_NOTIFICATIONS');
+    if (missingVars.length > 0) {
+        log(`❌ Variables d'environnement manquantes : ${missingVars.join(', ')}`);
+        return res.json({ success: false, error: `Configuration Function incomplète : ${missingVars.join(', ')}` }, 500);
+    }
+
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
         const { conversationId, content } = body;
+        log(`📩 conversationId=${conversationId} content.length=${content?.length}`);
 
         if (!conversationId || !content || !content.trim()) {
+            log('❌ conversationId ou content manquant/vide.');
             return res.json({ success: false, error: 'conversationId et content requis.' }, 400);
         }
 
+        log('🔍 Récupération de la conversation...');
         const conversation = await databases.getDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId);
+        log(`✅ Conversation trouvée, participants=${JSON.stringify(conversation.participantIds)}`);
 
         if (!conversation.participantIds.includes(callerId)) {
+            log(`❌ ${callerId} ne fait pas partie de participantIds.`);
             return res.json({ success: false, error: "Tu ne fais pas partie de cette conversation." }, 403);
         }
 
@@ -128,7 +147,9 @@ export default async ({ req, res, log, error }) => {
             ...conversation.participantIds.map((id) => Permission.read(Role.user(id))),
             Permission.update(Role.user(callerId)),
         ];
+        log(`🔐 Permissions calculées : ${JSON.stringify(permissions)}`);
 
+        log('✏️ Création du message...');
         const message = await databases.createDocument(
             DATABASE_ID,
             COLLECTION_MESSAGES,
@@ -142,12 +163,14 @@ export default async ({ req, res, log, error }) => {
             },
             permissions
         );
+        log(`✅ Message créé : ${message.$id}`);
 
         await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
             lastMessage: content.length > 200 ? content.slice(0, 200) : content,
             lastMessageAt: new Date().toISOString(),
             lastMessageSenderId: callerId,
         });
+        log('✅ Conversation mise à jour.');
 
         const preview = content.length > 60 ? `${content.slice(0, 60)}…` : content;
         await Promise.allSettled(
@@ -164,15 +187,18 @@ export default async ({ req, res, log, error }) => {
                     })
                 )
         );
+        log('✅ Notifications envoyées.');
 
         // Vanessa répond automatiquement si elle fait partie de la
         // conversation (et que ce n'est pas elle-même qui vient d'écrire).
         if (VANESSA_USER_ID && OPENAI_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
+            log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
             try {
                 const reply = await generateVanessaReply({
                     databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE,
                     OPENAI_API_KEY, VANESSA_USER_ID, conversationId,
                 });
+                log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
                 if (reply) {
                     await databases.createDocument(DATABASE_ID, COLLECTION_MESSAGES, ID.unique(), {
                         conversationId,
@@ -196,15 +222,20 @@ export default async ({ req, res, log, error }) => {
                         read: false,
                         createdAt: new Date().toISOString(),
                     });
+                    log('✅ Message de Vanessa créé et notification envoyée.');
                 }
             } catch (vanessaErr) {
-                log(`Réponse Vanessa échouée : ${vanessaErr.message}`);
+                log(`⚠️ Réponse Vanessa échouée (non bloquant) : ${vanessaErr.message}`);
                 // Non bloquant — le message humain reste envoyé normalement.
             }
+        } else {
+            log('ℹ️ Vanessa non concernée par cette conversation (ou variables manquantes).');
         }
 
+        log('✅ Terminé avec succès.');
         return res.json({ success: true, message });
     } catch (err) {
+        log(`❌ ERREUR NON GÉRÉE : ${err.message}`);
         error(err.message);
         return res.json({ success: false, error: err.message }, 500);
     }
