@@ -62,32 +62,32 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
-    const messages = [
-        { role: 'system', content: VANESSA_SYSTEM_PROMPT + knowledgeContext },
-        ...orderedHistory.map((m) => ({
-            role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
-            content: m.content,
-        })),
-    ];
+        const messages = orderedHistory.map((m) => ({
+        role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
+        content: m.content,
+    }));
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            'x-api-key': OPENAI_API_KEY,
+            'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'gpt-5.6-luna',
+            model: 'claude-haiku-4-5-20251001',
+            system: VANESSA_SYSTEM_PROMPT + knowledgeContext,
             messages,
+            max_tokens: 300,
             temperature: 0.9,
         }),
     });
 
     if (!response.ok) {
-        throw new Error(`OpenAI a répondu ${response.status}`);
+        throw new Error(`Claude a répondu ${response.status}`);
     }
     const data = await response.json();
-    return data.choices?.[0]?.message?.content?.trim() || null;
+    return data.content?.[0]?.text?.trim() || null;
 }
 
 export default async ({ req, res, log, error }) => {
@@ -110,7 +110,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = process.env.ANTHROPIC_API_KEY;
 
     // Vérifie tout de suite que les variables essentielles sont bien
     // définies — cause n°1 des échecs après un changement de config.

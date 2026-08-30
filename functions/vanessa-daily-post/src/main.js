@@ -31,7 +31,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_STORIES = process.env.COLLECTION_STORIES;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const OPENAI_API_KEY = process.env.ANTHROPIC_API_KEY;
 
     try {
         // Contexte public uniquement : histoires les plus réagies, visibles
@@ -58,22 +58,25 @@ export default async ({ req, res, log, error }) => {
             ? `Ce qui buzz en ce moment sur la plateforme : ${trendingTitles.join(' / ')}`
             : "Rien de spécial ne buzz aujourd'hui, improvise sur l'ambiance générale.";
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': OPENAI_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
             body: JSON.stringify({
-                model: 'gpt-5.6-luna',
-                messages: [
-                    { role: 'system', content: VANESSA_SYSTEM_PROMPT + knowledgeContext },
-                    { role: 'user', content: userContext },
-                ],
+                model: 'claude-haiku-4-5-20251001',
+                system: VANESSA_SYSTEM_PROMPT + knowledgeContext,
+                messages: [{ role: 'user', content: userContext }],
+                max_tokens: 300,
                 temperature: 0.95,
             }),
         });
 
-        if (!response.ok) throw new Error(`OpenAI a répondu ${response.status}`);
+        if (!response.ok) throw new Error(`Claude a répondu ${response.status}`);
         const data = await response.json();
-        const raw = data.choices?.[0]?.message?.content?.trim() || '{}';
+        const raw = data.content?.[0]?.text?.trim() || '{}';
 
         let parsed;
         try {

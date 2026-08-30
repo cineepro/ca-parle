@@ -36,25 +36,19 @@ export const messageService = {
         return result.documents;
     },
 
-    // ⚠️ TEST DE DIAGNOSTIC TEMPORAIRE — désactivé pour isoler si la
-    // connexion WebSocket Realtime est ce qui déclenche le flag "Suspicious
-    // Javascript code" d'urlquery. Le reste de la messagerie (lecture,
-    // envoi) continue de fonctionner normalement ; seule la mise à jour
-    // instantanée des messages est temporairement coupée (il faudra
-    // rafraîchir la page pour voir un nouveau message). À RÉTABLIR une fois
-    // le test conclusif — voir le code original en commentaire ci-dessous.
-    subscribeToConversation(_conversationId: string, _onMessage: (message: Message) => void): () => void {
-        return () => {};
-        /* ORIGINAL — à restaurer après le test :
+    // Abonnement Appwrite Realtime : contrairement aux notifications
+    // (polling 30s, suffisant pour un badge), un fil de discussion a
+    // vraiment besoin d'être instantané. Retourne une fonction de
+    // désabonnement à appeler au démontage du composant.
+    subscribeToConversation(conversationId: string, onMessage: (message: Message) => void): () => void {
         const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.MESSAGES}.documents`;
         return client.subscribe(channel, (response: any) => {
             const isCreate = response.events?.some((e: string) => e.endsWith('.create'));
             if (!isCreate) return;
             const payload = response.payload as Message;
-            if (payload.conversationId === _conversationId) {
-                _onMessage(payload);
+            if (payload.conversationId === conversationId) {
+                onMessage(payload);
             }
         });
-        */
     },
 };

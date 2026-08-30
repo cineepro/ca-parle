@@ -61,9 +61,16 @@ export const useConversationThread = (conversationId: string) => {
         if (!user || !conversation || !content.trim() || sending) return;
         setSending(true);
         try {
-            await messageService.send(conversation, user.$id, content.trim());
-            // Le message envoyé revient via la souscription temps réel —
-            // pas besoin de l'ajouter manuellement (évite les doublons).
+            const sentMessage = await messageService.send(conversation, user.$id, content.trim());
+            // Affichage optimiste immédiat de ton propre message — on
+            // n'attend plus la souscription temps réel pour le voir
+            // apparaître, ce qui évite l'effet "il faut recharger pour se
+            // voir". Son ID est marqué comme "déjà vu" pour éviter un
+            // doublon si l'événement Realtime arrive quand même ensuite.
+            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
+                seenIds.current.add(sentMessage.$id);
+                setMessages((prev) => [...prev, sentMessage]);
+            }
         } catch {
             setError("Impossible d'envoyer le message, réessaie.");
         } finally {
