@@ -9,12 +9,45 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
-    const { otherName, messages, loading, sending, error, sendMessage } = useConversationThread(id!);
+    const {
+        otherName, messages, loading, sending, error, sendMessage,
+        loadingOlder, hasMoreOlder, loadOlder,
+    } = useConversationThread(id!);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const lastMessageIdRef = useRef<string | null>(null);
+    const prevScrollHeightRef = useRef<number>(0);
+
+    // Défilement automatique vers le bas UNIQUEMENT quand un nouveau
+    // message arrive à la FIN (envoi, réponse, temps réel) — jamais quand
+    // on charge d'anciens messages en haut (loadOlder), sinon l'utilisateur
+    // se retrouverait renvoyé tout en bas alors qu'il consulte l'historique.
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        const lastId = lastMessage?.$id || null;
+        if (lastId && lastId !== lastMessageIdRef.current) {
+            lastMessageIdRef.current = lastId;
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages]);
+
+    // Conserve la position de lecture quand on charge d'anciens messages :
+    // sans ça, ajouter du contenu en haut du conteneur ferait "sauter"
+    // visuellement tout ce qu'on est en train de lire vers le bas.
+    const handleLoadOlder = async () => {
+        if (scrollContainerRef.current) {
+            prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+        }
+        await loadOlder();
+    };
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages.length]);
+        if (prevScrollHeightRef.current && scrollContainerRef.current) {
+            const newHeight = scrollContainerRef.current.scrollHeight;
+            scrollContainerRef.current.scrollTop = newHeight - prevScrollHeightRef.current;
+            prevScrollHeightRef.current = 0;
+        }
+    }, [messages]);
 
     if (loading) {
         return (
@@ -46,7 +79,19 @@ export default function ConversationPage() {
                 <p className="text-sm font-semibold text-gray-800">{otherName}</p>
             </div>
 
-            <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+            <div ref={scrollContainerRef} className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                {hasMoreOlder && (
+                    <div className="flex justify-center pb-2">
+                        <button
+                            onClick={handleLoadOlder}
+                            disabled={loadingOlder}
+                            className="text-xs text-[#FF4757] font-medium bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-4 py-1.5 disabled:opacity-50"
+                        >
+                            {loadingOlder ? 'Chargement...' : '↑ Charger les messages précédents'}
+                        </button>
+                    </div>
+                )}
+
                 {messages.length === 0 ? (
                     <p className="text-sm text-gray-400 text-center py-10">
                         Aucun message. Dis bonjour 👋

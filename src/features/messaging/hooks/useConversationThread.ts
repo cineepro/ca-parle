@@ -5,12 +5,16 @@ import { conversationService, type Conversation } from '../services/conversation
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { dbService } from '@/api/database';
 
+const PAGE_SIZE = 30;
+
 export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [otherName, setOtherName] = useState('Utilisateur');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingOlder, setLoadingOlder] = useState(false);
+    const [hasMoreOlder, setHasMoreOlder] = useState(false);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const seenIds = useRef(new Set<string>());
@@ -20,13 +24,20 @@ export const useConversationThread = (conversationId: string) => {
         setLoading(true);
         setError(null);
         try {
+            // Ne charge que les PAGE_SIZE messages les plus récents au
+            // départ — pas tout l'historique d'un coup (coûteux et inutile
+            // sur une longue conversation). Les plus anciens se chargent
+            // uniquement à la demande, via loadOlder().
             const [conv, msgs] = await Promise.all([
                 conversationService.getById(conversationId),
-                messageService.getByConversation(conversationId),
+                messageService.getRecentMessages(conversationId, PAGE_SIZE),
             ]);
             setConversation(conv);
             setMessages(msgs);
             seenIds.current = new Set(msgs.map((m) => m.$id));
+            // S'il y a exactement PAGE_SIZE messages chargés, il y en a
+            // probablement d'autres plus vieux à charger.
+            setHasMoreOlder(msgs.length === PAGE_SIZE);
 
             const otherId = conversationService.getOtherParticipantId(conv, user.$id);
             if (otherId) {
@@ -46,6 +57,25 @@ export const useConversationThread = (conversationId: string) => {
         load();
     }, [load]);
 
+    // Charge le lot de messages précédents (plus anciens), à la demande de
+    // l'utilisateur uniquement — jamais automatique. Les nouveaux messages
+    // sont ajoutés en TÊTE de liste (avant les messages déjà affichés).
+    const loadOlder = useCallback(async () => {
+        if (loadingOlder || !hasMoreOlder || messages.length === 0) return;
+        setLoadingOlder(true);
+        try {
+            const oldestId = messages[0].$id;
+            const older = await messageService.getOlderMessages(conversationId, oldestId, PAGE_SIZE);
+            older.forEach((m) => seenIds.current.add(m.$id));
+            setMessages((prev) => [...older, ...prev]);
+            setHasMoreOlder(older.length === PAGE_SIZE);
+        } catch {
+            // Non bloquant — l'utilisateur peut réessayer.
+        } finally {
+            setLoadingOlder(false);
+        }
+    }, [conversationId, messages, loadingOlder, hasMoreOlder]);
+
     // Abonnement temps réel : tant que le composant est monté, tout nouveau
     // message de cette conversation apparaît immédiatement, sans recharger.
     useEffect(() => {
@@ -64,8 +94,7 @@ export const useConversationThread = (conversationId: string) => {
             const sentMessage = await messageService.send(conversation, user.$id, content.trim());
             // Affichage optimiste immédiat de ton propre message — on
             // n'attend plus la souscription temps réel pour le voir
-            // apparaître, ce qui évite l'effet "il faut recharger pour se
-            // voir". Son ID est marqué comme "déjà vu" pour éviter un
+            // apparaître. Son ID est marqué comme "déjà vu" pour éviter un
             // doublon si l'événement Realtime arrive quand même ensuite.
             if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
                 seenIds.current.add(sentMessage.$id);
@@ -78,5 +107,8 @@ export const useConversationThread = (conversationId: string) => {
         }
     };
 
-    return { conversation, otherName, messages, loading, sending, error, sendMessage };
+    return {
+        conversation, otherName, messages, loading, sending, error, sendMessage,
+        loadingOlder, hasMoreOlder, loadOlder,
+    };
 };

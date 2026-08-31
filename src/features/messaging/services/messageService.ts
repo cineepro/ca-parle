@@ -27,6 +27,35 @@ export const messageService = {
         return result.message;
     },
 
+    // Charge les messages les plus RÉCENTS d'une conversation (comme
+    // WhatsApp/Messenger : on n'affiche pas tout l'historique d'un coup).
+    // Retourne dans l'ordre chronologique (plus ancien → plus récent) pour
+    // l'affichage, même si la requête interne trie par date décroissante.
+    async getRecentMessages(conversationId: string, limit = 30): Promise<Message[]> {
+        const result = await databases.listDocuments<Message>(DATABASE_ID, COLLECTIONS.MESSAGES, [
+            Query.equal('conversationId', conversationId),
+            Query.orderDesc('createdAt'),
+            Query.limit(limit),
+        ]);
+        return result.documents.reverse();
+    },
+
+    // Charge le lot de messages plus anciens que `beforeMessageId` (le plus
+    // ancien actuellement affiché à l'écran). Utilisé par le bouton
+    // "Charger les messages précédents" — jamais automatique, à la charge
+    // de l'utilisateur, exactement comme demandé.
+    async getOlderMessages(conversationId: string, beforeMessageId: string, limit = 30): Promise<Message[]> {
+        const result = await databases.listDocuments<Message>(DATABASE_ID, COLLECTIONS.MESSAGES, [
+            Query.equal('conversationId', conversationId),
+            Query.orderDesc('createdAt'),
+            Query.cursorAfter(beforeMessageId),
+            Query.limit(limit),
+        ]);
+        return result.documents.reverse();
+    },
+
+    // Conservé pour compatibilité (utilisé nulle part d'autre pour
+    // l'instant, mais évite de casser un appel existant).
     async getByConversation(conversationId: string, limit = 100): Promise<Message[]> {
         const result = await databases.listDocuments<Message>(DATABASE_ID, COLLECTIONS.MESSAGES, [
             Query.equal('conversationId', conversationId),
