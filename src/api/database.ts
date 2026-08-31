@@ -1,4 +1,4 @@
-// src/api/database.ts — Ça Parle
+// src/api/database.ts — Ça Parle (vraie)
 import { databases } from './appwrite';
 import { DATABASE_ID, COLLECTIONS } from './constants';
 import { Query } from 'appwrite';
@@ -28,6 +28,8 @@ export interface UserProfile extends Models.Document {
     defaultAnonymous: boolean;
     isModerator: boolean;
     isBanned: boolean;
+    // ➕ AJOUT : préférence de désabonnement à la newsletter
+    newsletterOptOut?: boolean;
     createdAt: string;
 }
 
@@ -66,6 +68,8 @@ export const dbService = {
                 defaultAnonymous: false,
                 isModerator: false,
                 isBanned: false,
+                // ➕ AJOUT : tout nouveau compte est abonné par défaut
+                newsletterOptOut: false,
                 createdAt: data.createdAt,
             }
         );

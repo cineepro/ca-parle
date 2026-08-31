@@ -106,11 +106,15 @@ export default async ({ req, res, log, error }) => {
         // Détermine la liste des destinataires :
         //   - si `recipientIds` est fourni (sélection manuelle depuis le
         //     nouveau sélecteur), on ne cible QUE ces utilisateurs-là ;
-        //   - sinon (comportement historique), tous les utilisateurs non
-        //     désabonnés.
-        // Dans les deux cas, on respecte toujours newsletterOptOut — même
-        // une sélection manuelle ne doit jamais recontacter quelqu'un qui
-        // s'est désabonné.
+        //   - sinon (comportement historique), tous les utilisateurs.
+        // Le filtre "non désabonné" est appliqué APRÈS coup, en JS, plutôt
+        // que dans la requête Appwrite (Query.notEqual) : les documents
+        // `users` créés avant l'ajout de l'attribut `newsletterOptOut` ne
+        // l'ont pas du tout (Appwrite ne rétro-remplit pas les documents
+        // existants avec la valeur par défaut d'un nouvel attribut), et
+        // Query.notEqual exclut silencieusement ces documents au lieu de
+        // les traiter comme "non désabonné". On considère donc "absent"
+        // ou "false" comme non désabonné — seul `true` exclut vraiment.
         let recipients = [];
 
         if (Array.isArray(recipientIds) && recipientIds.length > 0) {
@@ -123,24 +127,23 @@ export default async ({ req, res, log, error }) => {
                 chunks.map((chunk) =>
                     databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
                         Query.equal('$id', chunk),
-                        Query.notEqual('newsletterOptOut', true),
                         Query.limit(100),
                     ])
                 )
             );
-            recipients = results.flatMap((r) => r.documents);
+            recipients = results.flatMap((r) => r.documents).filter((u) => u.newsletterOptOut !== true);
         } else {
-            // Récupère tous les utilisateurs non désabonnés (pagination).
+            // Récupère tous les utilisateurs (pagination), filtre les
+            // désabonnés après coup.
             let offset = 0;
             const pageSize = 100;
             let hasMore = true;
             while (hasMore) {
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
-                    Query.notEqual('newsletterOptOut', true),
                     Query.limit(pageSize),
                     Query.offset(offset),
                 ]);
-                recipients.push(...result.documents);
+                recipients.push(...result.documents.filter((u) => u.newsletterOptOut !== true));
                 offset += pageSize;
                 hasMore = result.documents.length === pageSize;
             }
