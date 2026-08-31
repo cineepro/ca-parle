@@ -60,7 +60,7 @@ export default async ({ req, res, log, error }) => {
         }
 
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { subject, htmlBody, testOnly } = body;
+        const { subject, htmlBody, testOnly, recipientIds } = body;
         if (!subject || !htmlBody) {
             return res.json({ success: false, error: 'subject et htmlBody requis.' }, 400);
         }
@@ -103,20 +103,47 @@ export default async ({ req, res, log, error }) => {
             return res.json({ success: true, sent: 1, failed: 0, total: 1, testOnly: true });
         }
 
-        // Récupère tous les utilisateurs non désabonnés (pagination).
-        const recipients = [];
-        let offset = 0;
-        const pageSize = 100;
-        let hasMore = true;
-        while (hasMore) {
-            const result = await databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
-                Query.notEqual('newsletterOptOut', true),
-                Query.limit(pageSize),
-                Query.offset(offset),
-            ]);
-            recipients.push(...result.documents);
-            offset += pageSize;
-            hasMore = result.documents.length === pageSize;
+        // Détermine la liste des destinataires :
+        //   - si `recipientIds` est fourni (sélection manuelle depuis le
+        //     nouveau sélecteur), on ne cible QUE ces utilisateurs-là ;
+        //   - sinon (comportement historique), tous les utilisateurs non
+        //     désabonnés.
+        // Dans les deux cas, on respecte toujours newsletterOptOut — même
+        // une sélection manuelle ne doit jamais recontacter quelqu'un qui
+        // s'est désabonné.
+        let recipients = [];
+
+        if (Array.isArray(recipientIds) && recipientIds.length > 0) {
+            // Appwrite limite Query.equal('$id', [...]) à 100 valeurs par requête.
+            const chunks = [];
+            for (let i = 0; i < recipientIds.length; i += 100) {
+                chunks.push(recipientIds.slice(i, i + 100));
+            }
+            const results = await Promise.all(
+                chunks.map((chunk) =>
+                    databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
+                        Query.equal('$id', chunk),
+                        Query.notEqual('newsletterOptOut', true),
+                        Query.limit(100),
+                    ])
+                )
+            );
+            recipients = results.flatMap((r) => r.documents);
+        } else {
+            // Récupère tous les utilisateurs non désabonnés (pagination).
+            let offset = 0;
+            const pageSize = 100;
+            let hasMore = true;
+            while (hasMore) {
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
+                    Query.notEqual('newsletterOptOut', true),
+                    Query.limit(pageSize),
+                    Query.offset(offset),
+                ]);
+                recipients.push(...result.documents);
+                offset += pageSize;
+                hasMore = result.documents.length === pageSize;
+            }
         }
 
         // Résout l'email de chaque destinataire, avec repli Auth pour ceux
