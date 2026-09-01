@@ -104,7 +104,7 @@ async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLA
     }
 }
 
-async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE, OPENAI_API_KEY, VANESSA_USER_ID, conversationId }) {
+async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE, ANTHROPIC_API_KEY, VANESSA_USER_ID, conversationId }) {
     // Historique de CETTE conversation uniquement (jamais d'autres).
     const history = await databases.listDocuments(DATABASE_ID, COLLECTION_MESSAGES, [
         Query.equal('conversationId', conversationId),
@@ -136,7 +136,7 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-api-key': OPENAI_API_KEY,
+            'x-api-key': ANTHROPIC_API_KEY,
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
@@ -176,7 +176,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // contient en réalité la clé Anthropic
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const BUCKET_VOICE_MESSAGES = process.env.BUCKET_VOICE_MESSAGES;
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
     const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
@@ -276,12 +276,12 @@ export default async ({ req, res, log, error }) => {
 
         // Vanessa répond automatiquement si elle fait partie de la
         // conversation (et que ce n'est pas elle-même qui vient d'écrire).
-        if (VANESSA_USER_ID && OPENAI_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
+        if (VANESSA_USER_ID && ANTHROPIC_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
             log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
             try {
                 const reply = await generateVanessaReply({
                     databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE,
-                    OPENAI_API_KEY, VANESSA_USER_ID, conversationId,
+                    ANTHROPIC_API_KEY, VANESSA_USER_ID, conversationId,
                 });
                 log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
                 if (reply) {
