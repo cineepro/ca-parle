@@ -2,6 +2,8 @@
 import { Link } from 'react-router-dom';
 import type { ConversationWithParticipant } from '../hooks/useConversations';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { conversationService } from '../services/conversationService';
+import { Avatar } from '@/components/ui/avatar';
 
 const timeAgo = (dateStr?: string): string => {
     if (!dateStr) return '';
@@ -17,15 +19,14 @@ const timeAgo = (dateStr?: string): string => {
 export const ConversationListItem = ({ conversation, otherName }: ConversationWithParticipant) => {
     const { user } = useAuth();
     const isLastFromMe = conversation.lastMessageSenderId === user?.$id;
+    const otherId = user ? conversationService.getOtherParticipantId(conversation, user.$id) : undefined;
 
     return (
         <Link
             to={`/messages/${conversation.$id}`}
             className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors"
         >
-            <div className="w-11 h-11 rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center font-bold shrink-0">
-                {otherName.charAt(0).toUpperCase()}
-            </div>
+            <Avatar name={otherName} userId={otherId} sizeClass="w-11 h-11" />
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{otherName}</p>
                 <p className="text-xs text-gray-400 truncate">

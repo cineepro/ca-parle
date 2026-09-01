@@ -16,6 +16,7 @@ export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [otherName, setOtherName] = useState('Utilisateur');
+    const [otherId, setOtherId] = useState<string>('');
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingOlder, setLoadingOlder] = useState(false);
@@ -64,10 +65,11 @@ export const useConversationThread = (conversationId: string) => {
             // probablement d'autres plus vieux à charger.
             setHasMoreOlder(msgs.length === PAGE_SIZE);
 
-            const otherId = conversationService.getOtherParticipantId(conv, user.$id);
-            if (otherId) {
+            const targetId = conversationService.getOtherParticipantId(conv, user.$id);
+            if (targetId) {
+                setOtherId(targetId);
                 try {
-                    const profile: any = await dbService.getUserProfile(otherId);
+                    const profile: any = await dbService.getUserProfile(targetId);
                     setOtherName(profile.name || 'Utilisateur');
                 } catch { /* garde le nom par défaut */ }
             }
@@ -159,7 +161,7 @@ export const useConversationThread = (conversationId: string) => {
     };
 
     return {
-        conversation, otherName, messages, loading, sending, error, sendMessage, sendVoiceMessage,
+        conversation, otherName, otherId, messages, loading, sending, error, sendMessage, sendVoiceMessage,
         loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     };
 };

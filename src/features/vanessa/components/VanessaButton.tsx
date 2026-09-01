@@ -1,7 +1,7 @@
 // src/features/vanessa/components/VanessaButton.tsx — Ça Parle
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { VANESSA_USER_ID } from '@/api/constants';
+import { VANESSA_USER_ID, VANESSA_AVATAR_URL } from '@/api/constants';
 import { conversationService } from '@/features/messaging/services/conversationService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
@@ -37,7 +37,7 @@ export const VanessaButton = () => {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
             ) : (
-                '🔮'
+                <img src={VANESSA_AVATAR_URL} alt="" className="w-5 h-5 rounded-full object-cover" />
             )}
             {loading ? 'Ouverture...' : 'Vanessa'}
         </button>

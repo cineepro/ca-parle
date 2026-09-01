@@ -40,6 +40,9 @@ export const BUCKETS = {
 // Appwrite Auth + document `users`, créé une fois via scripts/setupVanessa.mjs.
 export const VANESSA_USER_ID = import.meta.env.VITE_APPWRITE_VANESSA_USER_ID || '';
 
+// Avatar statique de Vanessa, servi directement par Netlify (public/).
+export const VANESSA_AVATAR_URL = '/vanessa-avatar.png';
+
 // IDs des Appwrite Functions appelées depuis le client (celles déclenchées
 // par événement — on-story-created, on-comment-created, on-reaction-write
 // — n'ont PAS besoin d'être ici : elles ne sont jamais appelées par le
