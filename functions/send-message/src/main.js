@@ -21,7 +21,8 @@
 // contexte de Vanessa). Si Vanessa répond dans une conversation où le
 // dernier échange était vocal, sa réponse est ELLE AUSSI synthétisée en
 // voix (ElevenLabs Text-to-Speech) en plus du texte.
-import { Client, Databases, Storage, InputFile, ID, Permission, Role, Query } from 'node-appwrite';
+import { Client, Databases, Storage, ID, Permission, Role, Query } from 'node-appwrite';
+import { InputFile } from 'node-appwrite/file';
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
 

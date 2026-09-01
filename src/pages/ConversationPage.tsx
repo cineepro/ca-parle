@@ -1,5 +1,5 @@
 // src/pages/ConversationPage.tsx — Ça Parle
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
 import { MessageBubble } from '@/features/messaging/components/MessageBubble';
@@ -11,12 +11,13 @@ export default function ConversationPage() {
     const { user } = useAuth();
     const {
         otherName, messages, loading, sending, error, sendMessage, sendVoiceMessage,
-        loadingOlder, hasMoreOlder, loadOlder,
+        loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     } = useConversationThread(id!);
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const lastMessageIdRef = useRef<string | null>(null);
     const prevScrollHeightRef = useRef<number>(0);
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
     // Défilement automatique vers le bas UNIQUEMENT quand un nouveau
     // message arrive à la FIN (envoi, réponse, temps réel) — jamais quand
@@ -49,6 +50,20 @@ export default function ConversationPage() {
         }
     }, [messages]);
 
+    // Affiche le bouton "descendre en bas" dès qu'on n'est plus proche du
+    // bas de la conversation (utile après avoir remonté lire d'anciens
+    // messages, ou reçu de nouveaux messages pendant qu'on lit plus haut).
+    const handleScroll = () => {
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        setShowScrollToBottom(distanceFromBottom > 200);
+    };
+
+    const scrollToBottom = () => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -70,7 +85,7 @@ export default function ConversationPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto flex flex-col" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
+        <div className="max-w-2xl mx-auto flex flex-col relative" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
             <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 sticky top-14 z-10">
                 <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
                 <div className="w-9 h-9 rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center font-bold text-sm">
@@ -79,7 +94,11 @@ export default function ConversationPage() {
                 <p className="text-sm font-semibold text-gray-800">{otherName}</p>
             </div>
 
-            <div ref={scrollContainerRef} className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+            <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 px-4 py-4 space-y-2 overflow-y-auto"
+            >
                 {hasMoreOlder && (
                     <div className="flex justify-center pb-2">
                         <button
@@ -101,8 +120,29 @@ export default function ConversationPage() {
                         <MessageBubble key={message.$id} message={message} isMine={message.senderId === user?.$id} />
                     ))
                 )}
+
+                {vanessaTyping && (
+                    <div className="flex justify-start">
+                        <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                    </div>
+                )}
+
                 <div ref={bottomRef} />
             </div>
+
+            {showScrollToBottom && (
+                <button
+                    onClick={scrollToBottom}
+                    className="absolute right-4 bottom-24 md:bottom-20 z-20 w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#FF4757] transition-colors"
+                    aria-label="Descendre en bas"
+                >
+                    ↓
+                </button>
+            )}
 
             <div className="sticky bottom-20 md:bottom-0">
                 <MessageComposer onSend={sendMessage} onSendVoice={sendVoiceMessage} sending={sending} />

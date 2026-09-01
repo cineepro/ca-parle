@@ -37,7 +37,7 @@ export const StoryCard = ({ story }: { story: Story }) => {
                 <img
                     src={getStoryImageUrl(story.coverImageId)}
                     alt=""
-                    className="w-full max-h-52 object-cover rounded-xl mb-3"
+                    className="w-full max-h-80 object-contain bg-gray-50 rounded-xl mb-3"
                     loading="lazy"
                 />
             )}

@@ -4,8 +4,13 @@ import { messageService, type Message } from '../services/messageService';
 import { conversationService, type Conversation } from '../services/conversationService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { dbService } from '@/api/database';
+import { VANESSA_USER_ID } from '@/api/constants';
 
 const PAGE_SIZE = 30;
+// Si Vanessa ne répond pas dans ce délai (échec silencieux d'appel IA côté
+// serveur, quota dépassé, etc.), on arrête d'afficher "elle écrit..." pour
+// ne pas laisser l'indicateur tourner indéfiniment.
+const VANESSA_TYPING_TIMEOUT_MS = 25_000;
 
 export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
@@ -16,8 +21,28 @@ export const useConversationThread = (conversationId: string) => {
     const [loadingOlder, setLoadingOlder] = useState(false);
     const [hasMoreOlder, setHasMoreOlder] = useState(false);
     const [sending, setSending] = useState(false);
+    const [vanessaTyping, setVanessaTyping] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const seenIds = useRef(new Set<string>());
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const isVanessaConversation = !!(
+        VANESSA_USER_ID && conversation?.participantIds.includes(VANESSA_USER_ID)
+    );
+
+    const clearTypingTimeout = () => {
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+        }
+    };
+
+    const startWaitingForVanessa = () => {
+        if (!isVanessaConversation) return;
+        setVanessaTyping(true);
+        clearTypingTimeout();
+        typingTimeoutRef.current = setTimeout(() => setVanessaTyping(false), VANESSA_TYPING_TIMEOUT_MS);
+    };
 
     const load = useCallback(async () => {
         if (!user) return;
@@ -83,8 +108,16 @@ export const useConversationThread = (conversationId: string) => {
             if (seenIds.current.has(message.$id)) return;
             seenIds.current.add(message.$id);
             setMessages((prev) => [...prev, message]);
+            // Dès que le message de Vanessa arrive, on arrête "elle écrit...".
+            if (VANESSA_USER_ID && message.senderId === VANESSA_USER_ID) {
+                setVanessaTyping(false);
+                clearTypingTimeout();
+            }
         });
-        return unsubscribe;
+        return () => {
+            unsubscribe();
+            clearTypingTimeout();
+        };
     }, [conversationId]);
 
     const sendMessage = async (content: string) => {
@@ -100,6 +133,7 @@ export const useConversationThread = (conversationId: string) => {
                 seenIds.current.add(sentMessage.$id);
                 setMessages((prev) => [...prev, sentMessage]);
             }
+            startWaitingForVanessa();
         } catch {
             setError("Impossible d'envoyer le message, réessaie.");
         } finally {
@@ -116,6 +150,7 @@ export const useConversationThread = (conversationId: string) => {
                 seenIds.current.add(sentMessage.$id);
                 setMessages((prev) => [...prev, sentMessage]);
             }
+            startWaitingForVanessa();
         } catch {
             setError("Impossible d'envoyer le vocal, réessaie.");
         } finally {
@@ -125,6 +160,6 @@ export const useConversationThread = (conversationId: string) => {
 
     return {
         conversation, otherName, messages, loading, sending, error, sendMessage, sendVoiceMessage,
-        loadingOlder, hasMoreOlder, loadOlder,
+        loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     };
 };

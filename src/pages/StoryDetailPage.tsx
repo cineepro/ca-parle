@@ -4,7 +4,7 @@
 // suivante (features reactions/comments/predictions).
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { storyService, type Story } from '@/features/stories/services/storyService';
+import { storyService, getStoryImageUrl, type Story } from '@/features/stories/services/storyService';
 import { StoryTypeBadge } from '@/features/stories/components/StoryTypeBadge';
 import { StoryStatusBadge } from '@/features/stories/components/StoryStatusBadge';
 import { ReactionBar } from '@/features/reactions/components/ReactionBar';
@@ -128,6 +128,14 @@ export default function StoryDetailPage() {
 
                     <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{story.content}</p>
 
+                    {story.coverImageId && (
+                        <img
+                            src={getStoryImageUrl(story.coverImageId)}
+                            alt=""
+                            className="w-full max-h-[500px] object-contain bg-gray-50 rounded-2xl mt-4"
+                        />
+                    )}
+
                     <div className="flex items-center gap-4 mt-6 mb-4 text-sm text-gray-400">
                         <span>👀 {story.viewCount} vues</span>
                         <span className="ml-auto">
@@ -149,13 +157,13 @@ export default function StoryDetailPage() {
                 </div>
 
                 <div className="bg-white rounded-3xl p-6">
-    <CommentThread
-        storyId={story.$id}
-        storyCommentsCount={story.commentsCount}
-        storyAuthorId={story.authorId}
-        storyTitle={story.title}
-    />
-</div>
+                   <CommentThread
+                        storyId={story.$id}
+                    storyCommentsCount={story.commentsCount}
+                    storyAuthorId={story.authorId}
+                    storyTitle={story.title}
+                    />
+                </div>
             </div>
         </div>
     );
