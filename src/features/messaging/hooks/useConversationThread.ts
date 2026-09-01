@@ -107,8 +107,24 @@ export const useConversationThread = (conversationId: string) => {
         }
     };
 
+    const sendVoiceMessage = async (blob: Blob, durationSeconds: number) => {
+        if (!user || !conversation || sending) return;
+        setSending(true);
+        try {
+            const sentMessage = await messageService.sendVoice(conversation, blob, durationSeconds);
+            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
+                seenIds.current.add(sentMessage.$id);
+                setMessages((prev) => [...prev, sentMessage]);
+            }
+        } catch {
+            setError("Impossible d'envoyer le vocal, réessaie.");
+        } finally {
+            setSending(false);
+        }
+    };
+
     return {
-        conversation, otherName, messages, loading, sending, error, sendMessage,
+        conversation, otherName, messages, loading, sending, error, sendMessage, sendVoiceMessage,
         loadingOlder, hasMoreOlder, loadOlder,
     };
 };

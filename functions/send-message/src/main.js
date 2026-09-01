@@ -1,6 +1,7 @@
 // functions/send-message/src/main.js — Ça Parle
 // Appel HTTP explicite depuis le client :
-//   functions.createExecution('send-message', JSON.stringify({ conversationId, content }))
+//   Texte : functions.createExecution('send-message', JSON.stringify({ conversationId, content }))
+//   Vocal : functions.createExecution('send-message', JSON.stringify({ conversationId, audioFileId, audioDuration }))
 //
 // Même raison d'être que start-conversation : le message doit être lisible
 // par TOUS les participants de la conversation, pas seulement par
@@ -14,7 +15,13 @@
 // des notes publiques ajoutées manuellement par un modérateur. Ne jamais
 // élargir cette fonction pour lire d'autres conversations privées — c'est
 // une limite de sécurité volontaire, pas un oubli.
-import { Client, Databases, ID, Permission, Role, Query } from 'node-appwrite';
+//
+// 🎤 Messages vocaux : un message audio est transcrit (ElevenLabs
+// Speech-to-Text) pour alimenter le `content` (recherche, notifications,
+// contexte de Vanessa). Si Vanessa répond dans une conversation où le
+// dernier échange était vocal, sa réponse est ELLE AUSSI synthétisée en
+// voix (ElevenLabs Text-to-Speech) en plus du texte.
+import { Client, Databases, Storage, InputFile, ID, Permission, Role, Query } from 'node-appwrite';
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
 
@@ -39,6 +46,63 @@ CE QUE TU NE FAIS JAMAIS :
 - Face à une détresse réelle (violence, santé mentale), sors du personnage et invite la personne à en parler à quelqu'un de confiance.
 - Reste courte : 2 à 4 phrases maximum.`;
 
+async function transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, audioFileId, log }) {
+    try {
+        const arrayBuffer = await storage.getFileDownload(BUCKET_VOICE_MESSAGES, audioFileId);
+        const blob = new Blob([arrayBuffer], { type: 'audio/webm' });
+        const form = new FormData();
+        form.append('model_id', 'scribe_v1');
+        form.append('file', blob, 'voice.webm');
+
+        const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+            method: 'POST',
+            headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+            body: form,
+        });
+
+        if (!response.ok) throw new Error(`ElevenLabs STT a répondu ${response.status}`);
+        const data = await response.json();
+        return data.text?.trim() || '[Message vocal]';
+    } catch (err) {
+        log(`⚠️ Transcription échouée : ${err.message}`);
+        return '[Message vocal]';
+    }
+}
+
+// Synthétise un texte en voix et l'upload dans le bucket vocal — retourne
+// l'ID du fichier créé, ou null en cas d'échec (non bloquant : la réponse
+// texte de Vanessa reste envoyée même si la synthèse vocale échoue).
+async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, text, permissions, log }) {
+    try {
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'xi-api-key': ELEVENLABS_API_KEY,
+            },
+            body: JSON.stringify({
+                text,
+                model_id: 'eleven_multilingual_v2',
+            }),
+        });
+
+        if (!response.ok) throw new Error(`ElevenLabs TTS a répondu ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const uploaded = await storage.createFile(
+            BUCKET_VOICE_MESSAGES,
+            ID.unique(),
+            InputFile.fromBuffer(buffer, 'vanessa-reply.mp3'),
+            permissions
+        );
+        return uploaded.$id;
+    } catch (err) {
+        log(`⚠️ Synthèse vocale de Vanessa échouée (non bloquant) : ${err.message}`);
+        return null;
+    }
+}
+
 async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE, OPENAI_API_KEY, VANESSA_USER_ID, conversationId }) {
     // Historique de CETTE conversation uniquement (jamais d'autres).
     const history = await databases.listDocuments(DATABASE_ID, COLLECTION_MESSAGES, [
@@ -62,7 +126,7 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
-        const messages = orderedHistory.map((m) => ({
+    const messages = orderedHistory.map((m) => ({
         role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
         content: m.content,
     }));
@@ -104,16 +168,18 @@ export default async ({ req, res, log, error }) => {
         .setKey(process.env.APPWRITE_API_KEY);
 
     const databases = new Databases(client);
+    const storage = new Storage(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_CONVERSATIONS = process.env.COLLECTION_CONVERSATIONS;
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.ANTHROPIC_API_KEY;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // contient en réalité la clé Anthropic
+    const BUCKET_VOICE_MESSAGES = process.env.BUCKET_VOICE_MESSAGES;
+    const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+    const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
-    // Vérifie tout de suite que les variables essentielles sont bien
-    // définies — cause n°1 des échecs après un changement de config.
     const missingVars = [];
     if (!DATABASE_ID) missingVars.push('DATABASE_ID');
     if (!COLLECTION_CONVERSATIONS) missingVars.push('COLLECTION_CONVERSATIONS');
@@ -126,12 +192,13 @@ export default async ({ req, res, log, error }) => {
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { conversationId, content } = body;
-        log(`📩 conversationId=${conversationId} content.length=${content?.length}`);
+        const { conversationId, content, audioFileId, audioDuration } = body;
+        const isVoice = !!audioFileId;
+        log(`📩 conversationId=${conversationId} isVoice=${isVoice}`);
 
-        if (!conversationId || !content || !content.trim()) {
-            log('❌ conversationId ou content manquant/vide.');
-            return res.json({ success: false, error: 'conversationId et content requis.' }, 400);
+        if (!conversationId || (!isVoice && (!content || !content.trim()))) {
+            log('❌ conversationId manquant, ou ni content ni audioFileId fournis.');
+            return res.json({ success: false, error: 'conversationId et (content ou audioFileId) requis.' }, 400);
         }
 
         log('🔍 Récupération de la conversation...');
@@ -147,7 +214,20 @@ export default async ({ req, res, log, error }) => {
             ...conversation.participantIds.map((id) => Permission.read(Role.user(id))),
             Permission.update(Role.user(callerId)),
         ];
-        log(`🔐 Permissions calculées : ${JSON.stringify(permissions)}`);
+
+        // Message vocal : transcription pour alimenter `content` (recherche,
+        // notifications, contexte de Vanessa) — le fichier audio original
+        // reste la source affichée côté client.
+        let finalContent = content ? content.trim() : '';
+        if (isVoice) {
+            if (!BUCKET_VOICE_MESSAGES || !ELEVENLABS_API_KEY) {
+                log('❌ BUCKET_VOICE_MESSAGES ou ELEVENLABS_API_KEY manquant.');
+                return res.json({ success: false, error: 'Messagerie vocale non configurée côté serveur.' }, 500);
+            }
+            log('🎤 Transcription du message vocal...');
+            finalContent = await transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, audioFileId, log });
+            log(`✅ Transcription : ${finalContent.slice(0, 80)}`);
+        }
 
         log('✏️ Création du message...');
         const message = await databases.createDocument(
@@ -157,7 +237,10 @@ export default async ({ req, res, log, error }) => {
             {
                 conversationId,
                 senderId: callerId,
-                content: content.trim(),
+                content: finalContent,
+                type: isVoice ? 'audio' : 'text',
+                audioFileId: isVoice ? audioFileId : '',
+                audioDuration: isVoice ? (audioDuration || 0) : 0,
                 readBy: [callerId],
                 createdAt: new Date().toISOString(),
             },
@@ -165,21 +248,22 @@ export default async ({ req, res, log, error }) => {
         );
         log(`✅ Message créé : ${message.$id}`);
 
+        const lastPreview = isVoice ? '🎤 Message vocal' : finalContent;
         await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
-            lastMessage: content.length > 200 ? content.slice(0, 200) : content,
+            lastMessage: lastPreview.length > 200 ? lastPreview.slice(0, 200) : lastPreview,
             lastMessageAt: new Date().toISOString(),
             lastMessageSenderId: callerId,
         });
         log('✅ Conversation mise à jour.');
 
-        const preview = content.length > 60 ? `${content.slice(0, 60)}…` : content;
+        const preview = lastPreview.length > 60 ? `${lastPreview.slice(0, 60)}…` : lastPreview;
         await Promise.allSettled(
             conversation.participantIds
                 .filter((id) => id !== callerId)
                 .map((id) =>
                     databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
                         userId: id,
-                        title: '💬 Nouveau message',
+                        title: isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message',
                         message: preview,
                         url: `/messages/${conversationId}`,
                         read: false,
@@ -200,16 +284,31 @@ export default async ({ req, res, log, error }) => {
                 });
                 log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
                 if (reply) {
+                    // Si l'échange était vocal ET que la messagerie vocale
+                    // est configurée, Vanessa répond ELLE AUSSI en voix.
+                    let vanessaAudioFileId = null;
+                    if (isVoice && BUCKET_VOICE_MESSAGES && ELEVENLABS_API_KEY && ELEVENLABS_VOICE_ID) {
+                        log('🎙️ Synthèse de la réponse vocale de Vanessa...');
+                        vanessaAudioFileId = await synthesizeVanessaVoice({
+                            storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
+                            text: reply, permissions, log,
+                        });
+                    }
+
                     await databases.createDocument(DATABASE_ID, COLLECTION_MESSAGES, ID.unique(), {
                         conversationId,
                         senderId: VANESSA_USER_ID,
                         content: reply,
+                        type: vanessaAudioFileId ? 'audio' : 'text',
+                        audioFileId: vanessaAudioFileId || '',
+                        audioDuration: 0,
                         readBy: [VANESSA_USER_ID],
                         createdAt: new Date().toISOString(),
                     }, permissions);
 
+                    const vanessaPreview = vanessaAudioFileId ? '🎤 Message vocal' : reply;
                     await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
-                        lastMessage: reply.length > 200 ? reply.slice(0, 200) : reply,
+                        lastMessage: vanessaPreview.length > 200 ? vanessaPreview.slice(0, 200) : vanessaPreview,
                         lastMessageAt: new Date().toISOString(),
                         lastMessageSenderId: VANESSA_USER_ID,
                     });
@@ -217,7 +316,7 @@ export default async ({ req, res, log, error }) => {
                     await databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
                         userId: callerId,
                         title: '🔮 Vanessa a répondu',
-                        message: reply.length > 60 ? `${reply.slice(0, 60)}…` : reply,
+                        message: vanessaPreview.length > 60 ? `${vanessaPreview.slice(0, 60)}…` : vanessaPreview,
                         url: `/messages/${conversationId}`,
                         read: false,
                         createdAt: new Date().toISOString(),

@@ -31,6 +31,11 @@ export const COLLECTIONS = {
     VANESSA_KNOWLEDGE: import.meta.env.VITE_APPWRITE_COLLECTION_VANESSA_KNOWLEDGE || '',
 } as const;
 
+export const BUCKETS = {
+    STORY_IMAGES: import.meta.env.VITE_APPWRITE_BUCKET_STORY_IMAGES || '',
+    VOICE_MESSAGES: import.meta.env.VITE_APPWRITE_BUCKET_VOICE_MESSAGES || '',
+} as const;
+
 // Compte utilisateur de Vanessa (l'IA de Ça Parle) — un vrai compte
 // Appwrite Auth + document `users`, créé une fois via scripts/setupVanessa.mjs.
 export const VANESSA_USER_ID = import.meta.env.VITE_APPWRITE_VANESSA_USER_ID || '';

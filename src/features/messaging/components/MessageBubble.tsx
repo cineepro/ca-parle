@@ -1,6 +1,7 @@
 // src/features/messaging/components/MessageBubble.tsx — Ça Parle
 import { Link } from 'react-router-dom';
 import type { Message } from '../services/messageService';
+import { getVoiceMessageUrl } from '../services/messageService';
 
 const formatTime = (dateStr: string): string =>
     new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -20,6 +21,7 @@ function parseSuggestion(content: string): { text: string; suggestion: { title: 
 
 export const MessageBubble = ({ message, isMine }: { message: Message; isMine: boolean }) => {
     const { text, suggestion } = parseSuggestion(message.content);
+    const isVoice = message.type === 'audio' && !!message.audioFileId;
 
     return (
         <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -30,7 +32,19 @@ export const MessageBubble = ({ message, isMine }: { message: Message; isMine: b
                         : 'bg-gray-100 text-gray-800 rounded-bl-sm'
                 }`}
             >
-                {text && <p className="whitespace-pre-wrap break-words">{text}</p>}
+                {isVoice ? (
+                    <div className="flex items-center gap-2 min-w-[180px]">
+                        <span>🎤</span>
+                        <audio
+                            controls
+                            src={getVoiceMessageUrl(message.audioFileId!)}
+                            className="max-w-full"
+                            style={{ height: '32px' }}
+                        />
+                    </div>
+                ) : (
+                    text && <p className="whitespace-pre-wrap break-words">{text}</p>
+                )}
 
                 {suggestion && (
                     <div className={`mt-2 rounded-xl p-3 ${isMine ? 'bg-white/15' : 'bg-white'}`}>

@@ -2,7 +2,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { storyService, type Story } from '../services/storyService';
 
-export const useStoryFeed = (categorySlug: string) => {
+interface UseStoryFeedOptions {
+    categorySlug?: string;
+    countrySlug?: string;
+}
+
+export const useStoryFeed = (options: UseStoryFeedOptions = {}) => {
+    const { categorySlug = 'tout', countrySlug = 'tous' } = options;
+
     const [stories, setStories] = useState<Story[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -17,7 +24,11 @@ export const useStoryFeed = (categorySlug: string) => {
         setError(null);
         cursorRef.current = undefined;
         try {
-            const result = await storyService.getFeed({ limit: PAGE_SIZE, categorySlug });
+            const result = await storyService.getFeed({
+                limit: PAGE_SIZE,
+                categorySlug,
+                countrySlug,
+            });
             setStories(result.documents);
             setHasMore(result.documents.length === PAGE_SIZE);
             cursorRef.current = result.documents.at(-1)?.$id;
@@ -26,7 +37,7 @@ export const useStoryFeed = (categorySlug: string) => {
         } finally {
             setLoading(false);
         }
-    }, [categorySlug]);
+    }, [categorySlug, countrySlug]);
 
     const loadMore = useCallback(async () => {
         if (loadingMore || !hasMore) return;
@@ -35,6 +46,7 @@ export const useStoryFeed = (categorySlug: string) => {
             const result = await storyService.getFeed({
                 limit: PAGE_SIZE,
                 categorySlug,
+                countrySlug,
                 cursor: cursorRef.current,
             });
             setStories((prev) => [...prev, ...result.documents]);
@@ -45,7 +57,7 @@ export const useStoryFeed = (categorySlug: string) => {
         } finally {
             setLoadingMore(false);
         }
-    }, [categorySlug, hasMore, loadingMore]);
+    }, [categorySlug, countrySlug, hasMore, loadingMore]);
 
     useEffect(() => {
         loadInitial();

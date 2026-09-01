@@ -17,8 +17,10 @@ export const useCreateStory = () => {
         content: string;
         type: StoryType;
         categoryId: string;
+        country?: string;
         isAnonymous: boolean;
-        referenceIds?: string[]; // 👈 Ajouté ici
+        referenceIds?: string[];
+        coverImageId?: string;
     }) => {
         if (!user) {
             setError('Tu dois être connecté pour publier.');

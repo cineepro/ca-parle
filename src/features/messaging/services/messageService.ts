@@ -1,7 +1,8 @@
 // src/features/messaging/services/messageService.ts — Ça Parle
-import { databases, client } from '@/api/appwrite';
+import { databases, client, storage } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
-import { Query } from 'appwrite';
+import { BUCKETS } from '@/api/constants';
+import { ID, Query } from 'appwrite';
 import type { Models } from 'appwrite';
 import { callFunction } from '@/api/functionsClient';
 import type { Conversation } from './conversationService';
@@ -10,8 +11,24 @@ export interface Message extends Models.Document {
     conversationId: string;
     senderId: string;
     content: string;
+    type?: 'text' | 'audio';
+    audioFileId?: string;
+    audioDuration?: number;
     readBy?: string[];
     createdAt: string;
+}
+
+// Construit l'URL de lecture d'un fichier vocal.
+export function getVoiceMessageUrl(fileId: string): string {
+    return storage.getFileView(BUCKETS.VOICE_MESSAGES, fileId).toString();
+}
+
+// Upload direct depuis le client vers le bucket vocal (le bucket autorise
+// Create pour role:member) — retourne l'ID du fichier.
+export async function uploadVoiceMessage(blob: Blob): Promise<string> {
+    const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+    const uploaded = await storage.createFile(BUCKETS.VOICE_MESSAGES, ID.unique(), file);
+    return uploaded.$id;
 }
 
 export const messageService = {
@@ -23,6 +40,19 @@ export const messageService = {
         const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
             conversationId: conversation.$id,
             content,
+        });
+        return result.message;
+    },
+
+    // Envoi d'un message vocal : upload direct du fichier audio, puis la
+    // Function se charge de la transcription et, si Vanessa est concernée,
+    // de générer sa réponse (éventuellement elle aussi en voix).
+    async sendVoice(conversation: Conversation, audioBlob: Blob, durationSeconds: number): Promise<Message> {
+        const audioFileId = await uploadVoiceMessage(audioBlob);
+        const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
+            conversationId: conversation.$id,
+            audioFileId,
+            audioDuration: Math.round(durationSeconds),
         });
         return result.message;
     },

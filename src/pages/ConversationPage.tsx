@@ -10,7 +10,7 @@ export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const {
-        otherName, messages, loading, sending, error, sendMessage,
+        otherName, messages, loading, sending, error, sendMessage, sendVoiceMessage,
         loadingOlder, hasMoreOlder, loadOlder,
     } = useConversationThread(id!);
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -105,7 +105,7 @@ export default function ConversationPage() {
             </div>
 
             <div className="sticky bottom-20 md:bottom-0">
-                <MessageComposer onSend={sendMessage} sending={sending} />
+                <MessageComposer onSend={sendMessage} onSendVoice={sendVoiceMessage} sending={sending} />
             </div>
         </div>
     );
