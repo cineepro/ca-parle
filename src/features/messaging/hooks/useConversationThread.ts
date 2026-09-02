@@ -16,7 +16,7 @@ export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [otherName, setOtherName] = useState('Utilisateur');
-    const [otherId, setOtherId] = useState<string>('');
+    const [otherId, setOtherId] = useState<string | undefined>(undefined);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingOlder, setLoadingOlder] = useState(false);
@@ -65,11 +65,11 @@ export const useConversationThread = (conversationId: string) => {
             // probablement d'autres plus vieux à charger.
             setHasMoreOlder(msgs.length === PAGE_SIZE);
 
-            const targetId = conversationService.getOtherParticipantId(conv, user.$id);
-            if (targetId) {
-                setOtherId(targetId);
+            const otherId = conversationService.getOtherParticipantId(conv, user.$id);
+            if (otherId) {
+                setOtherId(otherId);
                 try {
-                    const profile: any = await dbService.getUserProfile(targetId);
+                    const profile: any = await dbService.getUserProfile(otherId);
                     setOtherName(profile.name || 'Utilisateur');
                 } catch { /* garde le nom par défaut */ }
             }

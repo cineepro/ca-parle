@@ -47,4 +47,15 @@ export const followService = {
         ]);
         return result.total;
     },
+
+    // Liste tout ce qu'un utilisateur suit d'un type donné (ex: toutes ses
+    // références suivies) — utilisé par la page "Mes références".
+    async getFollowing(followerId: string, followingType: FollowingType, limit = 100): Promise<Follow[]> {
+        const result = await databases.listDocuments<Follow>(DATABASE_ID, COLLECTIONS.FOLLOWS, [
+            Query.equal('followerId', followerId),
+            Query.equal('followingType', followingType),
+            Query.limit(limit),
+        ]);
+        return result.documents;
+    },
 };

@@ -157,12 +157,7 @@ export default function StoryDetailPage() {
                 </div>
 
                 <div className="bg-white rounded-3xl p-6">
-                   <CommentThread
-                        storyId={story.$id}
-                    storyCommentsCount={story.commentsCount}
-                    storyAuthorId={story.authorId}
-                    storyTitle={story.title}
-                    />
+                    <CommentThread storyId={story.$id} />
                 </div>
             </div>
         </div>

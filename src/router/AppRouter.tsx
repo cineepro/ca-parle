@@ -22,6 +22,10 @@ import PrivacyPage from '@/pages/PrivacyPage';
 import DocumentationPage from '@/pages/DocumentationPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import UnsubscribePage from '@/pages/UnsubscribePage';
+import SearchPage from '@/pages/SearchPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import MyReferencesPage from '@/pages/MyReferencesPage';
 
 export const AppRouter = () => {
     return (
@@ -29,6 +33,8 @@ export const AppRouter = () => {
             <Routes>
                 {/* Publiques */}
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
@@ -121,6 +127,22 @@ export const AppRouter = () => {
 
                 {/* Défaut */}
                 <Route path="/" element={<Navigate to="/accueil" replace />} />
+                <Route
+                    path="/recherche"
+                    element={
+                        <ProtectedRoute>
+                            <SearchPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/mes-references"
+                    element={
+                        <ProtectedRoute>
+                            <MyReferencesPage />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </BrowserRouter>

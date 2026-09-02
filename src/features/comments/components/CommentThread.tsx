@@ -7,17 +7,10 @@ import type { CommentType } from '../services/commentService';
 
 interface Props {
     storyId: string;
-    storyCommentsCount: number;
-    storyAuthorId: string;
-    storyTitle: string;
 }
 
-export const CommentThread = ({ storyId, storyCommentsCount, storyAuthorId, storyTitle }: Props) => {
-    const { topLevel, repliesByParent, loading, posting, error, postComment } = useComments(
-        storyId,
-        storyCommentsCount,
-        { storyAuthorId, storyTitle }
-    );
+export const CommentThread = ({ storyId }: Props) => {
+    const { topLevel, repliesByParent, loading, posting, error, postComment } = useComments(storyId);
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
     const handleMainSubmit = (content: string, type: CommentType, isAnonymous: boolean) => {

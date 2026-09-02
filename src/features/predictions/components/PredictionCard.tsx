@@ -51,6 +51,8 @@ export const PredictionCard = ({ prediction, isStoryAuthor }: Props) => {
             await predictionService.resolve(prediction.$id, correctIndex);
             setShowResolvePicker(false);
             await load();
+        } catch (err: any) {
+            alert(err.message || 'Impossible de résoudre cette prédiction.');
         } finally {
             setResolving(false);
         }

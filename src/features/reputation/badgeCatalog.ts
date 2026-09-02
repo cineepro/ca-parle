@@ -1,7 +1,12 @@
 // src/features/reputation/badgeCatalog.ts — Ça Parle
-// Source de vérité unique pour les badges : sert à la fois au script de
-// seed (création des documents dans la collection `badges`) et à la
-// logique d'attribution côté client (badgeService.checkAndAward).
+// ⚠️ Ce fichier n'est plus importé par le code applicatif : la logique
+// d'attribution vit désormais dans les Functions serveur
+// (`on-story-created`, `on-comment-created`, `resolve-prediction`), qui
+// dupliquent volontairement `meetsCriteria()` et `computeGossipLevel()`
+// (les Functions Appwrite ne peuvent pas importer du code depuis `src/`).
+// Ce fichier reste la DOCUMENTATION DE RÉFÉRENCE : si tu changes un seuil
+// ici, réplique le changement dans les 3 Functions ET dans
+// `scripts/seedBadges.mjs`.
 export interface BadgeDefinition {
     key: string;
     name: string;

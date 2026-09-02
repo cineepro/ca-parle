@@ -16,8 +16,7 @@ export { DATABASE_ID, COLLECTIONS, FUNCTIONS } from './constants';
 // Champs du document "users" (collection PARTAGÉE avec Kinema+).
 // Les champs historiques Kinema+ sont conservés tels quels ; les champs
 // propres à Ça Parle sont marqués ci-dessous.
-// 1. Profil stocké dans la collection USERS de la base de données Appwrite
-export interface UserProfileDocument extends Models.Document {
+export interface UserProfile extends Models.User<Models.Preferences> {
     name: string;
     email: string;
     avatarUrl?: string;
@@ -29,7 +28,8 @@ export interface UserProfileDocument extends Models.Document {
     isCreative?: boolean;
 
     // ── Ça Parle ──
-    phone?: string;
+    // phone est déjà déclaré (string, requis) dans Models.User — pas besoin
+    // de le redéclarer ici.
     bio?: string;
     pseudo?: string;
     gossipLevel?: number;
@@ -44,9 +44,6 @@ export interface UserProfileDocument extends Models.Document {
     isModerator?: boolean;
     isBanned?: boolean;
 }
-
-// 2. Type combiné pour l'utilisateur authentifié (Auth + Document Profil)
-export type UserProfile = Models.User<Models.Preferences> & Partial<UserProfileDocument>;
 
 export const authService = {
     async register(email: string, password: string, name: string) {

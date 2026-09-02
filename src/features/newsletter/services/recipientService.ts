@@ -1,10 +1,10 @@
 // src/features/newsletter/services/recipientService.ts — Ça Parle
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
-import { Query, Models } from 'appwrite';
+import { Query } from 'appwrite';
 
-// Étendre Models.Document règle directement l'erreur de typage avec Appwrite
-export interface RecipientUser extends Models.Document {
+export interface RecipientUser {
+    $id: string;
     name: string;
     reputationScore?: number;
     storiesCount?: number;
@@ -16,6 +16,10 @@ export interface RecipientUser extends Models.Document {
 export type SortOption = 'recent' | 'reputation' | 'name';
 
 export const recipientService = {
+    // ⚠️ Le tri par `createdAt`/`reputationScore` nécessite un index sur
+    // ces attributs dans la collection `users`. Si le tri échoue avec une
+    // erreur "Attribute not found in schema" ou similaire côté Appwrite,
+    // crée un index de type "key" sur l'attribut concerné.
     async list(options: { search?: string; sort?: SortOption; limit?: number; offset?: number } = {}) {
         const { search, sort = 'recent', limit = 20, offset = 0 } = options;
         const queries = [Query.limit(limit), Query.offset(offset)];
@@ -27,10 +31,9 @@ export const recipientService = {
         else if (sort === 'reputation') queries.push(Query.orderDesc('reputationScore'));
         else if (sort === 'name') queries.push(Query.orderAsc('name'));
 
-        // Utilisation directe du type RecipientUser
-        const result = await databases.listDocuments<RecipientUser>(
+        const result = await databases.listDocuments(
             DATABASE_ID, COLLECTIONS.USERS, queries
         );
-        return { documents: result.documents, total: result.total };
+        return { documents: result.documents as unknown as (RecipientUser & { $id: string })[], total: result.total };
     },
 };

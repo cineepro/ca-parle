@@ -2,14 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { storyService, type Story } from '../services/storyService';
 
-interface UseStoryFeedOptions {
-    categorySlug?: string;
-    countrySlug?: string;
-}
-
-export const useStoryFeed = (options: UseStoryFeedOptions = {}) => {
-    const { categorySlug = 'tout', countrySlug = 'tous' } = options;
-
+export const useStoryFeed = (categorySlug: string, countrySlug: string = 'tous') => {
     const [stories, setStories] = useState<Story[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -24,11 +17,7 @@ export const useStoryFeed = (options: UseStoryFeedOptions = {}) => {
         setError(null);
         cursorRef.current = undefined;
         try {
-            const result = await storyService.getFeed({
-                limit: PAGE_SIZE,
-                categorySlug,
-                countrySlug,
-            });
+            const result = await storyService.getFeed({ limit: PAGE_SIZE, categorySlug, countrySlug });
             setStories(result.documents);
             setHasMore(result.documents.length === PAGE_SIZE);
             cursorRef.current = result.documents.at(-1)?.$id;

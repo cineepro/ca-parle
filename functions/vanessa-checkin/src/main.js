@@ -26,7 +26,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.ANTHROPIC_API_KEY;
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
     try {
         const threshold = new Date(Date.now() - INACTIVITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -44,24 +44,18 @@ export default async ({ req, res, log, error }) => {
             if (!humanId) continue;
 
             try {
-                                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': OPENAI_API_KEY,
-                        'anthropic-version': '2023-06-01',
-                    },
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
                     body: JSON.stringify({
-                        model: 'claude-haiku-4-5-20251001',
-                        system: VANESSA_SYSTEM_PROMPT,
-                        messages: [{ role: 'user', content: 'Relance-moi avec ta question gbaraï.' }],
-                        max_tokens: 150,
+                        model: 'gpt-5.6-luna',
+                        messages: [{ role: 'system', content: VANESSA_SYSTEM_PROMPT }],
                         temperature: 1,
                     }),
                 });
-                if (!response.ok) throw new Error(`Claude a répondu ${response.status}`);
+                if (!response.ok) throw new Error(`OpenAI a répondu ${response.status}`);
                 const data = await response.json();
-                const question = data.content?.[0]?.text?.trim();
+                const question = data.choices?.[0]?.message?.content?.trim();
                 if (!question) continue;
 
                 const permissions = [

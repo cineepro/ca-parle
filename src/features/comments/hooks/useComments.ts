@@ -2,18 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { commentService, type Comment, type CommentType } from '../services/commentService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { databases } from '@/api/appwrite';
-import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
-import { reputationService } from '@/features/reputation/services/reputationService';
-import { refreshReputation } from '@/features/reputation/hooks/useReputation';
-import { notificationService } from '@/features/notifications/services/notificationService';
 
-interface StoryContext {
-    storyAuthorId: string;
-    storyTitle: string;
-}
-
-export const useComments = (storyId: string, storyCommentsCount: number, storyContext?: StoryContext) => {
+export const useComments = (storyId: string) => {
     const { user } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -46,7 +36,7 @@ export const useComments = (storyId: string, storyCommentsCount: number, storyCo
         setPosting(true);
         setError(null);
         try {
-            const newComment = await commentService.create({
+            await commentService.create({
                 storyId,
                 authorId: user.$id,
                 authorName: user.name,
@@ -57,36 +47,10 @@ export const useComments = (storyId: string, storyCommentsCount: number, storyCo
             });
             await load();
 
-            // Compteur dénormalisé sur la story (best-effort).
-            try {
-                await databases.updateDocument(DATABASE_ID, COLLECTIONS.STORIES, storyId, {
-                    commentsCount: storyCommentsCount + 1,
-                });
-            } catch { /* non bloquant */ }
-
-            // Compteurs de réputation de l'auteur du commentaire.
-            // Vos Appwrite Functions se chargent du recalcul et des badges en arrière-plan.
-// On rafraîchit simplement les stats côté client :
-refreshReputation(user.$id);
-
-            // Notifications : réponse à un commentaire OU nouveau commentaire
-            // sur l'histoire (pas les deux, pour éviter de spammer l'auteur
-            // de l'histoire quand quelqu'un répond à un fil de discussion).
-            if (parentCommentId) {
-                commentService.getById(parentCommentId).then((parent) => {
-                    notificationService.notifyIfNotSelf(user.$id, parent.authorId, {
-                        title: '💬 Nouvelle réponse',
-                        message: `${user.name} a répondu à ton commentaire.`,
-                        url: `/histoire/${storyId}`,
-                    });
-                }).catch(() => {});
-            } else if (storyContext) {
-                notificationService.notifyIfNotSelf(user.$id, storyContext.storyAuthorId, {
-                    title: '💬 Nouveau commentaire',
-                    message: `${user.name} a commenté « ${storyContext.storyTitle} ».`,
-                    url: `/histoire/${storyId}`,
-                });
-            }
+            // Compteur commentsCount de la story, réputation/badges de
+            // l'auteur, et notifications (réponse ou commentaire sur
+            // l'histoire) sont désormais gérés automatiquement côté serveur
+            // par la Function `on-comment-created`.
         } catch {
             setError("Impossible d'envoyer ton message, réessaie.");
         } finally {

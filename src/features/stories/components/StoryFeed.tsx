@@ -3,16 +3,8 @@ import { useStoryFeed } from '../hooks/useStoryFeed';
 import { StoryCard } from './StoryCard';
 import { Button } from '@/components/ui/button';
 
-interface StoryFeedProps {
-    categorySlug?: string;
-    countrySlug?: string;
-}
-
-export const StoryFeed = ({ categorySlug = 'tout', countrySlug = 'tous' }: StoryFeedProps) => {
-    const { stories, loading, loadingMore, hasMore, error, loadMore } = useStoryFeed({
-        categorySlug,
-        countrySlug,
-    });
+export const StoryFeed = ({ categorySlug, countrySlug = 'tous' }: { categorySlug: string; countrySlug?: string }) => {
+    const { stories, loading, loadingMore, hasMore, error, loadMore } = useStoryFeed(categorySlug, countrySlug);
 
     if (loading) {
         return (
@@ -33,7 +25,7 @@ export const StoryFeed = ({ categorySlug = 'tout', countrySlug = 'tous' }: Story
         return (
             <div className="text-center py-16 text-gray-400">
                 <div className="text-4xl mb-2">🤫</div>
-                <p className="text-sm">Rien ne se raconte encore avec ces filtres.</p>
+                <p className="text-sm">Rien ne se raconte encore dans cette catégorie.</p>
                 <p className="text-sm">Sois le premier à lancer une histoire !</p>
             </div>
         );

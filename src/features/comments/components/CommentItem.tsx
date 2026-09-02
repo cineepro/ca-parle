@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Comment } from '../services/commentService';
 import { commentService } from '../services/commentService';
+import { ReportButton } from '@/features/moderation/components/ReportButton';
 
 const TYPE_LABEL: Record<string, { icon: string; className: string }> = {
     commentaire: { icon: '💬', className: 'text-gray-400' },
@@ -68,6 +69,7 @@ export const CommentItem = ({ comment, onReply, isReply = false }: Props) => {
                         Répondre
                     </button>
                 )}
+                <ReportButton targetType="comment" targetId={comment.$id} label="🚩" />
             </div>
         </div>
     );

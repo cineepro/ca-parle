@@ -29,7 +29,17 @@ export const storyReferenceService = {
     },
 
     async linkMany(storyId: string, referenceIds: string[]): Promise<void> {
-        await Promise.allSettled(referenceIds.map((refId) => this.link(storyId, refId)));
+        const results = await Promise.allSettled(referenceIds.map((refId) => this.link(storyId, refId)));
+        results.forEach((r, i) => {
+            if (r.status === 'rejected') {
+                // Ne bloque pas la publication de l'histoire, mais laisse
+                // une trace claire dans la console — sans ça, un échec de
+                // permission sur `story_references` ou `references` passe
+                // totalement inaperçu et l'histoire n'apparaît jamais sur
+                // la fiche de la référence, sans aucune explication.
+                console.error(`[storyReferenceService] Échec de liaison avec la référence ${referenceIds[i]} :`, r.reason);
+            }
+        });
     },
 
     async getReferencesForStory(storyId: string): Promise<Reference[]> {

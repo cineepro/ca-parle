@@ -5,7 +5,12 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Headers anti-cache Service Worker
+# ⚠️ CRUCIAL pour tuer l'ancien Service Worker Kinema+ : ces fichiers ne
+# doivent JAMAIS être mis en cache (ni par le navigateur, ni par le CDN
+# Netlify), sinon le navigateur pourrait continuer à croire qu'il a déjà
+# la dernière version et ne jamais redemander le vrai contenu du kill
+# switch. Sans ce header, tout le mécanisme de public/sw.js peut échouer
+# silencieusement pendant des jours/semaines selon le cache HTTP du client.
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -18,33 +23,34 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     Content-Type = "application/javascript; charset=utf-8"
 
-# Non-cache par défaut sur TOUTES les routes. Nécessaire car /index.html
-# seul ne suffit pas : les visiteurs demandent /, /login, /accueil, etc.,
-# jamais littéralement /index.html — c'est la redirection SPA plus bas qui
-# sert son contenu pour ces chemins, et Netlify applique les règles de
-# cache sur le chemin DEMANDÉ, pas sur le chemin de destination.
+# Non-cache par défaut sur TOUTES les routes. C'est indispensable car
+# /index.html seul ne suffit pas : les visiteurs demandent /, /login,
+# /accueil, /histoire/xxx, etc., jamais littéralement /index.html — c'est
+# la redirection SPA plus bas qui sert son contenu pour ces chemins. Or
+# Netlify applique les règles de cache sur le CHEMIN DEMANDÉ par le
+# visiteur, pas sur le chemin de destination de la redirection. Une règle
+# ciblant uniquement "/index.html" ne se déclenche donc quasiment jamais
+# en pratique — c'est exactement ce qui causait la persistance de
+# l'ancien bundle JS malgré des redéploiements réussis.
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# Exception : fichiers sous /assets/, nommés avec un hash de leur contenu
-# (ex: index-B2RrHHP0.js) — leur contenu ne change jamais sans que leur nom
-# change aussi. Cache "pour toujours" sans risque, plus performant. Cette
-# règle plus spécifique prend le dessus sur la règle générale ci-dessus.
+# Exception : les fichiers sous /assets/ sont nommés avec un hash de leur
+# contenu (ex: index-B2RrHHP0.js) — leur contenu ne change JAMAIS sans que
+# leur nom change aussi. Ils peuvent donc être mis en cache "pour
+# toujours" sans risque, ce qui est bien plus performant. Cette règle plus
+# spécifique prend le dessus sur la règle générale ci-dessus pour ce
+# sous-dossier précis.
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# 1. Redirection 301 stricte de kinemao.netlify.app vers le domaine propre kinemaplus.com
-[[redirects]]
-  from = "https://kinemao.netlify.app/*"
-  to = "https://kinemaplus.com/:splat"
-  status = 301
-  force = true
-
-# 2. Redirection des routes SPA pour React Router (doit rester en dernier)
+# Indispensable pour une SPA avec React Router : sans ça, un rafraîchissement
+# de page sur une route comme /histoire/xxx ou un lien direct partagé
+# renvoie une 404 Netlify au lieu de laisser React Router gérer la route.
 [[redirects]]
   from = "/*"
   to = "/index.html"

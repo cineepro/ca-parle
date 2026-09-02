@@ -24,6 +24,9 @@ const emptyCounts = (): ReactionCounts => ({
 export const reactionService = {
     // Un seul document "reaction" par utilisateur/cible (contrainte DB
     // unique userId+targetId) : on crée si absent, on met à jour sinon.
+    // Le compteur stories.reactionsCount n'est plus recalculé ici : c'est
+    // la Function `on-reaction-write` (déclenchée sur create/update/delete
+    // de cette collection) qui s'en charge côté serveur.
     async react(targetType: TargetType, targetId: string, userId: string, reactionType: ReactionType): Promise<void> {
         const existing = await this.getUserReaction(targetType, targetId, userId);
 

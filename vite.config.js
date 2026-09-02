@@ -10,6 +10,10 @@ export default defineConfig({
         },
     },
     build: {
+        // Transparence pour les scanners de sécurité et pour toi-même en
+        // cas de bug en prod : le code source lisible reste consultable
+        // derrière le bundle minifié, plutôt que de ressembler à du code
+        // délibérément offusqué.
         sourcemap: true,
     },
 });

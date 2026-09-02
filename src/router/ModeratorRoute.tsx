@@ -1,6 +1,7 @@
 // src/router/ModeratorRoute.tsx — Ça Parle
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 export const ModeratorRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
@@ -26,5 +27,5 @@ export const ModeratorRoute = ({ children }: { children: React.ReactNode }) => {
         return <Navigate to="/accueil" replace />;
     }
 
-    return <>{children}</>;
+    return <AppLayout>{children}</AppLayout>;
 };

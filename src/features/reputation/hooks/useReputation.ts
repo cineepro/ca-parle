@@ -36,11 +36,3 @@ export const useReputation = (userId: string | undefined) => {
 
     return { stats, catalog, earnedKeys, loading, refresh: load };
 };
-
-// Appelé après toute action qui affecte la réputation (publication,
-// commentaire, résolution de prédiction) : recalcule le score et attribue
-// les nouveaux badges mérités.
-// Récupère les stats à jour directement recalculées par les Functions Appwrite serveur
-export async function refreshReputation(userId: string) {
-    return await reputationService.getStats(userId);
-}

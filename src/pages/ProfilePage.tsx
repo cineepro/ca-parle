@@ -8,7 +8,7 @@ import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBan
 import { InviteButton } from '@/features/stories/components/InviteButton';
 
 export default function ProfilePage() {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const { stats, catalog, earnedKeys, loading } = useReputation(user?.$id);
 
     if (loading || !stats) {
@@ -37,6 +37,10 @@ export default function ProfilePage() {
                 <BadgeGrid catalog={catalog} earnedKeys={earnedKeys} />
 
                 <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
+                    <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        🔎 Mes références suivies
+                        <span className="text-gray-300">›</span>
+                    </Link>
                     <Link to="/documentation" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
                         📖 Comment ça marche
                         <span className="text-gray-300">›</span>
@@ -49,6 +53,13 @@ export default function ProfilePage() {
                         📄 Conditions d'utilisation
                         <span className="text-gray-300">›</span>
                     </Link>
+                    <button
+                        onClick={logout}
+                        className="w-full flex items-center justify-between px-5 py-4 text-sm text-red-500 hover:bg-red-50 text-left"
+                    >
+                        🚪 Déconnexion
+                        <span className="text-red-200">›</span>
+                    </button>
                 </div>
             </div>
         </div>
