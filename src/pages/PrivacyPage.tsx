@@ -8,24 +8,19 @@ export default function PrivacyPage() {
                 <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">← Retour</Link>
 
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-sm">
-                    ⚠️ Ce document est une rédaction complète destinée à servir de base de travail. Il
-                    ne constitue pas un conseil juridique définitif — à faire relire et adapter par un
-                    professionnel du droit avant publication réelle, notamment sur le cadre
-                    réglementaire applicable (RGPD, loi locale de protection des données selon les
-                    pays d'implantation de tes utilisateurs) et les transferts internationaux de
-                    données.
+                    ⚠️ Ce document est une rédaction complète de la dernière mise à jour.
                 </div>
 
                 <div className="bg-white rounded-3xl p-6 space-y-6 text-sm text-gray-700 leading-relaxed">
                     <div>
                         <h1 className="text-xl font-bold text-gray-800">Politique de confidentialité</h1>
-                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : [à compléter] — Version 1.0</p>
+                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : — Version 1.0</p>
                     </div>
 
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">1. Qui sommes-nous</h2>
                         <p>
-                            La présente politique décrit comment [Nom légal de l'éditeur à compléter]
+                            La présente politique décrit comment ASILLIA
                             ("nous"), éditeur de la plateforme Ça Parle, collecte, utilise et protège
                             les données personnelles des utilisateurs ("toi", "tu").
                         </p>
@@ -110,9 +105,7 @@ export default function PrivacyPage() {
                         <p>
                             Certains de nos prestataires techniques sont situés en dehors de ton pays
                             de résidence, notamment aux États-Unis. Ces transferts sont encadrés par
-                            les garanties contractuelles proposées par ces prestataires. [Section à
-                            préciser avec un juriste selon les pays de résidence effectifs de tes
-                            utilisateurs et le cadre réglementaire applicable.]
+                            les garanties contractuelles proposées par ces prestataires.
                         </p>
                     </section>
 
@@ -133,7 +126,7 @@ export default function PrivacyPage() {
                             Sous réserve de la réglementation qui t'est applicable, tu disposes
                             notamment d'un droit d'accès, de rectification, d'effacement et
                             d'opposition concernant tes données personnelles. Pour exercer ces droits,
-                            contacte-nous à [email de contact à compléter]. Nous nous efforçons de
+                            contacte-nous à seriquicinee@gmail.com. Nous nous efforçons de
                             répondre dans un délai raisonnable.
                         </p>
                     </section>
@@ -178,7 +171,7 @@ export default function PrivacyPage() {
 
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">14. Contact</h2>
-                        <p>Pour toute question relative à cette politique : [email de contact à compléter]</p>
+                        <p>Pour toute question relative à cette politique : seriquicinee@gmail.com</p>
                     </section>
                 </div>
             </div>

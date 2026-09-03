@@ -8,18 +8,13 @@ export default function TermsPage() {
                 <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">← Retour</Link>
 
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-sm">
-                    ⚠️ Ce document est une rédaction complète destinée à servir de base de travail.
-                    Il ne constitue pas un conseil juridique définitif et doit être relu, adapté et
-                    validé par un professionnel du droit (notamment sur le droit applicable, la
-                    responsabilité liée au contenu généré par les utilisateurs, et la conformité aux
-                    réglementations locales) avant toute publication engageant réellement la
-                    plateforme.
+                    ⚠️ Ce document est une rédaction complète de la dernière mise à jour.
                 </div>
 
                 <div className="bg-white rounded-3xl p-6 space-y-6 text-sm text-gray-700 leading-relaxed">
                     <div>
                         <h1 className="text-xl font-bold text-gray-800">Conditions Générales d'Utilisation</h1>
-                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : [à compléter] — Version 1.0</p>
+                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : — Version 1.0</p>
                     </div>
 
                     <section className="space-y-2">
@@ -27,8 +22,7 @@ export default function TermsPage() {
                         <p>
                             Les présentes Conditions Générales d'Utilisation (ci-après "CGU") régissent
                             l'accès et l'utilisation de la plateforme "Ça Parle" (ci-après "la
-                            Plateforme"), éditée par [Nom légal de l'éditeur / raison sociale à
-                            compléter], accessible notamment via le site kinemaplus.com et les
+                            Plateforme"), éditée par ASILLIA, accessible notamment via le site kinemaplus.com et les
                             applications mobiles associées.
                         </p>
                         <p>
@@ -56,7 +50,7 @@ export default function TermsPage() {
                         <h2 className="font-bold text-gray-800">Article 3 — Conditions d'accès</h2>
                         <p>
                             L'inscription est réservée aux personnes physiques âgées d'au moins
-                            [16/18 ans — à trancher selon la juridiction cible] au moment de la
+                            18 ans au moment de la
                             création du compte. En créant un compte, tu déclares et garantis remplir
                             cette condition d'âge et disposer de la capacité juridique nécessaire.
                         </p>
@@ -213,17 +207,16 @@ export default function TermsPage() {
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">Article 13 — Droit applicable et litiges</h2>
                         <p>
-                            [Clause à finaliser avec un juriste selon le ou les pays visés par
-                            l'exploitation commerciale de la Plateforme.] À titre indicatif, les
-                            présentes CGU pourraient être soumises au droit de [pays à déterminer], tout
+                            À titre indicatif, les
+                            présentes CGU pourraient être soumises au droit international, tout
                             litige relevant, à défaut de résolution amiable, de la compétence des
-                            juridictions de [ressort à déterminer].
+                            juridictions.
                         </p>
                     </section>
 
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">Article 14 — Contact</h2>
-                        <p>Pour toute question relative aux présentes CGU : [email de contact à compléter]</p>
+                        <p>Pour toute question relative aux présentes CGU : seriquicinee@gmail.com</p>
                     </section>
                 </div>
             </div>

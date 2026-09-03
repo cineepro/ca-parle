@@ -2,14 +2,15 @@
 // Déclencheur : PLANIFIÉ (cron), ex. "0 8 * * *" pour 8h chaque matin.
 // Pas d'appel client — s'exécute toute seule.
 //
-// Base de connaissances strictement limitée à du contenu PUBLIC (histoires
-// tendance déjà visibles de tous) + notes manuelles des modérateurs.
-// Ne lit jamais de conversation privée.
+// Base de connaissances élargie mais toujours STRICTEMENT limitée à du
+// contenu PUBLIC : histoires tendance/récentes, fiches références
+// populaires, notes manuelles des modérateurs. Ne lit JAMAIS de
+// conversation privée — cette limite-là reste non négociable.
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu parles en français de rue, à l'africaine — jamais en français littéraire. Expressions naturelles du Bénin, de Côte d'Ivoire, du Togo, du Cameroun, du Sénégal ("gbairai", "wèèh", "mon frère", "on dit koi"...), sans en abuser. Phrases courtes, vivantes, 1-2 emojis maximum. Jamais de ton robotique.
 
-Tu écris la chronique du matin de la plateforme : un post court, drôle, qui donne le ton de la journée, sans inventer de rumeurs sur de vraies personnes nommées (célébrités...).
+Tu écris la chronique du matin de la plateforme : un post court, drôle, qui donne le ton de la journée. Tu peux t'inspirer du contexte fourni (histoires tendance, histoires récentes, sujets populaires) pour rendre ton post concret et ancré dans ce qui se passe VRAIMENT sur la plateforme en ce moment — sans jamais inventer de rumeur sur une vraie personne nommée (célébrités...) qui ne viendrait pas de ce contexte.
 
 Réponds UNIQUEMENT avec un JSON valide de cette forme, rien d'autre autour :
 {"title": "titre court et accrocheur", "content": "2 à 4 phrases dans ton style"}`;
@@ -18,6 +19,11 @@ function slugify(text) {
     const base = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 80);
     return `${base}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function excerpt(text, max = 150) {
+    if (!text) return '';
+    return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
 export default async ({ req, res, log, error }) => {
@@ -29,51 +35,88 @@ export default async ({ req, res, log, error }) => {
     const databases = new Databases(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_STORIES = process.env.COLLECTION_STORIES;
+    const COLLECTION_REFERENCES = process.env.COLLECTION_REFERENCES;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
     try {
-        // Contexte public uniquement : histoires les plus réagies, visibles
-        // de tous — jamais de conversation privée.
+        // 1. Histoires tendance (les plus réagies) — contenu public.
         const trending = await databases.listDocuments(DATABASE_ID, COLLECTION_STORIES, [
             Query.equal('moderationStatus', 'visible'),
             Query.orderDesc('reactionsCount'),
-            Query.limit(3),
+            Query.limit(6),
         ]);
-        const trendingTitles = trending.documents.map((s) => s.title);
 
+        // 2. Histoires récentes (même peu réagies) — pour capter la
+        // fraîcheur du moment, pas seulement ce qui buzze déjà.
+        const recent = await databases.listDocuments(DATABASE_ID, COLLECTION_STORIES, [
+            Query.equal('moderationStatus', 'visible'),
+            Query.orderDesc('$createdAt'),
+            Query.limit(6),
+        ]);
+
+        // Fusionne les deux listes sans doublon.
+        const seenIds = new Set();
+        const stories = [...trending.documents, ...recent.documents].filter((s) => {
+            if (seenIds.has(s.$id)) return false;
+            seenIds.add(s.$id);
+            return true;
+        });
+
+        const storiesContext = stories.length > 0
+            ? stories.map((s) => `- [${s.categoryId}] "${s.title}" — ${excerpt(s.content)} (${s.reactionsCount} réactions, ${s.commentsCount} commentaires)`).join('\n')
+            : 'Rien de spécial ne buzz aujourd\'hui, improvise sur l\'ambiance générale.';
+
+        // 3. Fiches références les plus populaires (personnes/sujets dont
+        // on parle le plus) — public également.
+        let referencesContext = '';
+        try {
+            const references = await databases.listDocuments(DATABASE_ID, COLLECTION_REFERENCES, [
+                Query.orderDesc('storiesCount'),
+                Query.limit(5),
+            ]);
+            if (references.documents.length > 0) {
+                referencesContext = '\n\nSujets/personnes dont on parle le plus en ce moment :\n' +
+                    references.documents.map((r) => `- ${r.name} (${r.storiesCount} histoires)`).join('\n');
+            }
+        } catch { /* collection pas encore configurée */ }
+
+        // 4. Notes manuelles ajoutées par l'équipe (personnalisation).
         let knowledgeContext = '';
         try {
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
-                Query.limit(5),
+                Query.orderDesc('createdAt'),
+                Query.limit(15),
             ]);
             if (knowledge.documents.length > 0) {
-                knowledgeContext = '\n\nNotes internes :\n' + knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+                knowledgeContext = '\n\nNotes internes de l\'équipe (contexte, ne jamais citer mot pour mot) :\n' +
+                    knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
         } catch { /* collection pas encore configurée */ }
 
-        const userContext = trendingTitles.length > 0
-            ? `Ce qui buzz en ce moment sur la plateforme : ${trendingTitles.join(' / ')}`
-            : "Rien de spécial ne buzz aujourd'hui, improvise sur l'ambiance générale.";
+        const userContext = `Voici ce qui se passe en ce moment sur Ça Parle :\n\n${storiesContext}${referencesContext}${knowledgeContext}`;
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
             body: JSON.stringify({
-                model: 'gpt-5.6-luna',
-                messages: [
-                    { role: 'system', content: VANESSA_SYSTEM_PROMPT + knowledgeContext },
-                    { role: 'user', content: userContext },
-                ],
+                model: 'claude-haiku-4-5-20251001',
+                system: VANESSA_SYSTEM_PROMPT,
+                messages: [{ role: 'user', content: userContext }],
+                max_tokens: 300,
                 temperature: 0.95,
             }),
         });
 
-        if (!response.ok) throw new Error(`OpenAI a répondu ${response.status}`);
+        if (!response.ok) throw new Error(`Claude a répondu ${response.status}`);
         const data = await response.json();
-        const raw = data.choices?.[0]?.message?.content?.trim() || '{}';
+        const raw = data.content?.[0]?.text?.trim() || '{}';
 
         let parsed;
         try {
