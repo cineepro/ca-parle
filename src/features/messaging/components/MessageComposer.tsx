@@ -4,25 +4,46 @@ import { useState, useRef } from 'react';
 interface Props {
     onSend: (content: string) => void;
     onSendVoice?: (blob: Blob, durationSeconds: number) => void;
+    onSendImage?: (file: File) => void;
     sending: boolean;
 }
 
-export const MessageComposer = ({ onSend, onSendVoice, sending }: Props) => {
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
+
+export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending }: Props) => {
     const [content, setContent] = useState('');
     const [recording, setRecording] = useState(false);
     const [recordSeconds, setRecordSeconds] = useState(0);
     const [micError, setMicError] = useState<string | null>(null);
+    const [imageError, setImageError] = useState<string | null>(null);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const startTimeRef = useRef<number>(0);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!content.trim()) return;
         onSend(content);
         setContent('');
+    };
+
+    const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // permet de resélectionner le même fichier ensuite
+        setImageError(null);
+        if (!file || !onSendImage) return;
+        if (!file.type.startsWith('image/')) {
+            setImageError('Seules les images sont acceptées (pas de vidéo ni de document).');
+            return;
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+            setImageError('Image trop lourde (5 Mo maximum).');
+            return;
+        }
+        onSendImage(file);
     };
 
     const startRecording = async () => {
@@ -109,7 +130,29 @@ export const MessageComposer = ({ onSend, onSendVoice, sending }: Props) => {
     return (
         <div>
             {micError && <p className="text-xs text-red-500 px-3 pt-2">{micError}</p>}
+            {imageError && <p className="text-xs text-red-500 px-3 pt-2">{imageError}</p>}
             <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3 bg-white border-t border-gray-100">
+                {onSendImage && (
+                    <>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImagePick}
+                            className="hidden"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={sending}
+                            className="shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center disabled:opacity-40 hover:bg-gray-200 transition-colors"
+                            aria-label="Envoyer une photo"
+                        >
+                            📷
+                        </button>
+                    </>
+                )}
+
                 <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value)}

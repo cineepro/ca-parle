@@ -11,9 +11,10 @@ export interface Message extends Models.Document {
     conversationId: string;
     senderId: string;
     content: string;
-    type?: 'text' | 'audio';
+    type?: 'text' | 'audio' | 'image';
     audioFileId?: string;
     audioDuration?: number;
+    imageFileId?: string;
     readBy?: string[];
     createdAt: string;
 }
@@ -23,11 +24,24 @@ export function getVoiceMessageUrl(fileId: string): string {
     return storage.getFileView(BUCKETS.VOICE_MESSAGES, fileId).toString();
 }
 
+// Construit l'URL d'affichage d'une image envoyée en messagerie (réutilise
+// le bucket story-images, déjà configuré).
+export function getChatImageUrl(fileId: string): string {
+    return storage.getFileView(BUCKETS.STORY_IMAGES, fileId).toString();
+}
+
 // Upload direct depuis le client vers le bucket vocal (le bucket autorise
 // Create pour role:member) — retourne l'ID du fichier.
 export async function uploadVoiceMessage(blob: Blob): Promise<string> {
     const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
     const uploaded = await storage.createFile(BUCKETS.VOICE_MESSAGES, ID.unique(), file);
+    return uploaded.$id;
+}
+
+// Upload direct d'une image de messagerie (destinée à être décrite par
+// Vanessa, ou simplement partagée).
+export async function uploadChatImage(file: File): Promise<string> {
+    const uploaded = await storage.createFile(BUCKETS.STORY_IMAGES, ID.unique(), file);
     return uploaded.$id;
 }
 
@@ -53,6 +67,18 @@ export const messageService = {
             conversationId: conversation.$id,
             audioFileId,
             audioDuration: Math.round(durationSeconds),
+        });
+        return result.message;
+    },
+
+    // Envoi d'une image : upload direct, puis la Function crée le message.
+    // Elle ne déclenche JAMAIS de réponse automatique à elle seule — il
+    // faut un message suivant qui demande explicitement une description.
+    async sendImage(conversation: Conversation, file: File): Promise<Message> {
+        const imageFileId = await uploadChatImage(file);
+        const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
+            conversationId: conversation.$id,
+            imageFileId,
         });
         return result.message;
     },

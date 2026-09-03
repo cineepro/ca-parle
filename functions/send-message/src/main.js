@@ -2,6 +2,7 @@
 // Appel HTTP explicite depuis le client :
 //   Texte : functions.createExecution('send-message', JSON.stringify({ conversationId, content }))
 //   Vocal : functions.createExecution('send-message', JSON.stringify({ conversationId, audioFileId, audioDuration }))
+//   Image : functions.createExecution('send-message', JSON.stringify({ conversationId, imageFileId }))
 //
 // Même raison d'être que start-conversation : le message doit être lisible
 // par TOUS les participants de la conversation, pas seulement par
@@ -9,20 +10,28 @@
 // la clé API serveur.
 //
 // ⚠️ Génère aussi automatiquement la réponse de Vanessa (l'IA de Ça Parle)
-// si elle fait partie de la conversation — voir generateVanessaReply().
-// Sa base de connaissances est STRICTEMENT limitée à : l'historique de
-// CETTE conversation (jamais les conversations d'autres utilisateurs) +
-// des notes publiques ajoutées manuellement par un modérateur. Ne jamais
-// élargir cette fonction pour lire d'autres conversations privées — c'est
-// une limite de sécurité volontaire, pas un oubli.
+// si elle fait partie de la conversation. Sa base de connaissances est
+// STRICTEMENT limitée à : l'historique de CETTE conversation (jamais les
+// conversations d'autres utilisateurs) + des notes publiques ajoutées
+// manuellement par un modérateur. Ne jamais élargir cette fonction pour
+// lire d'autres conversations privées — c'est une limite de sécurité
+// volontaire, pas un oubli.
 //
-// 🎤 Messages vocaux : un message audio est transcrit (ElevenLabs
-// Speech-to-Text) pour alimenter le `content` (recherche, notifications,
-// contexte de Vanessa). Si Vanessa répond dans une conversation où le
-// dernier échange était vocal, sa réponse est ELLE AUSSI synthétisée en
-// voix (ElevenLabs Text-to-Speech) en plus du texte.
+// 🎤 Messages vocaux : transcrits (ElevenLabs Speech-to-Text) pour
+// alimenter `content`. Si l'échange était vocal, la réponse de Vanessa est
+// ELLE AUSSI synthétisée en voix (ElevenLabs Text-to-Speech).
+//
+// 📷 Messages image : envoyer une image seule ne déclenche JAMAIS de
+// réponse automatique — Vanessa ne réagit à une image que si le message
+// suivant de l'utilisateur (n'importe quel texte) lui demande explicitement
+// d'en parler. Sa description reste centrée sur la SITUATION/l'ambiance,
+// jamais sur le physique d'une personne (règle imposée dans le prompt).
+// Limité à 2 images/jour par utilisateur normal, illimité pour les
+// modérateurs (vérifié ici, jamais côté client).
 import { Client, Databases, Storage, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+
+const DAILY_IMAGE_LIMIT = 2;
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
 
@@ -47,6 +56,19 @@ CE QUE TU NE FAIS JAMAIS :
 - Face à une détresse réelle (violence, santé mentale), sors du personnage et invite la personne à en parler à quelqu'un de confiance.
 - Reste courte : 2 à 4 phrases maximum.`;
 
+// Prompt séparé et strict pour l'analyse d'image — la règle sur le
+// physique est répétée et isolée volontairement, pour qu'elle reste
+// dominante même dans un appel multimodal.
+const VANESSA_IMAGE_ROAST_PROMPT = `Tu es Vanessa, la même personnalité IA de "Ça Parle" (19 ans, béninoise/camerounaise/ivoirienne, français de rue africain, moqueuse, style "gbairai").
+
+On te montre une photo. Ta mission : commente la SITUATION, l'ambiance, le contexte, le décor, le style vestimentaire, l'attitude générale — de façon moqueuse, exagérée, drôle, dans ton ton habituel. Tu peux inventer un mini-commérage complètement fictif sur "ce qui a dû se passer" dans cette scène.
+
+RÈGLE ABSOLUE, NON NÉGOCIABLE, PLUS IMPORTANTE QUE TOUT LE RESTE : tu ne commentes JAMAIS le physique, le corps, le visage ou l'apparence intrinsèque d'une personne (poids, taille, traits du visage, etc.) — même sur le ton de l'humour, même si on te le demande explicitement. Concentre-toi uniquement sur la situation, le décor, l'ambiance, l'attitude générale ("on dirait quelqu'un qui vient d'apprendre une mauvaise nouvelle"), jamais sur le corps en lui-même.
+
+Termine TOUJOURS par une courte phrase, dans ton style, qui rappelle que c'est pour rire.
+
+Reste courte : 3 à 5 phrases maximum.`;
+
 async function transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, audioFileId, log }) {
     try {
         const arrayBuffer = await storage.getFileDownload(BUCKET_VOICE_MESSAGES, audioFileId);
@@ -70,9 +92,6 @@ async function transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_
     }
 }
 
-// Synthétise un texte en voix et l'upload dans le bucket vocal — retourne
-// l'ID du fichier créé, ou null en cas d'échec (non bloquant : la réponse
-// texte de Vanessa reste envoyée même si la synthèse vocale échoue).
 async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, text, permissions, log }) {
     try {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
@@ -104,17 +123,16 @@ async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLA
     }
 }
 
-async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE, ANTHROPIC_API_KEY, VANESSA_USER_ID, conversationId }) {
-    // Historique de CETTE conversation uniquement (jamais d'autres).
+async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversationId, limit = 12) {
     const history = await databases.listDocuments(DATABASE_ID, COLLECTION_MESSAGES, [
         Query.equal('conversationId', conversationId),
         Query.orderDesc('createdAt'),
-        Query.limit(12),
+        Query.limit(limit),
     ]);
-    const orderedHistory = history.documents.reverse();
+    return history.documents.reverse();
+}
 
-    // Notes publiques ajoutées manuellement (personnalisation), jamais de
-    // données privées d'autres conversations.
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID }) {
     let knowledgeContext = '';
     try {
         const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
@@ -127,10 +145,12 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
-    const messages = orderedHistory.map((m) => ({
-        role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
-        content: m.content,
-    }));
+    const messages = history
+        .filter((m) => m.type !== 'image') // Claude n'a pas besoin des anciens messages "image" en texte brut ici
+        .map((m) => ({
+            role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
+            content: m.content || (m.type === 'audio' ? '[message vocal]' : m.content),
+        }));
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -150,6 +170,45 @@ async function generateVanessaReply({ databases, DATABASE_ID, COLLECTION_MESSAGE
 
     if (!response.ok) {
         throw new Error(`Claude a répondu ${response.status}`);
+    }
+    const data = await response.json();
+    return data.content?.[0]?.text?.trim() || null;
+}
+
+// Analyse d'image à la demande — appelée uniquement quand le message
+// précédent de l'utilisateur dans la conversation était une image non
+// encore commentée.
+async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROPIC_API_KEY, imageFileId, requestText, log }) {
+    const file = await storage.getFile(BUCKET_STORY_IMAGES, imageFileId);
+    const mimeType = file.mimeType && file.mimeType.startsWith('image/') ? file.mimeType : 'image/jpeg';
+    const arrayBuffer = await storage.getFileDownload(BUCKET_STORY_IMAGES, imageFileId);
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            system: VANESSA_IMAGE_ROAST_PROMPT,
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+                    { type: 'text', text: requestText || 'Décris cette situation, façon gbairai.' },
+                ],
+            }],
+            max_tokens: 300,
+            temperature: 1,
+        }),
+    });
+
+    if (!response.ok) {
+        log(`⚠️ Claude Vision a répondu ${response.status}`);
+        throw new Error(`Claude Vision a répondu ${response.status}`);
     }
     const data = await response.json();
     return data.content?.[0]?.text?.trim() || null;
@@ -175,9 +234,11 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
+    const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const BUCKET_VOICE_MESSAGES = process.env.BUCKET_VOICE_MESSAGES;
+    const BUCKET_STORY_IMAGES = process.env.BUCKET_STORY_IMAGES;
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
     const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
@@ -193,13 +254,14 @@ export default async ({ req, res, log, error }) => {
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { conversationId, content, audioFileId, audioDuration } = body;
+        const { conversationId, content, audioFileId, audioDuration, imageFileId } = body;
         const isVoice = !!audioFileId;
-        log(`📩 conversationId=${conversationId} isVoice=${isVoice}`);
+        const isImage = !!imageFileId;
+        log(`📩 conversationId=${conversationId} isVoice=${isVoice} isImage=${isImage}`);
 
-        if (!conversationId || (!isVoice && (!content || !content.trim()))) {
-            log('❌ conversationId manquant, ou ni content ni audioFileId fournis.');
-            return res.json({ success: false, error: 'conversationId et (content ou audioFileId) requis.' }, 400);
+        if (!conversationId || (!isVoice && !isImage && (!content || !content.trim()))) {
+            log('❌ conversationId manquant, ou ni content, audioFileId, ni imageFileId fournis.');
+            return res.json({ success: false, error: 'conversationId et (content, audioFileId ou imageFileId) requis.' }, 400);
         }
 
         log('🔍 Récupération de la conversation...');
@@ -216,9 +278,38 @@ export default async ({ req, res, log, error }) => {
             Permission.update(Role.user(callerId)),
         ];
 
-        // Message vocal : transcription pour alimenter `content` (recherche,
-        // notifications, contexte de Vanessa) — le fichier audio original
-        // reste la source affichée côté client.
+        // Quota d'images (2/jour, illimité pour les modérateurs) — vérifié
+        // uniquement quand une image est envoyée, et uniquement côté
+        // serveur (impossible à contourner depuis le client).
+        let callerUser = null;
+        if (isImage && COLLECTION_USERS) {
+            log('👤 Vérification du quota image...');
+            callerUser = await databases.getDocument(DATABASE_ID, COLLECTION_USERS, callerId);
+            const today = new Date().toISOString().slice(0, 10);
+
+            if (!callerUser.isModerator) {
+                const sameDay = callerUser.imageAnalysisDate === today;
+                const currentCount = sameDay ? (callerUser.imageAnalysisCount || 0) : 0;
+
+                if (currentCount >= DAILY_IMAGE_LIMIT) {
+                    log(`❌ Quota image atteint pour ${callerId} (${currentCount}/${DAILY_IMAGE_LIMIT}).`);
+                    return res.json({
+                        success: false,
+                        error: `Tu as atteint la limite de ${DAILY_IMAGE_LIMIT} images par jour avec Vanessa. Reviens demain ! 📷`,
+                    }, 429);
+                }
+
+                await databases.updateDocument(DATABASE_ID, COLLECTION_USERS, callerId, {
+                    imageAnalysisDate: today,
+                    imageAnalysisCount: currentCount + 1,
+                });
+                log(`✅ Quota mis à jour : ${currentCount + 1}/${DAILY_IMAGE_LIMIT}.`);
+            } else {
+                log('✅ Modérateur — quota illimité.');
+            }
+        }
+
+        // Message vocal : transcription pour alimenter `content`.
         let finalContent = content ? content.trim() : '';
         if (isVoice) {
             if (!BUCKET_VOICE_MESSAGES || !ELEVENLABS_API_KEY) {
@@ -239,9 +330,10 @@ export default async ({ req, res, log, error }) => {
                 conversationId,
                 senderId: callerId,
                 content: finalContent,
-                type: isVoice ? 'audio' : 'text',
+                type: isImage ? 'image' : (isVoice ? 'audio' : 'text'),
                 audioFileId: isVoice ? audioFileId : '',
                 audioDuration: isVoice ? (audioDuration || 0) : 0,
+                imageFileId: isImage ? imageFileId : '',
                 readBy: [callerId],
                 createdAt: new Date().toISOString(),
             },
@@ -249,7 +341,7 @@ export default async ({ req, res, log, error }) => {
         );
         log(`✅ Message créé : ${message.$id}`);
 
-        const lastPreview = isVoice ? '🎤 Message vocal' : finalContent;
+        const lastPreview = isImage ? '📷 Photo' : (isVoice ? '🎤 Message vocal' : finalContent);
         await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
             lastMessage: lastPreview.length > 200 ? lastPreview.slice(0, 200) : lastPreview,
             lastMessageAt: new Date().toISOString(),
@@ -264,7 +356,7 @@ export default async ({ req, res, log, error }) => {
                 .map((id) =>
                     databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
                         userId: id,
-                        title: isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message',
+                        title: isImage ? '📷 Nouvelle photo' : (isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message'),
                         message: preview,
                         url: `/messages/${conversationId}`,
                         read: false,
@@ -274,15 +366,38 @@ export default async ({ req, res, log, error }) => {
         );
         log('✅ Notifications envoyées.');
 
+        // Une image seule ne déclenche JAMAIS de réponse automatique —
+        // Vanessa attend une demande explicite dans un message suivant.
+        if (isImage) {
+            log('📷 Image envoyée, en attente d\'une demande explicite avant toute description.');
+            return res.json({ success: true, message });
+        }
+
         // Vanessa répond automatiquement si elle fait partie de la
         // conversation (et que ce n'est pas elle-même qui vient d'écrire).
         if (VANESSA_USER_ID && ANTHROPIC_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
             log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
             try {
-                const reply = await generateVanessaReply({
-                    databases, DATABASE_ID, COLLECTION_MESSAGES, COLLECTION_VANESSA_KNOWLEDGE,
-                    ANTHROPIC_API_KEY, VANESSA_USER_ID, conversationId,
-                });
+                const history = await fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversationId);
+                // Le message qu'on vient de créer est le dernier de cet
+                // historique — on regarde celui juste AVANT pour savoir si
+                // c'est une image en attente de description.
+                const previous = history[history.length - 2];
+                const pendingImage = previous && previous.type === 'image' && previous.senderId === callerId && previous.imageFileId;
+
+                let reply;
+                if (pendingImage && BUCKET_STORY_IMAGES) {
+                    log('📷 Image en attente détectée — analyse Claude Vision...');
+                    reply = await generateVanessaImageRoast({
+                        storage, BUCKET_STORY_IMAGES, ANTHROPIC_API_KEY,
+                        imageFileId: previous.imageFileId, requestText: finalContent, log,
+                    });
+                } else {
+                    reply = await generateVanessaReply({
+                        history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                    });
+                }
+
                 log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
                 if (reply) {
                     // Si l'échange était vocal ET que la messagerie vocale
@@ -303,6 +418,7 @@ export default async ({ req, res, log, error }) => {
                         type: vanessaAudioFileId ? 'audio' : 'text',
                         audioFileId: vanessaAudioFileId || '',
                         audioDuration: 0,
+                        imageFileId: '',
                         readBy: [VANESSA_USER_ID],
                         createdAt: new Date().toISOString(),
                     }, permissions);

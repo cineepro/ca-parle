@@ -23,7 +23,11 @@ export const useConversationThread = (conversationId: string) => {
     const [hasMoreOlder, setHasMoreOlder] = useState(false);
     const [sending, setSending] = useState(false);
     const [vanessaTyping, setVanessaTyping] = useState(false);
+    // `error` : bloquant, remplace toute la page (conversation introuvable).
+    // `sendError` : transitoire, affiché comme un simple message sans
+    // cacher le reste de la conversation (échec d'envoi, quota dépassé...).
     const [error, setError] = useState<string | null>(null);
+    const [sendError, setSendError] = useState<string | null>(null);
     const seenIds = useRef(new Set<string>());
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -125,19 +129,23 @@ export const useConversationThread = (conversationId: string) => {
     const sendMessage = async (content: string) => {
         if (!user || !conversation || !content.trim() || sending) return;
         setSending(true);
+        setSendError(null);
+        // Démarré AVANT l'envoi, pas après : la Function traite tout en
+        // un seul appel bloquant (message humain + réponse de Vanessa), sa
+        // réponse peut donc arriver par le temps réel avant même que ce
+        // sendMessage() ait fini d'attendre — d'où l'indicateur affiché
+        // dès le départ, pas une fois la réponse déjà revenue.
+        startWaitingForVanessa();
         try {
             const sentMessage = await messageService.send(conversation, user.$id, content.trim());
-            // Affichage optimiste immédiat de ton propre message — on
-            // n'attend plus la souscription temps réel pour le voir
-            // apparaître. Son ID est marqué comme "déjà vu" pour éviter un
-            // doublon si l'événement Realtime arrive quand même ensuite.
             if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
                 seenIds.current.add(sentMessage.$id);
                 setMessages((prev) => [...prev, sentMessage]);
             }
-            startWaitingForVanessa();
         } catch {
-            setError("Impossible d'envoyer le message, réessaie.");
+            setSendError("Impossible d'envoyer le message, réessaie.");
+            setVanessaTyping(false);
+            clearTypingTimeout();
         } finally {
             setSending(false);
         }
@@ -146,22 +154,48 @@ export const useConversationThread = (conversationId: string) => {
     const sendVoiceMessage = async (blob: Blob, durationSeconds: number) => {
         if (!user || !conversation || sending) return;
         setSending(true);
+        setSendError(null);
+        startWaitingForVanessa();
         try {
             const sentMessage = await messageService.sendVoice(conversation, blob, durationSeconds);
             if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
                 seenIds.current.add(sentMessage.$id);
                 setMessages((prev) => [...prev, sentMessage]);
             }
-            startWaitingForVanessa();
         } catch {
-            setError("Impossible d'envoyer le vocal, réessaie.");
+            setSendError("Impossible d'envoyer le vocal, réessaie.");
+            setVanessaTyping(false);
+            clearTypingTimeout();
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // Une image seule ne déclenche jamais de réponse automatique — pas de
+    // startWaitingForVanessa() ici, elle ne se déclenche que sur le
+    // prochain message texte qui en fera la demande.
+    const sendImageMessage = async (file: File) => {
+        if (!user || !conversation || sending) return;
+        setSending(true);
+        setSendError(null);
+        try {
+            const sentMessage = await messageService.sendImage(conversation, file);
+            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
+                seenIds.current.add(sentMessage.$id);
+                setMessages((prev) => [...prev, sentMessage]);
+            }
+        } catch (err: any) {
+            // Le message d'erreur du quota est spécifique et utile à
+            // afficher tel quel (ex: "Tu as atteint la limite...").
+            setSendError(err?.message || "Impossible d'envoyer l'image, réessaie.");
         } finally {
             setSending(false);
         }
     };
 
     return {
-        conversation, otherName, otherId, messages, loading, sending, error, sendMessage, sendVoiceMessage,
+        conversation, otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
+        sendImageMessage, isVanessaConversation,
         loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     };
 };

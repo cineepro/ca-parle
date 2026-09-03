@@ -11,7 +11,8 @@ export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const {
-        otherName, otherId, messages, loading, sending, error, sendMessage, sendVoiceMessage,
+        otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
+        sendImageMessage, isVanessaConversation,
         loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     } = useConversationThread(id!);
     const bottomRef = useRef<HTMLDivElement>(null);
@@ -85,6 +86,18 @@ export default function ConversationPage() {
         );
     }
 
+    // Indice discret : la dernière chose envoyée est une image de
+    // l'utilisateur, Vanessa est dans la conversation, et rien n'a encore
+    // répondu à cette image — on suggère de lui demander une description.
+    const lastMessage = messages[messages.length - 1];
+    const showImageHint = !!(
+        isVanessaConversation &&
+        lastMessage &&
+        lastMessage.type === 'image' &&
+        lastMessage.senderId === user?.$id &&
+        !vanessaTyping
+    );
+
     return (
         <div className="max-w-2xl mx-auto flex flex-col relative" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
             <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 sticky top-14 z-10">
@@ -120,6 +133,12 @@ export default function ConversationPage() {
                     ))
                 )}
 
+                {showImageHint && (
+                    <p className="text-xs text-gray-400 text-center py-1">
+                        📷 Envoyée ! Écris un message pour demander à Vanessa ce qu'elle en pense 👀
+                    </p>
+                )}
+
                 {vanessaTyping && (
                     <div className="flex justify-start">
                         <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1">
@@ -144,7 +163,15 @@ export default function ConversationPage() {
             )}
 
             <div className="sticky bottom-20 md:bottom-0">
-                <MessageComposer onSend={sendMessage} onSendVoice={sendVoiceMessage} sending={sending} />
+                {sendError && (
+                    <p className="text-xs text-red-500 text-center bg-red-50 py-1.5 px-3">{sendError}</p>
+                )}
+                <MessageComposer
+                    onSend={sendMessage}
+                    onSendVoice={sendVoiceMessage}
+                    onSendImage={sendImageMessage}
+                    sending={sending}
+                />
             </div>
         </div>
     );
