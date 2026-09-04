@@ -8,7 +8,7 @@
 // conversation privée — cette limite-là reste non négociable.
 //
 // Notifie TOUS les utilisateurs de la nouvelle chronique du jour.
-import { Client, Databases, Query, ID } from 'node-appwrite';
+import { Client, Databases, Messaging, Query, ID } from 'node-appwrite';
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu parles en français de rue, à l'africaine — jamais en français littéraire. Expressions naturelles du Bénin, de Côte d'Ivoire, du Togo, du Cameroun, du Sénégal ("gbairai", "wèèh", "mon frère", "on dit koi"...), sans en abuser. Phrases courtes, vivantes, 1-2 emojis maximum. Jamais de ton robotique.
 
@@ -35,6 +35,7 @@ export default async ({ req, res, log, error }) => {
         .setKey(process.env.APPWRITE_API_KEY);
 
     const databases = new Databases(client);
+    const messaging = new Messaging(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_STORIES = process.env.COLLECTION_STORIES;
     const COLLECTION_REFERENCES = process.env.COLLECTION_REFERENCES;
@@ -157,6 +158,7 @@ export default async ({ req, res, log, error }) => {
         // documents créés) si la plateforme dépasse plusieurs dizaines de
         // milliers de comptes.
         let notified = 0;
+        const allUserIds = [];
         if (COLLECTION_USERS && COLLECTION_NOTIFICATIONS) {
             let offset = 0;
             const pageSize = 100;
@@ -170,25 +172,52 @@ export default async ({ req, res, log, error }) => {
                     Query.offset(offset),
                 ]);
 
+                const pageIds = usersPage.documents
+                    .filter((u) => u.$id !== VANESSA_USER_ID)
+                    .map((u) => u.$id);
+                allUserIds.push(...pageIds);
+
                 await Promise.allSettled(
-                    usersPage.documents
-                        .filter((u) => u.$id !== VANESSA_USER_ID)
-                        .map((u) =>
-                            databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
-                                userId: u.$id,
-                                title: `☀️ ${title}`,
-                                message: notifPreview,
-                                url: `/histoire/${story.slug}`,
-                                read: false,
-                                createdAt: new Date().toISOString(),
-                            })
-                        )
+                    pageIds.map((id) =>
+                        databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
+                            userId: id,
+                            title: `☀️ ${title}`,
+                            message: notifPreview,
+                            url: `/histoire/${story.slug}`,
+                            read: false,
+                            createdAt: new Date().toISOString(),
+                        })
+                    )
                 );
-                notified += usersPage.documents.length;
+                notified += pageIds.length;
                 offset += pageSize;
                 hasMore = usersPage.documents.length === pageSize;
             }
-            log(`✅ ${notified} utilisateurs notifiés.`);
+            log(`✅ ${notified} utilisateurs notifiés (base de données).`);
+
+            // Push natif envoyé par LOTS (jusqu'à 100 destinataires par
+            // appel Messaging) — bien plus efficace qu'un appel par
+            // utilisateur pour une chronique quotidienne à grande échelle.
+            const PUSH_BATCH_SIZE = 100;
+            let pushed = 0;
+            for (let i = 0; i < allUserIds.length; i += PUSH_BATCH_SIZE) {
+                const batch = allUserIds.slice(i, i + PUSH_BATCH_SIZE);
+                try {
+                    await messaging.createPush(
+                        ID.unique(),
+                        `☀️ ${title}`,
+                        notifPreview,
+                        [],
+                        batch,
+                        [],
+                        { url: `/histoire/${story.slug}` }
+                    );
+                    pushed += batch.length;
+                } catch (pushErr) {
+                    log(`⚠️ Échec envoi push lot ${i}-${i + PUSH_BATCH_SIZE} (non bloquant) : ${pushErr.message}`);
+                }
+            }
+            log(`✅ Push envoyé à ${pushed} utilisateurs.`);
         }
 
         return res.json({ success: true, storyId: story.$id, title, notified });

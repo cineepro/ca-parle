@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "85590523151",
+    "project_id": "ca-parle",
+    "storage_bucket": "ca-parle.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85590523151:android:da6544e37f11d713dd127a",
+        "android_client_info": {
+          "package_name": "com.kinemaplus.caparle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCUJBlHgSYd58iq0GB8-NKTc1C5suydbA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

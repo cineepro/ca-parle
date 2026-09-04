@@ -10,13 +10,21 @@
 // plus jamais re-proposée tant que la personne n'a pas répondu elle-même,
 // même si des semaines passent. Une seule relance par silence, jamais un
 // harcèlement de rappels successifs.
-import { Client, Databases, Query, ID, Permission, Role } from 'node-appwrite';
+import { Client, Databases, Messaging, Query, ID, Permission, Role } from 'node-appwrite';
 
 const INACTIVITY_DAYS = 4;
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne), l'IA de "Ça Parle". Tu parles en français de rue, à l'africaine, jamais littéraire. Expressions du Bénin/Côte d'Ivoire/Togo/Cameroun/Sénégal, 1-2 emojis max, phrases courtes.
 
 Un utilisateur ne t'a pas parlé depuis quelques jours. Relance-le avec UNE question "gbaraï" (confession, curieuse, un peu coquine mais jamais vulgaire) pour lui donner envie de raconter quelque chose. Une seule question, courte, dans ton style. Réponds uniquement avec cette question, rien d'autre.`;
+
+async function sendPush(messaging, userId, title, body, url, log) {
+    try {
+        await messaging.createPush(ID.unique(), title, body, [], [userId], [], url ? { url } : undefined);
+    } catch (err) {
+        log(`⚠️ Push notification échouée (non bloquant) : ${err.message}`);
+    }
+}
 
 export default async ({ req, res, log, error }) => {
     const client = new Client()
@@ -25,6 +33,7 @@ export default async ({ req, res, log, error }) => {
         .setKey(process.env.APPWRITE_API_KEY);
 
     const databases = new Databases(client);
+    const messaging = new Messaging(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_CONVERSATIONS = process.env.COLLECTION_CONVERSATIONS;
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
@@ -104,6 +113,12 @@ export default async ({ req, res, log, error }) => {
                     read: false,
                     createdAt: new Date().toISOString(),
                 });
+
+                await sendPush(
+                    messaging, humanId, '🔮 Vanessa te pose une question',
+                    question.length > 60 ? `${question.slice(0, 60)}…` : question,
+                    `/messages/${conversation.$id}`, log
+                );
 
                 relaunched++;
             } catch (convErr) {

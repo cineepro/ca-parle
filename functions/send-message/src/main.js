@@ -28,8 +28,30 @@
 // jamais sur le physique d'une personne (règle imposée dans le prompt).
 // Limité à 2 images/jour par utilisateur normal, illimité pour les
 // modérateurs (vérifié ici, jamais côté client).
-import { Client, Databases, Storage, ID, Permission, Role, Query } from 'node-appwrite';
+//
+// 🔔 Notification PUSH native (en plus de la notification stockée en
+// base) : envoyée uniquement pour un vrai message d'un AUTRE utilisateur
+// — jamais pour les réponses de Vanessa (déjà exclues des notifications
+// tout court, voir plus bas). Non bloquant : si Appwrite Messaging n'est
+// pas configuré ou échoue, le message est envoyé quand même.
+import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+
+async function sendPush(messaging, userId, title, body, url, log) {
+    try {
+        await messaging.createPush(
+            ID.unique(),
+            title,
+            body,
+            [],        // topics
+            [userId],  // users ciblés
+            [],        // targets
+            url ? { url } : undefined // data, récupérée côté client au tap
+        );
+    } catch (err) {
+        log(`⚠️ Push notification échouée (non bloquant) : ${err.message}`);
+    }
+}
 
 const DAILY_IMAGE_LIMIT = 2;
 
@@ -229,6 +251,7 @@ export default async ({ req, res, log, error }) => {
 
     const databases = new Databases(client);
     const storage = new Storage(client);
+    const messaging = new Messaging(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_CONVERSATIONS = process.env.COLLECTION_CONVERSATIONS;
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
@@ -350,21 +373,30 @@ export default async ({ req, res, log, error }) => {
         log('✅ Conversation mise à jour.');
 
         const preview = lastPreview.length > 60 ? `${lastPreview.slice(0, 60)}…` : lastPreview;
+        const notifTitle = isImage ? '📷 Nouvelle photo' : (isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message');
+        const recipients = conversation.participantIds.filter((id) => id !== callerId);
+
         await Promise.allSettled(
-            conversation.participantIds
-                .filter((id) => id !== callerId)
-                .map((id) =>
-                    databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
-                        userId: id,
-                        title: isImage ? '📷 Nouvelle photo' : (isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message'),
-                        message: preview,
-                        url: `/messages/${conversationId}`,
-                        read: false,
-                        createdAt: new Date().toISOString(),
-                    })
-                )
+            recipients.map((id) =>
+                databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
+                    userId: id,
+                    title: notifTitle,
+                    message: preview,
+                    url: `/messages/${conversationId}`,
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                })
+            )
         );
         log('✅ Notifications envoyées.');
+
+        // Push natif — uniquement vers de vrais utilisateurs (jamais vers
+        // Vanessa, qui n'a pas d'appareil).
+        await Promise.allSettled(
+            recipients
+                .filter((id) => id !== VANESSA_USER_ID)
+                .map((id) => sendPush(messaging, id, notifTitle, preview, `/messages/${conversationId}`, log))
+        );
 
         // Une image seule ne déclenche JAMAIS de réponse automatique —
         // Vanessa attend une demande explicite dans un message suivant.
