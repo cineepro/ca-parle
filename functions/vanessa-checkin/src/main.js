@@ -3,9 +3,13 @@
 //
 // Cherche les conversations avec Vanessa inactives depuis plusieurs jours
 // et lui fait envoyer une "question gbaraï" pour relancer la discussion.
-// S'auto-limite naturellement : dès qu'elle envoie ce message,
-// lastMessageAt est mis à jour, donc cette conversation ne sera plus
-// éligible avant le prochain seuil d'inactivité.
+//
+// ⚠️ Anti-harcèlement : ne relance QUE si le DERNIER message de la
+// conversation vient de l'humain (pas de Vanessa). Après une relance,
+// lastMessageSenderId devient Vanessa — donc cette conversation ne sera
+// plus jamais re-proposée tant que la personne n'a pas répondu elle-même,
+// même si des semaines passent. Une seule relance par silence, jamais un
+// harcèlement de rappels successifs.
 import { Client, Databases, Query, ID, Permission, Role } from 'node-appwrite';
 
 const INACTIVITY_DAYS = 4;
@@ -34,6 +38,7 @@ export default async ({ req, res, log, error }) => {
         const stale = await databases.listDocuments(DATABASE_ID, COLLECTION_CONVERSATIONS, [
             Query.contains('participantIds', VANESSA_USER_ID),
             Query.lessThan('lastMessageAt', threshold),
+            Query.notEqual('lastMessageSenderId', VANESSA_USER_ID),
             Query.limit(50),
         ]);
 
@@ -73,6 +78,10 @@ export default async ({ req, res, log, error }) => {
                     conversationId: conversation.$id,
                     senderId: VANESSA_USER_ID,
                     content: question,
+                    type: 'text',
+                    audioFileId: '',
+                    audioDuration: 0,
+                    imageFileId: '',
                     readBy: [VANESSA_USER_ID],
                     createdAt: new Date().toISOString(),
                 }, permissions);
@@ -83,6 +92,10 @@ export default async ({ req, res, log, error }) => {
                     lastMessageSenderId: VANESSA_USER_ID,
                 });
 
+                // Ici, la notification reste volontaire : contrairement à
+                // une réponse en pleine conversation active, une relance
+                // arrive alors que l'utilisateur n'est probablement pas
+                // dans l'app — c'est justement le but.
                 await databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
                     userId: humanId,
                     title: '🔮 Vanessa te pose une question',

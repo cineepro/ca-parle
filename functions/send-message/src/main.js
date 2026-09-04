@@ -430,15 +430,14 @@ export default async ({ req, res, log, error }) => {
                         lastMessageSenderId: VANESSA_USER_ID,
                     });
 
-                    await databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
-                        userId: callerId,
-                        title: '🔮 Vanessa a répondu',
-                        message: vanessaPreview.length > 60 ? `${vanessaPreview.slice(0, 60)}…` : vanessaPreview,
-                        url: `/messages/${conversationId}`,
-                        read: false,
-                        createdAt: new Date().toISOString(),
-                    });
-                    log('✅ Message de Vanessa créé et notification envoyée.');
+                    // Pas de notification ici volontairement : l'utilisateur
+                    // vient d'envoyer un message, il est donc déjà en train
+                    // de regarder cette conversation — une notification à
+                    // chaque réponse serait redondante et vite lassante.
+                    // Seules ses RELANCES (vanessa-checkin) et sa chronique
+                    // du matin (vanessa-daily-post) déclenchent une vraie
+                    // notification, quand l'utilisateur n'est pas déjà là.
+                    log('✅ Message de Vanessa créé (sans notification, conversation déjà active).');
                 }
             } catch (vanessaErr) {
                 log(`⚠️ Réponse Vanessa échouée (non bloquant) : ${vanessaErr.message}`);

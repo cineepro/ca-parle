@@ -6,6 +6,8 @@
 // contenu PUBLIC : histoires tendance/récentes, fiches références
 // populaires, notes manuelles des modérateurs. Ne lit JAMAIS de
 // conversation privée — cette limite-là reste non négociable.
+//
+// Notifie TOUS les utilisateurs de la nouvelle chronique du jour.
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu parles en français de rue, à l'africaine — jamais en français littéraire. Expressions naturelles du Bénin, de Côte d'Ivoire, du Togo, du Cameroun, du Sénégal ("gbairai", "wèèh", "mon frère", "on dit koi"...), sans en abuser. Phrases courtes, vivantes, 1-2 emojis maximum. Jamais de ton robotique.
@@ -37,6 +39,8 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_STORIES = process.env.COLLECTION_STORIES;
     const COLLECTION_REFERENCES = process.env.COLLECTION_REFERENCES;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
+    const COLLECTION_USERS = process.env.COLLECTION_USERS;
+    const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -56,7 +60,6 @@ export default async ({ req, res, log, error }) => {
             Query.limit(6),
         ]);
 
-        // Fusionne les deux listes sans doublon.
         const seenIds = new Set();
         const stories = [...trending.documents, ...recent.documents].filter((s) => {
             if (seenIds.has(s.$id)) return false;
@@ -68,8 +71,7 @@ export default async ({ req, res, log, error }) => {
             ? stories.map((s) => `- [${s.categoryId}] "${s.title}" — ${excerpt(s.content)} (${s.reactionsCount} réactions, ${s.commentsCount} commentaires)`).join('\n')
             : 'Rien de spécial ne buzz aujourd\'hui, improvise sur l\'ambiance générale.';
 
-        // 3. Fiches références les plus populaires (personnes/sujets dont
-        // on parle le plus) — public également.
+        // 3. Fiches références les plus populaires — public également.
         let referencesContext = '';
         try {
             const references = await databases.listDocuments(DATABASE_ID, COLLECTION_REFERENCES, [
@@ -82,7 +84,7 @@ export default async ({ req, res, log, error }) => {
             }
         } catch { /* collection pas encore configurée */ }
 
-        // 4. Notes manuelles ajoutées par l'équipe (personnalisation).
+        // 4. Notes manuelles ajoutées par l'équipe.
         let knowledgeContext = '';
         try {
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
@@ -147,8 +149,49 @@ export default async ({ req, res, log, error }) => {
             referenceIds: [],
             createdAt: new Date().toISOString(),
         });
+        log(`✅ Chronique du jour publiée : ${story.$id}`);
 
-        return res.json({ success: true, storyId: story.$id, title });
+        // Notifie tous les utilisateurs non bannis de la nouvelle chronique.
+        // ⚠️ Fan-out potentiellement coûteux si la base d'utilisateurs
+        // grossit beaucoup — à surveiller (temps d'exécution + volume de
+        // documents créés) si la plateforme dépasse plusieurs dizaines de
+        // milliers de comptes.
+        let notified = 0;
+        if (COLLECTION_USERS && COLLECTION_NOTIFICATIONS) {
+            let offset = 0;
+            const pageSize = 100;
+            let hasMore = true;
+            const notifPreview = content.length > 60 ? `${content.slice(0, 60)}…` : content;
+
+            while (hasMore) {
+                const usersPage = await databases.listDocuments(DATABASE_ID, COLLECTION_USERS, [
+                    Query.notEqual('isBanned', true),
+                    Query.limit(pageSize),
+                    Query.offset(offset),
+                ]);
+
+                await Promise.allSettled(
+                    usersPage.documents
+                        .filter((u) => u.$id !== VANESSA_USER_ID)
+                        .map((u) =>
+                            databases.createDocument(DATABASE_ID, COLLECTION_NOTIFICATIONS, ID.unique(), {
+                                userId: u.$id,
+                                title: `☀️ ${title}`,
+                                message: notifPreview,
+                                url: `/histoire/${story.slug}`,
+                                read: false,
+                                createdAt: new Date().toISOString(),
+                            })
+                        )
+                );
+                notified += usersPage.documents.length;
+                offset += pageSize;
+                hasMore = usersPage.documents.length === pageSize;
+            }
+            log(`✅ ${notified} utilisateurs notifiés.`);
+        }
+
+        return res.json({ success: true, storyId: story.$id, title, notified });
     } catch (err) {
         error(err.message);
         return res.json({ success: false, error: err.message }, 500);
