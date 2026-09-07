@@ -122,18 +122,26 @@ export const messageService = {
     },
 
     // Abonnement Appwrite Realtime : contrairement aux notifications
-    // (polling 30s, suffisant pour un badge), un fil de discussion a
-    // vraiment besoin d'être instantané. Retourne une fonction de
-    // désabonnement à appeler au démontage du composant.
+    // (maintenant elles aussi en temps réel, voir useNotifications), un
+    // fil de discussion a vraiment besoin d'être instantané. Retourne une
+    // fonction de désabonnement à appeler au démontage du composant.
+    //
+    // ⚠️ Le filtre `Query.equal('conversationId', ...)` est appliqué CÔTÉ
+    // SERVEUR (Realtime queries, SDK v22+) — sans lui, cet abonnement
+    // recevait TOUS les messages de TOUTE la plateforme sur chaque client
+    // connecté, filtrés seulement après coup ici. À grande échelle, ça
+    // gonfle inutilement le nombre de messages Realtime facturés par
+    // Appwrite. Ne jamais revenir à un abonnement sans ce filtre.
     subscribeToConversation(conversationId: string, onMessage: (message: Message) => void): () => void {
         const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.MESSAGES}.documents`;
-        return client.subscribe(channel, (response: any) => {
-            const isCreate = response.events?.some((e: string) => e.endsWith('.create'));
-            if (!isCreate) return;
-            const payload = response.payload as Message;
-            if (payload.conversationId === conversationId) {
-                onMessage(payload);
-            }
-        });
+        return client.subscribe(
+            channel,
+            (response: any) => {
+                const isCreate = response.events?.some((e: string) => e.endsWith('.create'));
+                if (!isCreate) return;
+                onMessage(response.payload as Message);
+            },
+            [Query.equal('conversationId', [conversationId])]
+        );
     },
 };

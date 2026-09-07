@@ -2,12 +2,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { notificationService, type AppNotification } from '../services/notificationService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { client } from '@/api/appwrite';
+import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
+import { Query } from 'appwrite';
 
-// Rafraîchissement périodique simple (pas de temps réel Appwrite branché
-// ici) — suffisant pour un badge de compteur qui reste raisonnablement à
-// jour sans complexifier l'architecture avec des souscriptions Realtime.
-const POLL_INTERVAL_MS = 30_000;
-
+// Anciennement un polling toutes les 30s (2 lectures en base par
+// utilisateur actif, en continu) — remplacé par un vrai abonnement
+// Realtime filtré CÔTÉ SERVEUR sur `userId` (SDK v22+, Realtime queries).
+// Un seul chargement initial au montage, puis plus aucune lecture tant
+// qu'aucune nouvelle notification n'arrive réellement.
 export const useNotifications = () => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -30,9 +33,24 @@ export const useNotifications = () => {
 
     useEffect(() => {
         load();
-        const interval = setInterval(load, POLL_INTERVAL_MS);
-        return () => clearInterval(interval);
     }, [load]);
+
+    useEffect(() => {
+        if (!user) return;
+        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.NOTIFICATIONS}.documents`;
+        const unsubscribe = client.subscribe(
+            channel,
+            (response: any) => {
+                const isCreate = response.events?.some((e: string) => e.endsWith('.create'));
+                if (!isCreate) return;
+                const notif = response.payload as AppNotification;
+                setNotifications((prev) => [notif, ...prev].slice(0, 30));
+                if (!notif.read) setUnreadCount((c) => c + 1);
+            },
+            [Query.equal('userId', [user.$id])]
+        );
+        return unsubscribe;
+    }, [user]);
 
     const markAsRead = async (id: string) => {
         await notificationService.markRead(id);
