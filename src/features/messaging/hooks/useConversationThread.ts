@@ -12,6 +12,17 @@ const PAGE_SIZE = 30;
 // ne pas laisser l'indicateur tourner indéfiniment.
 const VANESSA_TYPING_TIMEOUT_MS = 25_000;
 
+function buildOptimisticMessage(conversationId: string, senderId: string, content: string, tempId: string): Message {
+    const nowIso = new Date().toISOString();
+    return {
+        $id: tempId,
+        $collectionId: '', $databaseId: '', $permissions: [],
+        $createdAt: nowIso, $updatedAt: nowIso,
+        conversationId, senderId, content,
+        type: 'text', readBy: [senderId], createdAt: nowIso,
+    } as unknown as Message;
+}
+
 export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
     const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -30,6 +41,12 @@ export const useConversationThread = (conversationId: string) => {
     const [sendError, setSendError] = useState<string | null>(null);
     const seenIds = useRef(new Set<string>());
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // File d'attente des messages optimistes envoyés par MOI, pas encore
+    // confirmés par le serveur — nécessaire pour éviter un doublon si le
+    // temps réel fait arriver la version confirmée AVANT que l'appel réseau
+    // initial n'ait fini de répondre (déjà observé avec les réponses de
+    // Vanessa, le même risque existe pour l'écho de mon propre message).
+    const pendingTempIds = useRef<string[]>([]);
 
     const isVanessaConversation = !!(
         VANESSA_USER_ID && conversation?.participantIds.includes(VANESSA_USER_ID)
@@ -113,6 +130,17 @@ export const useConversationThread = (conversationId: string) => {
         const unsubscribe = messageService.subscribeToConversation(conversationId, (message) => {
             if (seenIds.current.has(message.$id)) return;
             seenIds.current.add(message.$id);
+
+            // Si c'est l'écho de mon propre message optimiste (arrivé par
+            // le temps réel avant que mon propre appel réseau n'ait fini),
+            // on remplace le plus ancien message temporaire en attente au
+            // lieu d'en ajouter un doublon.
+            if (user && message.senderId === user.$id && pendingTempIds.current.length > 0) {
+                const tempId = pendingTempIds.current.shift()!;
+                setMessages((prev) => prev.map((m) => (m.$id === tempId ? message : m)));
+                return;
+            }
+
             setMessages((prev) => [...prev, message]);
             // Dès que le message de Vanessa arrive, on arrête "elle écrit...".
             if (VANESSA_USER_ID && message.senderId === VANESSA_USER_ID) {
@@ -124,25 +152,39 @@ export const useConversationThread = (conversationId: string) => {
             unsubscribe();
             clearTypingTimeout();
         };
-    }, [conversationId]);
+    }, [conversationId, user]);
 
     const sendMessage = async (content: string) => {
         if (!user || !conversation || !content.trim() || sending) return;
         setSending(true);
         setSendError(null);
-        // Démarré AVANT l'envoi, pas après : la Function traite tout en
-        // un seul appel bloquant (message humain + réponse de Vanessa), sa
-        // réponse peut donc arriver par le temps réel avant même que ce
-        // sendMessage() ait fini d'attendre — d'où l'indicateur affiché
-        // dès le départ, pas une fois la réponse déjà revenue.
         startWaitingForVanessa();
+
+        // Affichage optimiste IMMÉDIAT du message — AVANT même l'appel
+        // réseau, exactement comme le fait Astra sur DataInsight (comparé
+        // et vérifié). Auparavant, le message n'apparaissait qu'une fois
+        // la Function entièrement terminée (message créé + réponse de
+        // Vanessa générée), ce qui donnait l'impression que "les points de
+        // réflexion" arrivaient avant le message lui-même — déroutant pour
+        // l'utilisateur.
+        const tempId = `temp-${Date.now()}`;
+        pendingTempIds.current.push(tempId);
+        setMessages((prev) => [...prev, buildOptimisticMessage(conversation.$id, user.$id, content.trim(), tempId)]);
+
         try {
             const sentMessage = await messageService.send(conversation, user.$id, content.trim());
-            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
+            if (sentMessage && pendingTempIds.current.includes(tempId)) {
+                // Toujours en attente : le temps réel n'a pas encore
+                // remplacé ce message temporaire, on le fait ici.
+                pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
                 seenIds.current.add(sentMessage.$id);
-                setMessages((prev) => [...prev, sentMessage]);
+                setMessages((prev) => prev.map((m) => (m.$id === tempId ? sentMessage : m)));
             }
         } catch {
+            pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
+            // Retire le message optimiste raté — sinon l'utilisateur croit
+            // qu'il est parti alors que ce n'est pas le cas.
+            setMessages((prev) => prev.filter((m) => m.$id !== tempId));
             setSendError("Impossible d'envoyer le message, réessaie.");
             setVanessaTyping(false);
             clearTypingTimeout();
@@ -156,13 +198,25 @@ export const useConversationThread = (conversationId: string) => {
         setSending(true);
         setSendError(null);
         startWaitingForVanessa();
+
+        // Un vocal ne peut pas être "joué" avant la fin de l'upload (il
+        // faut le fichier réel), mais on montre tout de suite qu'il part,
+        // pour garder le bon ordre visuel (message avant points de
+        // réflexion).
+        const tempId = `temp-${Date.now()}`;
+        pendingTempIds.current.push(tempId);
+        setMessages((prev) => [...prev, buildOptimisticMessage(conversation.$id, user.$id, '🎤 Envoi du vocal...', tempId)]);
+
         try {
             const sentMessage = await messageService.sendVoice(conversation, blob, durationSeconds);
-            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
+            if (sentMessage && pendingTempIds.current.includes(tempId)) {
+                pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
                 seenIds.current.add(sentMessage.$id);
-                setMessages((prev) => [...prev, sentMessage]);
+                setMessages((prev) => prev.map((m) => (m.$id === tempId ? sentMessage : m)));
             }
         } catch {
+            pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
+            setMessages((prev) => prev.filter((m) => m.$id !== tempId));
             setSendError("Impossible d'envoyer le vocal, réessaie.");
             setVanessaTyping(false);
             clearTypingTimeout();
