@@ -6,12 +6,14 @@ import { MessageBubble } from '@/features/messaging/components/MessageBubble';
 import { MessageComposer } from '@/features/messaging/components/MessageComposer';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Avatar } from '@/components/ui/avatar';
+import { ConnectorChips } from '@/features/vanessa/components/ConnectorChips';
+import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const {
-        otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
+        conversation, otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
         sendImageMessage, isVanessaConversation,
         loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
     } = useConversationThread(id!);
@@ -20,6 +22,24 @@ export default function ConversationPage() {
     const lastMessageIdRef = useRef<string | null>(null);
     const prevScrollHeightRef = useRef<number>(0);
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+    // Connecteurs de partenaires — chargés une seule fois, réutilisés à la
+    // fois pour les pastilles du composeur et le badge d'en-tête.
+    const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
+    const [activeConnectorId, setActiveConnectorId] = useState('');
+
+    useEffect(() => {
+        if (!isVanessaConversation) return;
+        vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
+    }, [isVanessaConversation]);
+
+    // Synchronise l'état local avec le connecteur déjà actif sur cette
+    // conversation (persisté en base), une fois qu'elle a fini de charger.
+    useEffect(() => {
+        if (conversation) setActiveConnectorId(conversation.vanessaConnectorId || '');
+    }, [conversation?.$id]);
+
+    const activeConnector = connectors.find((c) => c.$id === activeConnectorId);
 
     // Défilement automatique vers le bas UNIQUEMENT quand un nouveau
     // message arrive à la FIN (envoi, réponse, temps réel) — jamais quand
@@ -100,10 +120,28 @@ export default function ConversationPage() {
 
     return (
         <div className="max-w-2xl mx-auto flex flex-col relative" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
-            <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 sticky top-14 z-10">
-                <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
-                <Avatar name={otherName} userId={otherId} sizeClass="w-9 h-9" />
-                <p className="text-sm font-semibold text-gray-800">{otherName}</p>
+            <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
+                <div className="flex items-center gap-3 px-4 py-3">
+                    <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
+                    <Avatar name={otherName} userId={otherId} sizeClass="w-9 h-9" />
+                    <div>
+                        <p className="text-sm font-semibold text-gray-800">{otherName}</p>
+                        {activeConnector && (
+                            <p className="text-[11px] font-medium" style={{ color: activeConnector.color }}>
+                                {activeConnector.icon} {activeConnector.description || activeConnector.name}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {isVanessaConversation && connectors.length > 0 && (
+                    <ConnectorChips
+                        conversationId={id!}
+                        connectors={connectors}
+                        activeConnectorId={activeConnectorId}
+                        onChanged={setActiveConnectorId}
+                    />
+                )}
             </div>
 
             <div

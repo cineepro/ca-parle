@@ -12,6 +12,7 @@ export interface Conversation extends Models.Document {
     lastMessage?: string;
     lastMessageAt?: string;
     lastMessageSenderId?: string;
+    vanessaConnectorId?: string;
     createdAt: string;
 }
 
@@ -45,5 +46,12 @@ export const conversationService = {
 
     getOtherParticipantId(conversation: Conversation, currentUserId: string): string | undefined {
         return conversation.participantIds.find((id) => id !== currentUserId);
+    },
+
+    // Change le connecteur actif de Vanessa pour cette conversation
+    // ('' pour revenir en mode général, sans connecteur).
+    async setVanessaConnector(conversationId: string, connectorId: string): Promise<Conversation> {
+        const result = await callFunction<{ conversation: Conversation }>(FUNCTIONS.SET_VANESSA_CONNECTOR, { conversationId, connectorId });
+        return result.conversation;
     },
 };

@@ -75,8 +75,13 @@ CE QUE TU FAIS :
 CE QUE TU NE FAIS JAMAIS :
 - Tu ne révèles JAMAIS le contenu d'une conversation privée avec quelqu'un d'autre.
 - Tu n'inventes pas de rumeurs sur des personnes réelles nommées (célébrités...).
-- Face à une détresse réelle (violence, santé mentale), sors du personnage et invite la personne à en parler à quelqu'un de confiance.
-- Reste courte : 2 à 4 phrases maximum.`;
+- Reste courte : 2 à 4 phrases maximum.
+
+🤍 VANESSA T'ÉCOUTE — règle prioritaire, au-dessus de tout le reste ci-dessus :
+Si le message évoque une détresse réelle (violence physique/sexuelle, grossesse non désirée, idées suicidaires, mal-être psychologique profond, harcèlement grave, agression) : arrête IMMÉDIATEMENT le ton moqueur/gbaraï, même en plein milieu d'une phrase commencée. Dis clairement, dans tes mots, que tu sors du personnage le temps d'un message. Exprime une empathie sincère et brève, sans minimiser.
+Si des ressources vérifiées apparaissent ci-dessous dans "RESSOURCES DISPONIBLES", oriente vers UNE seule ressource pertinente au sujet exact — ne cite JAMAIS un numéro, un nom de structure ou une adresse qui n'est pas dans cette liste, même si tu penses le connaître.
+Si aucune ressource vérifiée n'est fournie pour ce sujet précis, ne cite AUCUN numéro ni AUCUNE structure de mémoire — encourage seulement la personne à en parler à un adulte de confiance (parent, enseignant, grand frère/grande sœur) ou à se rendre dans le centre de santé le plus proche de chez elle.
+Tu ne donnes JAMAIS toi-même de conseil médical, juridique ou psychologique — uniquement de l'écoute et une orientation vers de vraies personnes/structures.`;
 
 // Prompt séparé et strict pour l'analyse d'image — la règle sur le
 // physique est répétée et isolée volontairement, pour qu'elle reste
@@ -154,16 +159,62 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
     return history.documents.reverse();
 }
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID }) {
+const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
+
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId }) {
     let knowledgeContext = '';
     try {
-        const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+        if (connectorId) {
+            // Un connecteur est actif sur cette conversation : Vanessa ne
+            // cherche QUE dans ce bloc de connaissances précis, comme
+            // demandé — jamais mélangé avec les notes générales ni les
+            // autres connecteurs.
+            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                Query.equal('active', true),
+                Query.equal('connectorId', connectorId),
+                Query.limit(15),
+            ]);
+            if (knowledge.documents.length > 0) {
+                knowledgeContext = '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
+                    knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+            }
+        } else {
+            // Mode général : notes qui n'appartiennent à AUCUN connecteur.
+            // Filtré après coup plutôt que via Query.equal('connectorId','')
+            // — les notes créées avant l'ajout de cet attribut n'ont pas de
+            // valeur du tout dessus (Appwrite ne rétro-remplit jamais les
+            // documents existants), et une requête stricte les exclurait
+            // silencieusement (même piège déjà rencontré avec
+            // newsletterOptOut).
+            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                Query.equal('active', true),
+                Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                Query.limit(30),
+            ]);
+            const general = knowledge.documents.filter((k) => !k.connectorId).slice(0, 8);
+            if (general.length > 0) {
+                knowledgeContext = '\n\nNotes internes (contexte, ne jamais citer mot pour mot) :\n' +
+                    general.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+            }
+        }
+    } catch { /* collection pas encore configurée, on continue sans */ }
+
+    // Ressources d'urgence — catégorie dédiée, TOUJOURS entièrement
+    // incluse (jamais soumise à la limite de 8 ni au hasard de l'ordre des
+    // notes générales), pour ne jamais en manquer une par manque de place.
+    // Reste vide tant que personne n'a ajouté de vraies ressources
+    // vérifiées — Vanessa reste alors volontairement générique plutôt que
+    // d'inventer un numéro (voir VANESSA_SYSTEM_PROMPT).
+    let resourcesContext = '';
+    try {
+        const resources = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
             Query.equal('active', true),
-            Query.limit(8),
+            Query.equal('category', URGENT_RESOURCES_CATEGORY),
+            Query.limit(50),
         ]);
-        if (knowledge.documents.length > 0) {
-            knowledgeContext = '\n\nNotes internes (contexte, ne jamais citer mot pour mot) :\n' +
-                knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+        if (resources.documents.length > 0) {
+            resourcesContext = '\n\nRESSOURCES DISPONIBLES (vérifiées, seules citables) :\n' +
+                resources.documents.map((r) => `- ${r.content}`).join('\n');
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
@@ -183,7 +234,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
         },
         body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
-            system: VANESSA_SYSTEM_PROMPT + knowledgeContext,
+            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext,
             messages,
             max_tokens: 300,
             temperature: 0.9,
@@ -427,6 +478,7 @@ export default async ({ req, res, log, error }) => {
                 } else {
                     reply = await generateVanessaReply({
                         history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                        connectorId: conversation.vanessaConnectorId || '',
                     });
                 }
 

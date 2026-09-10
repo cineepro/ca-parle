@@ -4,6 +4,7 @@ import { useModerationQueue } from '@/features/moderation/hooks/useModerationQue
 import { ModerationQueueItem } from '@/features/moderation/components/ModerationQueueItem';
 import { NewsletterComposer } from '@/features/newsletter/components/NewsletterComposer';
 import { VanessaKnowledgeManager } from '@/features/vanessa/components/VanessaKnowledgeManager';
+import { VanessaConnectorManager } from '@/features/vanessa/components/VanessaConnectorManager';
 
 export default function ModerationPage() {
     const { items, loading, refresh } = useModerationQueue();
@@ -18,6 +19,7 @@ export default function ModerationPage() {
                 </div>
 
                 <NewsletterComposer />
+                <VanessaConnectorManager />
                 <VanessaKnowledgeManager />
 
                 {loading ? (

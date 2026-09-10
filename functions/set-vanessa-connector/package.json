@@ -1,0 +1,9 @@
+{
+  "name": "set-vanessa-connector",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "^13.0.0"
+  }
+}

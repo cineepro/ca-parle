@@ -1,0 +1,57 @@
+// src/features/vanessa/components/ConnectorChips.tsx — Ça Parle
+import { useState } from 'react';
+import type { VanessaConnector } from '../services/vanessaKnowledgeService';
+import { conversationService } from '@/features/messaging/services/conversationService';
+
+interface Props {
+    conversationId: string;
+    connectors: VanessaConnector[];
+    activeConnectorId: string;
+    onChanged: (connectorId: string) => void;
+}
+
+export const ConnectorChips = ({ conversationId, connectors, activeConnectorId, onChanged }: Props) => {
+    const [switching, setSwitching] = useState(false);
+
+    if (connectors.length === 0) return null;
+
+    const handleTap = async (connectorId: string) => {
+        if (switching) return;
+        // Appuyer à nouveau sur le connecteur déjà actif revient au mode
+        // général — comportement "bascule" plutôt qu'un simple bouton.
+        const next = activeConnectorId === connectorId ? '' : connectorId;
+        setSwitching(true);
+        try {
+            await conversationService.setVanessaConnector(conversationId, next);
+            onChanged(next);
+        } finally {
+            setSwitching(false);
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-2 px-3 pt-2 overflow-x-auto">
+            {connectors.map((c) => {
+                const isActive = activeConnectorId === c.$id;
+                return (
+                    <button
+                        key={c.$id}
+                        type="button"
+                        onClick={() => handleTap(c.$id)}
+                        disabled={switching}
+                        title={c.description}
+                        className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all disabled:opacity-50"
+                        style={
+                            isActive
+                                ? { backgroundColor: c.color, borderColor: c.color, color: 'white' }
+                                : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#4b5563' }
+                        }
+                    >
+                        <span>{c.icon}</span>
+                        {c.name}
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
