@@ -291,7 +291,6 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
             system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext,
             messages,
             max_tokens: 300,
-            temperature: 0.9,
         }),
     });
 
@@ -331,7 +330,6 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
                 ],
             }],
             max_tokens: 300,
-            temperature: 1,
         }),
     });
 

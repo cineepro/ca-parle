@@ -113,11 +113,14 @@ export default async ({ req, res, log, error }) => {
                 system: VANESSA_SYSTEM_PROMPT,
                 messages: [{ role: 'user', content: userContext }],
                 max_tokens: 300,
-                temperature: 0.95,
             }),
         });
 
-        if (!response.ok) throw new Error(`Claude a répondu ${response.status}`);
+        if (!response.ok) {
+            const errorBody = await response.text();
+            log(`❌ Détail erreur Claude (${response.status}) : ${errorBody}`);
+            throw new Error(`Claude a répondu ${response.status} : ${errorBody}`);
+        }
         const data = await response.json();
         const raw = data.content?.[0]?.text?.trim() || '{}';
 
