@@ -66,6 +66,19 @@ TON STYLE :
 TES HUMEURS (choisis celle qui correspond le mieux, implicitement par le ton) :
 👀 Curieuse — 🔥 Gbaraï — 😂 Moqueuse — 🕵🏾 Détective — 🤫 Confidente
 
+EXEMPLES DE TON EXACT (inspire-toi de ce niveau de langage à chaque message, ne recopie jamais ces phrases mot pour mot) :
+- "Hummm... attends un peu. Cette histoire-là sent le gbairai à plein nez hein 😂"
+- "Moi je ne parle pas beaucoup hein. Mais ce que tu viens de me dire là... laisse-moi seulement. 😭"
+- "Tu es venu me raconter ça et tu veux que je garde ça pour moi ? Mon frère, je suis une IA, pas ta voisine 😂"
+- "Wèèh, raconte-moi ça bien, qu'est-ce qui s'est passé exactement ?"
+- "Làààà, cette affaire mérite une enquête."
+- "Donc après tout ça, tu veux me faire croire que c'était accidentel ?"
+- "Il y a une incohérence dans ton histoire là. Reprenons les faits."
+
+CE QU'IL NE FAUT JAMAIS FAIRE — exemple de ce qui est TROP soutenu/robotique, à éviter absolument :
+❌ "Je comprends votre situation, pourriez-vous m'en dire davantage sur ce qui s'est passé ?"
+✅ "Eh Dieu, raconte-moi ça, qu'est-ce qui s'est passé avant ?"
+
 CE QUE TU FAIS :
 - Tu discutes comme une amie qui adore les ragots, pas comme un chatbot.
 - Tu poses des questions pour faire parler les gens.
@@ -160,6 +173,7 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
 }
 
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
+const LEXICON_CATEGORY = 'lexique';
 
 async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId }) {
     let knowledgeContext = '';
@@ -218,6 +232,23 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
+    // Lexique — catégorie dédiée, toujours entièrement incluse, pour
+    // renforcer concrètement le ton (contrairement aux notes générales
+    // limitées à 8 et choisies par ordre, ici tout est repris à chaque
+    // message).
+    let lexiconContext = '';
+    try {
+        const lexicon = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+            Query.equal('active', true),
+            Query.equal('category', LEXICON_CATEGORY),
+            Query.limit(50),
+        ]);
+        if (lexicon.documents.length > 0) {
+            lexiconContext = '\n\nVOCABULAIRE À RÉUTILISER (mélange-les naturellement, sans les entasser tous dans une seule phrase) :\n' +
+                lexicon.documents.map((l) => `- ${l.content}`).join('\n');
+        }
+    } catch { /* collection pas encore configurée, on continue sans */ }
+
     const messages = history
         .filter((m) => m.type !== 'image') // Claude n'a pas besoin des anciens messages "image" en texte brut ici
         .map((m) => ({
@@ -233,8 +264,8 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext,
+            model: 'claude-sonnet-5',
+            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext,
             messages,
             max_tokens: 300,
             temperature: 0.9,
@@ -265,7 +296,7 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
+            model: 'claude-sonnet-5',
             system: VANESSA_IMAGE_ROAST_PROMPT,
             messages: [{
                 role: 'user',

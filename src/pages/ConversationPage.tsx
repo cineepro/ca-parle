@@ -204,6 +204,11 @@ export default function ConversationPage() {
                 {sendError && (
                     <p className="text-xs text-red-500 text-center bg-red-50 py-1.5 px-3">{sendError}</p>
                 )}
+                {isVanessaConversation && (
+                    <p className="text-[11px] text-gray-400 text-center bg-gray-50 py-1 px-3 border-t border-gray-100">
+                        🔮 Vanessa est une intelligence artificielle. Elle peut se tromper.
+                    </p>
+                )}
                 <MessageComposer
                     onSend={sendMessage}
                     onSendVoice={sendVoiceMessage}

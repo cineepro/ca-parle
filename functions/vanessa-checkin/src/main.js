@@ -66,7 +66,7 @@ export default async ({ req, res, log, error }) => {
                         'anthropic-version': '2023-06-01',
                     },
                     body: JSON.stringify({
-                        model: 'claude-haiku-4-5-20251001',
+                        model: 'claude-sonnet-5',
                         system: VANESSA_SYSTEM_PROMPT,
                         messages: [{ role: 'user', content: 'Relance-moi avec ta question gbaraï.' }],
                         max_tokens: 150,
