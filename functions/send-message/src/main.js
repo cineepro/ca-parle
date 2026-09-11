@@ -175,7 +175,7 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
 const LEXICON_CATEGORY = 'lexique';
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId }) {
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, log }) {
     let knowledgeContext = '';
     try {
         if (connectorId) {
@@ -277,6 +277,8 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
         messages.shift();
     }
 
+    log(`📨 ${messages.length} messages envoyés à Claude, rôles: [${messages.map((m) => m.role).join(', ')}]`);
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -294,7 +296,9 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
     });
 
     if (!response.ok) {
-        throw new Error(`Claude a répondu ${response.status}`);
+        const errorBody = await response.text();
+        log(`❌ Détail erreur Claude (${response.status}) : ${errorBody}`);
+        throw new Error(`Claude a répondu ${response.status} : ${errorBody}`);
     }
     const data = await response.json();
     return data.content?.[0]?.text?.trim() || null;
@@ -332,8 +336,9 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
     });
 
     if (!response.ok) {
-        log(`⚠️ Claude Vision a répondu ${response.status}`);
-        throw new Error(`Claude Vision a répondu ${response.status}`);
+        const errorBody = await response.text();
+        log(`❌ Détail erreur Claude Vision (${response.status}) : ${errorBody}`);
+        throw new Error(`Claude Vision a répondu ${response.status} : ${errorBody}`);
     }
     const data = await response.json();
     return data.content?.[0]?.text?.trim() || null;
@@ -530,7 +535,7 @@ export default async ({ req, res, log, error }) => {
                 } else {
                     reply = await generateVanessaReply({
                         history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
-                        connectorId: conversation.vanessaConnectorId || '',
+                        connectorId: conversation.vanessaConnectorId || '', log,
                     });
                 }
 
