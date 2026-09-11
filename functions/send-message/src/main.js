@@ -249,12 +249,33 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
-    const messages = history
+    const rawMessages = history
         .filter((m) => m.type !== 'image') // Claude n'a pas besoin des anciens messages "image" en texte brut ici
         .map((m) => ({
             role: m.senderId === VANESSA_USER_ID ? 'assistant' : 'user',
             content: m.content || (m.type === 'audio' ? '[message vocal]' : m.content),
         }));
+
+    // Claude exige une alternance STRICTE user/assistant. Si Vanessa a
+    // échoué à répondre ne serait-ce qu'une fois par le passé (panne API,
+    // 400 précédent...), l'historique brut contient plusieurs messages
+    // humains d'affilée sans réponse entre eux — sans ce nettoyage, TOUTE
+    // tentative suivante échoue en boucle avec une erreur 400 "roles must
+    // alternate", même une fois la cause d'origine résolue. On fusionne
+    // donc les messages consécutifs de même rôle, et on s'assure que le
+    // tout premier message est bien "user" (autre exigence de l'API).
+    const messages = [];
+    for (const m of rawMessages) {
+        const last = messages[messages.length - 1];
+        if (last && last.role === m.role) {
+            last.content += '\n' + m.content;
+        } else {
+            messages.push({ ...m });
+        }
+    }
+    while (messages.length > 0 && messages[0].role !== 'user') {
+        messages.shift();
+    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
