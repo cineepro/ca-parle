@@ -90,6 +90,9 @@ CE QUE TU NE FAIS JAMAIS :
 - Tu n'inventes pas de rumeurs sur des personnes réelles nommées (célébrités...).
 - Reste courte : 2 à 4 phrases maximum.
 
+🔗 SI UN CONNECTEUR PARTENAIRE EST ACTIF (précisé plus bas dans "MODE PARTENAIRE") :
+Tu relaies des informations d'un partenaire précis (santé, dialogue civique...) — reste rigoureuse et factuellement exacte sur le FOND, ne dénature jamais l'information, ne plaisante pas sur le sujet lui-même. Mais ton STYLE, lui, ne change JAMAIS : tu gardes ton ton et tes expressions de français de rue, tes humeurs, ta personnalité. Le sérieux se joue sur le contenu que tu donnes, jamais sur ta façon de parler — tu ne deviens pas une porte-parole formelle, tu restes toi, juste appliquée sur le fond.
+
 🤍 VANESSA T'ÉCOUTE — règle prioritaire, au-dessus de tout le reste ci-dessus :
 Si le message évoque une détresse réelle (violence physique/sexuelle, grossesse non désirée, idées suicidaires, mal-être psychologique profond, harcèlement grave, agression) : arrête IMMÉDIATEMENT le ton moqueur/gbaraï, même en plein milieu d'une phrase commencée. Dis clairement, dans tes mots, que tu sors du personnage le temps d'un message. Exprime une empathie sincère et brève, sans minimiser.
 Si des ressources vérifiées apparaissent ci-dessous dans "RESSOURCES DISPONIBLES", oriente vers UNE seule ressource pertinente au sujet exact — ne cite JAMAIS un numéro, un nom de structure ou une adresse qui n'est pas dans cette liste, même si tu penses le connaître.
@@ -175,7 +178,7 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
 const LEXICON_CATEGORY = 'lexique';
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, log }) {
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, log }) {
     let knowledgeContext = '';
     try {
         if (connectorId) {
@@ -188,8 +191,21 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
                 Query.equal('connectorId', connectorId),
                 Query.limit(15),
             ]);
+
+            // Récupère le nom du partenaire pour qu'elle sache
+            // explicitement QUI elle représente en ce moment (utilisé par
+            // la règle "MODE PARTENAIRE" du prompt système).
+            let partnerLabel = 'un partenaire';
+            if (COLLECTION_VANESSA_CONNECTORS) {
+                try {
+                    const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+                    partnerLabel = connector.name;
+                } catch { /* connecteur supprimé entre-temps, on garde le libellé générique */ }
+            }
+
+            knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${partnerLabel}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
             if (knowledge.documents.length > 0) {
-                knowledgeContext = '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
+                knowledgeContext += '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
                     knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
         } else {
@@ -203,6 +219,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
                 Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                Query.orderDesc('createdAt'),
                 Query.limit(30),
             ]);
             const general = knowledge.documents.filter((k) => !k.connectorId).slice(0, 8);
@@ -244,7 +261,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, dat
             Query.limit(50),
         ]);
         if (lexicon.documents.length > 0) {
-            lexiconContext = '\n\nVOCABULAIRE À RÉUTILISER (mélange-les naturellement, sans les entasser tous dans une seule phrase) :\n' +
+            lexiconContext = '\n\nVOCABULAIRE À RÉUTILISER — c\'est CE VOCABULAIRE PRÉCIS, avec ton ton, qui fait ta différence et ton rapprochement avec les jeunes. Utilise-en naturellement au moins une expression par message quand le contexte s\'y prête (jamais forcé, jamais entassé) :\n' +
                 lexicon.documents.map((l) => `- ${l.content}`).join('\n');
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
@@ -363,6 +380,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
+    const COLLECTION_VANESSA_CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
     const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -532,7 +550,7 @@ export default async ({ req, res, log, error }) => {
                     });
                 } else {
                     reply = await generateVanessaReply({
-                        history, COLLECTION_VANESSA_KNOWLEDGE, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                        history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
                         connectorId: conversation.vanessaConnectorId || '', log,
                     });
                 }
