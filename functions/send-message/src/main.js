@@ -317,7 +317,13 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
         throw new Error(`Claude a répondu ${response.status} : ${errorBody}`);
     }
     const data = await response.json();
-    return data.content?.[0]?.text?.trim() || null;
+    // Ne pas prendre content[0] à l'aveugle : claude-sonnet-5 peut renvoyer
+    // un bloc de réflexion interne (type "thinking") AVANT le bloc de
+    // texte — le premier élément n'est alors pas forcément le texte. On
+    // cherche explicitement le bloc de type "text", peu importe sa position.
+    const textBlock = data.content?.find((b) => b.type === 'text');
+    if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude : ${JSON.stringify(data.content)}`);
+    return textBlock?.text?.trim() || null;
 }
 
 // Analyse d'image à la demande — appelée uniquement quand le message
@@ -356,7 +362,9 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
         throw new Error(`Claude Vision a répondu ${response.status} : ${errorBody}`);
     }
     const data = await response.json();
-    return data.content?.[0]?.text?.trim() || null;
+    const textBlock = data.content?.find((b) => b.type === 'text');
+    if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude Vision : ${JSON.stringify(data.content)}`);
+    return textBlock?.text?.trim() || null;
 }
 
 export default async ({ req, res, log, error }) => {

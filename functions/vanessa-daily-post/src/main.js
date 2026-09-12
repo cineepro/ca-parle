@@ -122,7 +122,9 @@ export default async ({ req, res, log, error }) => {
             throw new Error(`Claude a répondu ${response.status} : ${errorBody}`);
         }
         const data = await response.json();
-        const raw = data.content?.[0]?.text?.trim() || '{}';
+        const textBlock = data.content?.find((b) => b.type === 'text');
+        if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude : ${JSON.stringify(data.content)}`);
+        const raw = textBlock?.text?.trim() || '{}';
 
         let parsed;
         try {
