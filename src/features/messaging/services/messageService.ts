@@ -15,6 +15,7 @@ export interface Message extends Models.Document {
     audioFileId?: string;
     audioDuration?: number;
     imageFileId?: string;
+    feedback?: 'up' | 'down' | '';
     readBy?: string[];
     createdAt: string;
 }
@@ -143,5 +144,11 @@ export const messageService = {
             },
             [Query.equal('conversationId', [conversationId])]
         );
+    },
+
+    // Note un message de Vanessa (👍/👎). feedback === '' retire un avis
+    // déjà donné.
+    async rateFeedback(messageId: string, feedback: 'up' | 'down' | ''): Promise<void> {
+        await callFunction(FUNCTIONS.RATE_VANESSA_MESSAGE, { messageId, feedback });
     },
 };

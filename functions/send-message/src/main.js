@@ -54,6 +54,15 @@ async function sendPush(messaging, userId, title, body, url, log) {
 }
 
 const DAILY_IMAGE_LIMIT = 2;
+const DAILY_VANESSA_TOKEN_LIMIT = 15000; // ≈ 25-30 échanges/jour — protège le compte Anthropic partagé (Ça Parle + Vanessa API + automatisations) d'un usage individuel démesuré
+// Phrases de quota écrites d'avance, dans le ton de Vanessa — postées SANS
+// appeler Claude quand le quota est dépassé, pour ne pas payer un appel
+// juste pour dire "stop" (le but même de cette limite).
+const QUOTA_REACHED_LINES = [
+    "Wèèh doucement là 😅 On a bien causé aujourd'hui, laisse-moi souffler un peu. Reviens me voir demain, je serai fraîche pour un nouveau gbairai !",
+    "Eh Dieu, tu m'as fait travailler aujourd'hui hein 😂 Je dois me reposer maintenant. On reprend demain ?",
+    "Bon là je suis épuisée, tu m'as vidée pour aujourd'hui 😭 Reviens demain, promis je serai toute ouïe.",
+];
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es LA personnalité IA de "Ça Parle", une plateforme de ragots et de commérages. Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
 
@@ -323,7 +332,10 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     // cherche explicitement le bloc de type "text", peu importe sa position.
     const textBlock = data.content?.find((b) => b.type === 'text');
     if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude : ${JSON.stringify(data.content)}`);
-    return textBlock?.text?.trim() || null;
+    return {
+        text: textBlock?.text?.trim() || null,
+        tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+    };
 }
 
 // Analyse d'image à la demande — appelée uniquement quand le message
@@ -364,7 +376,10 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
     const data = await response.json();
     const textBlock = data.content?.find((b) => b.type === 'text');
     if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude Vision : ${JSON.stringify(data.content)}`);
-    return textBlock?.text?.trim() || null;
+    return {
+        text: textBlock?.text?.trim() || null,
+        tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+    };
 }
 
 export default async ({ req, res, log, error }) => {
@@ -542,67 +557,107 @@ export default async ({ req, res, log, error }) => {
         if (VANESSA_USER_ID && ANTHROPIC_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
             log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
             try {
-                const history = await fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversationId);
-                // Le message qu'on vient de créer est le dernier de cet
-                // historique — on regarde celui juste AVANT pour savoir si
-                // c'est une image en attente de description.
-                const previous = history[history.length - 2];
-                const pendingImage = previous && previous.type === 'image' && previous.senderId === callerId && previous.imageFileId;
-
-                let reply;
-                if (pendingImage && BUCKET_STORY_IMAGES) {
-                    log('📷 Image en attente détectée — analyse Claude Vision...');
-                    reply = await generateVanessaImageRoast({
-                        storage, BUCKET_STORY_IMAGES, ANTHROPIC_API_KEY,
-                        imageFileId: previous.imageFileId, requestText: finalContent, log,
-                    });
-                } else {
-                    reply = await generateVanessaReply({
-                        history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
-                        connectorId: conversation.vanessaConnectorId || '', log,
-                    });
+                // Quota quotidien de tokens (façon Claude : "reviens plus
+                // tard une fois la limite atteinte") — protège le compte
+                // Anthropic partagé entre Ça Parle, Vanessa API et les
+                // automatisations d'un usage individuel démesuré. Illimité
+                // pour les modérateurs (tests internes).
+                if (!callerUser && COLLECTION_USERS) {
+                    callerUser = await databases.getDocument(DATABASE_ID, COLLECTION_USERS, callerId);
                 }
+                const today = new Date().toISOString().slice(0, 10);
+                const sameDayTokens = callerUser && callerUser.vanessaTokensUsedDate === today;
+                const tokensUsedToday = sameDayTokens ? (callerUser.vanessaTokensUsedCount || 0) : 0;
+                const quotaReached = callerUser && !callerUser.isModerator && tokensUsedToday >= DAILY_VANESSA_TOKEN_LIMIT;
 
-                log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
-                if (reply) {
-                    // Si l'échange était vocal ET que la messagerie vocale
-                    // est configurée, Vanessa répond ELLE AUSSI en voix.
-                    let vanessaAudioFileId = null;
-                    if (isVoice && BUCKET_VOICE_MESSAGES && ELEVENLABS_API_KEY && ELEVENLABS_VOICE_ID) {
-                        log('🎙️ Synthèse de la réponse vocale de Vanessa...');
-                        vanessaAudioFileId = await synthesizeVanessaVoice({
-                            storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
-                            text: reply, permissions, log,
-                        });
-                    }
+                if (quotaReached) {
+                    log(`❌ Quota quotidien de tokens atteint pour ${callerId} (${tokensUsedToday}/${DAILY_VANESSA_TOKEN_LIMIT}) — réponse envoyée sans appeler Claude.`);
+                    const quotaLine = QUOTA_REACHED_LINES[Math.floor(Math.random() * QUOTA_REACHED_LINES.length)];
 
                     await databases.createDocument(DATABASE_ID, COLLECTION_MESSAGES, ID.unique(), {
-                        conversationId,
-                        senderId: VANESSA_USER_ID,
-                        content: reply,
-                        type: vanessaAudioFileId ? 'audio' : 'text',
-                        audioFileId: vanessaAudioFileId || '',
-                        audioDuration: 0,
-                        imageFileId: '',
-                        readBy: [VANESSA_USER_ID],
-                        createdAt: new Date().toISOString(),
+                        conversationId, senderId: VANESSA_USER_ID, content: quotaLine, type: 'text',
+                        audioFileId: '', audioDuration: 0, imageFileId: '',
+                        readBy: [VANESSA_USER_ID], createdAt: new Date().toISOString(),
                     }, permissions);
 
-                    const vanessaPreview = vanessaAudioFileId ? '🎤 Message vocal' : reply;
                     await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
-                        lastMessage: vanessaPreview.length > 200 ? vanessaPreview.slice(0, 200) : vanessaPreview,
-                        lastMessageAt: new Date().toISOString(),
-                        lastMessageSenderId: VANESSA_USER_ID,
+                        lastMessage: quotaLine, lastMessageAt: new Date().toISOString(), lastMessageSenderId: VANESSA_USER_ID,
                     });
+                } else {
+                    const history = await fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversationId);
+                    // Le message qu'on vient de créer est le dernier de cet
+                    // historique — on regarde celui juste AVANT pour savoir si
+                    // c'est une image en attente de description.
+                    const previous = history[history.length - 2];
+                    const pendingImage = previous && previous.type === 'image' && previous.senderId === callerId && previous.imageFileId;
 
-                    // Pas de notification ici volontairement : l'utilisateur
-                    // vient d'envoyer un message, il est donc déjà en train
-                    // de regarder cette conversation — une notification à
-                    // chaque réponse serait redondante et vite lassante.
-                    // Seules ses RELANCES (vanessa-checkin) et sa chronique
-                    // du matin (vanessa-daily-post) déclenchent une vraie
-                    // notification, quand l'utilisateur n'est pas déjà là.
-                    log('✅ Message de Vanessa créé (sans notification, conversation déjà active).');
+                    let result;
+                    if (pendingImage && BUCKET_STORY_IMAGES) {
+                        log('📷 Image en attente détectée — analyse Claude Vision...');
+                        result = await generateVanessaImageRoast({
+                            storage, BUCKET_STORY_IMAGES, ANTHROPIC_API_KEY,
+                            imageFileId: previous.imageFileId, requestText: finalContent, log,
+                        });
+                    } else {
+                        result = await generateVanessaReply({
+                            history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                            connectorId: conversation.vanessaConnectorId || '', log,
+                        });
+                    }
+                    const reply = result.text;
+
+                    log(`🔮 Réponse générée : ${reply ? reply.slice(0, 80) : 'null'}`);
+                    if (reply) {
+                        // Si l'échange était vocal ET que la messagerie vocale
+                        // est configurée, Vanessa répond ELLE AUSSI en voix.
+                        let vanessaAudioFileId = null;
+                        if (isVoice && BUCKET_VOICE_MESSAGES && ELEVENLABS_API_KEY && ELEVENLABS_VOICE_ID) {
+                            log('🎙️ Synthèse de la réponse vocale de Vanessa...');
+                            vanessaAudioFileId = await synthesizeVanessaVoice({
+                                storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID,
+                                text: reply, permissions, log,
+                            });
+                        }
+
+                        await databases.createDocument(DATABASE_ID, COLLECTION_MESSAGES, ID.unique(), {
+                            conversationId,
+                            senderId: VANESSA_USER_ID,
+                            content: reply,
+                            type: vanessaAudioFileId ? 'audio' : 'text',
+                            audioFileId: vanessaAudioFileId || '',
+                            audioDuration: 0,
+                            imageFileId: '',
+                            readBy: [VANESSA_USER_ID],
+                            createdAt: new Date().toISOString(),
+                        }, permissions);
+
+                        const vanessaPreview = vanessaAudioFileId ? '🎤 Message vocal' : reply;
+                        await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
+                            lastMessage: vanessaPreview.length > 200 ? vanessaPreview.slice(0, 200) : vanessaPreview,
+                            lastMessageAt: new Date().toISOString(),
+                            lastMessageSenderId: VANESSA_USER_ID,
+                        });
+
+                        // Décompte du quota — après coup, avec la vraie
+                        // consommation renvoyée par Claude (pas une estimation).
+                        if (callerUser && !callerUser.isModerator && COLLECTION_USERS) {
+                            const newCount = tokensUsedToday + (result.tokensUsed || 0);
+                            await databases.updateDocument(DATABASE_ID, COLLECTION_USERS, callerId, {
+                                vanessaTokensUsedDate: today,
+                                vanessaTokensUsedCount: newCount,
+                            });
+                            log(`📊 Quota tokens mis à jour : ${newCount}/${DAILY_VANESSA_TOKEN_LIMIT}.`);
+                        }
+
+                        // Pas de notification ici volontairement : l'utilisateur
+                        // vient d'envoyer un message, il est donc déjà en train
+                        // de regarder cette conversation — une notification à
+                        // chaque réponse serait redondante et vite lassante.
+                        // Seules ses RELANCES (vanessa-checkin) et sa chronique
+                        // du matin (vanessa-daily-post) déclenchent une vraie
+                        // notification, quand l'utilisateur n'est pas déjà là.
+                        log('✅ Message de Vanessa créé (sans notification, conversation déjà active).');
+                    }
                 }
             } catch (vanessaErr) {
                 log(`⚠️ Réponse Vanessa échouée (non bloquant) : ${vanessaErr.message}`);
