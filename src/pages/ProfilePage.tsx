@@ -6,6 +6,7 @@ import { ReputationCard } from '@/features/reputation/components/ReputationCard'
 import { BadgeGrid } from '@/features/reputation/components/BadgeGrid';
 import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBanner';
 import { InviteButton } from '@/features/stories/components/InviteButton';
+import { VanessaMemoryPanel } from '@/features/vanessa/components/VanessaMemoryPanel';
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
@@ -35,6 +36,8 @@ export default function ProfilePage() {
 
                 <ReputationCard stats={stats} name={user?.name} />
                 <BadgeGrid catalog={catalog} earnedKeys={earnedKeys} />
+
+                <VanessaMemoryPanel />
 
                 <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
                     <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">

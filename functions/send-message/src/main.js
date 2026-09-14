@@ -186,8 +186,89 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
 
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
 const LEXICON_CATEGORY = 'lexique';
+const MEMORY_CHECK_THRESHOLD = 5; // extrait un fait tous les ~5 messages humains, pas à chaque message
+const MAX_MEMORY_ENTRIES = 20; // au-delà, les plus anciens sont désactivés
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, log }) {
+// Extraction périodique d'un fait durable — appelée seulement de temps en
+// temps (voir MEMORY_CHECK_THRESHOLD), avec un modèle volontairement plus
+// léger (haiku) que celui de la conversation elle-même : c'est une tâche
+// simple de classification, pas la personnalité de Vanessa, pas besoin de
+// payer le tarif de sonnet pour ça.
+async function extractMemoryIfNeeded({ conversation, databases, DATABASE_ID, COLLECTION_CONVERSATIONS, COLLECTION_MESSAGES, COLLECTION_VANESSA_MEMORY, ANTHROPIC_API_KEY, VANESSA_USER_ID, callerId, log }) {
+    if (!COLLECTION_VANESSA_MEMORY) return;
+
+    const count = (conversation.messagesSinceMemoryCheck || 0) + 1;
+    if (count < MEMORY_CHECK_THRESHOLD) {
+        await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversation.$id, {
+            messagesSinceMemoryCheck: count,
+        });
+        return;
+    }
+
+    try {
+        const recent = await fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversation.$id, MEMORY_CHECK_THRESHOLD * 2);
+        const transcript = recent
+            .filter((m) => m.content)
+            .map((m) => `${m.senderId === VANESSA_USER_ID ? 'Vanessa' : 'Utilisateur'} : ${m.content}`)
+            .join('\n');
+
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: 'Tu analyses un extrait de conversation pour repérer UN SEUL fait durable et utile à retenir sur "Utilisateur" (prénom, lieu de vie, études/travail, goûts, situation personnelle stable). Ignore tout ce qui est temporaire ou déjà probablement connu. Réponds UNIQUEMENT par une phrase courte en français (moins de 15 mots), à la troisième personne, sans "il/elle a dit". S\'il n\'y a rien de nouveau ou de suffisamment durable, réponds exactement : RIEN.',
+                messages: [{ role: 'user', content: transcript || 'RIEN' }],
+                max_tokens: 60,
+            }),
+        });
+
+        if (!response.ok) {
+            log(`⚠️ Extraction mémoire échouée (non bloquant) : ${response.status}`);
+            return;
+        }
+        const data = await response.json();
+        const textBlock = data.content?.find((b) => b.type === 'text');
+        const fact = textBlock?.text?.trim();
+
+        if (fact && fact.toUpperCase() !== 'RIEN' && fact.length <= 300) {
+            await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_MEMORY, ID.unique(), {
+                userId: callerId, content: fact, active: true, createdAt: new Date().toISOString(),
+            });
+            log(`🧠 Nouveau fait retenu pour ${callerId} : ${fact}`);
+
+            // Plafonne le nombre de faits actifs — désactive les plus
+            // anciens au-delà de la limite plutôt que de les supprimer
+            // (garde une trace, au cas où).
+            const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_MEMORY, [
+                Query.equal('userId', callerId),
+                Query.equal('active', true),
+                Query.orderDesc('createdAt'),
+                Query.limit(100),
+            ]);
+            if (existing.documents.length > MAX_MEMORY_ENTRIES) {
+                const toDeactivate = existing.documents.slice(MAX_MEMORY_ENTRIES);
+                await Promise.allSettled(
+                    toDeactivate.map((doc) => databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_MEMORY, doc.$id, { active: false }))
+                );
+            }
+        } else {
+            log('🧠 Rien de nouveau à retenir cette fois.');
+        }
+
+        await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversation.$id, {
+            messagesSinceMemoryCheck: 0,
+        });
+    } catch (memErr) {
+        log(`⚠️ Extraction mémoire échouée (non bloquant) : ${memErr.message}`);
+    }
+}
+
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
     let knowledgeContext = '';
     try {
         if (connectorId) {
@@ -275,6 +356,28 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
+    // Mémoire — faits durables retenus sur CET utilisateur précis, au fil
+    // du temps, au-delà de la fenêtre de messages visible. Extraite
+    // périodiquement (voir extractMemoryIfNeeded), pas à chaque message.
+    // L'utilisateur peut la consulter et tout effacer depuis son profil —
+    // ce n'est jamais un historique brut de ce qu'il a dit, seulement des
+    // faits ponctuels ("s'appelle Kevin", "étudie à Cotonou"...).
+    let memoryContext = '';
+    if (COLLECTION_VANESSA_MEMORY && callerId) {
+        try {
+            const memory = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_MEMORY, [
+                Query.equal('userId', callerId),
+                Query.equal('active', true),
+                Query.orderDesc('createdAt'),
+                Query.limit(15),
+            ]);
+            if (memory.documents.length > 0) {
+                memoryContext = '\n\nCE QUE TU TE SOUVIENS DE CETTE PERSONNE (d\'échanges précédents — mentionne-le naturellement si pertinent, ne récite jamais cette liste telle quelle) :\n' +
+                    memory.documents.map((m) => `- ${m.content}`).join('\n');
+            }
+        } catch { /* collection pas encore configurée, on continue sans */ }
+    }
+
     const rawMessages = history
         .filter((m) => m.type !== 'image') // Claude n'a pas besoin des anciens messages "image" en texte brut ici
         .map((m) => ({
@@ -314,7 +417,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
         },
         body: JSON.stringify({
             model: 'claude-sonnet-5',
-            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext,
+            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext + memoryContext,
             messages,
             max_tokens: 300,
         }),
@@ -404,6 +507,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const COLLECTION_VANESSA_CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
+    const COLLECTION_VANESSA_MEMORY = process.env.COLLECTION_VANESSA_MEMORY;
     const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -600,8 +704,8 @@ export default async ({ req, res, log, error }) => {
                         });
                     } else {
                         result = await generateVanessaReply({
-                            history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
-                            connectorId: conversation.vanessaConnectorId || '', log,
+                            history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                            connectorId: conversation.vanessaConnectorId || '', callerId, log,
                         });
                     }
                     const reply = result.text;
@@ -657,6 +761,17 @@ export default async ({ req, res, log, error }) => {
                         // du matin (vanessa-daily-post) déclenchent une vraie
                         // notification, quand l'utilisateur n'est pas déjà là.
                         log('✅ Message de Vanessa créé (sans notification, conversation déjà active).');
+
+                        // Mémoire — déclenchée après coup, pour ne jamais
+                        // ralentir la réponse elle-même. Pas d'image (pas de
+                        // texte exploitable) ni en mode connecteur (contexte
+                        // professionnel, pas une conversation personnelle).
+                        if (!isImage && !conversation.vanessaConnectorId) {
+                            await extractMemoryIfNeeded({
+                                conversation, databases, DATABASE_ID, COLLECTION_CONVERSATIONS, COLLECTION_MESSAGES,
+                                COLLECTION_VANESSA_MEMORY, ANTHROPIC_API_KEY, VANESSA_USER_ID, callerId, log,
+                            });
+                        }
                     }
                 }
             } catch (vanessaErr) {
