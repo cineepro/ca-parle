@@ -186,6 +186,7 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
 
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
 const LEXICON_CATEGORY = 'lexique';
+const PUBLICITE_CATEGORY = 'publicite';
 const MEMORY_CHECK_THRESHOLD = 5; // extrait un fait tous les ~5 messages humains, pas à chaque message
 const MAX_MEMORY_ENTRIES = 20; // au-delà, les plus anciens sont désactivés
 
@@ -279,8 +280,29 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
                 Query.equal('connectorId', connectorId),
+                Query.notEqual('category', PUBLICITE_CATEGORY),
                 Query.limit(15),
             ]);
+
+            // Infos "publicité" — séparées du reste, toujours entièrement
+            // incluses (pas soumises à la limite de 15), avec une
+            // instruction FORTE de citation obligatoire. C'est la seule
+            // catégorie que Vanessa doit systématiquement mentionner,
+            // contrairement au reste du contexte qu'elle utilise seulement
+            // si pertinent.
+            let publiciteContext = '';
+            try {
+                const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                    Query.equal('active', true),
+                    Query.equal('connectorId', connectorId),
+                    Query.equal('category', PUBLICITE_CATEGORY),
+                    Query.limit(3),
+                ]);
+                if (ads.documents.length > 0) {
+                    publiciteContext = '\n\nINFORMATION À MENTIONNER OBLIGATOIREMENT, en une phrase courte, À LA TOUTE FIN de ta réponse (reformule dans ton ton, ne recopie jamais mot pour mot, mais ne l\'omets JAMAIS) :\n' +
+                        ads.documents.map((a) => `- ${a.content}`).join('\n');
+                }
+            } catch { /* collection pas encore configurée */ }
 
             // Récupère le nom du partenaire pour qu'elle sache
             // explicitement QUI elle représente en ce moment (utilisé par
@@ -298,6 +320,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
                 knowledgeContext += '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
                     knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
+            knowledgeContext += publiciteContext;
         } else {
             // Mode général : notes qui n'appartiennent à AUCUN connecteur.
             // Filtré après coup plutôt que via Query.equal('connectorId','')

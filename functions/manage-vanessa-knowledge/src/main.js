@@ -54,7 +54,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -108,6 +108,8 @@ export default async ({ req, res, error }) => {
                     icon: icon || '🔗',
                     color: color || '#FF4757',
                     description: description || '',
+                    sourceUrl: sourceUrl || '',
+                    processedItemHashes: [],
                     active: active !== undefined ? active : true,
                     createdAt: new Date().toISOString(),
                 });
@@ -121,6 +123,7 @@ export default async ({ req, res, error }) => {
                 if (icon !== undefined) updateData.icon = icon;
                 if (color !== undefined) updateData.color = color;
                 if (description !== undefined) updateData.description = description;
+                if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
                 if (active !== undefined) updateData.active = active;
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, updateData);
                 return res.json({ success: true, connector: doc });

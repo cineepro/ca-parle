@@ -1,6 +1,9 @@
 // src/features/vanessa/services/vanessaKnowledgeService.ts — Ça Parle
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
+import { storage } from '@/api/appwrite';
+import { BUCKETS } from '@/api/constants';
+import { ID } from 'appwrite';
 
 export interface VanessaKnowledge {
     $id: string;
@@ -18,8 +21,17 @@ export interface VanessaConnector {
     icon: string;
     color: string;
     description: string;
+    sourceUrl?: string;
+    lastSyncedAt?: string;
     active: boolean;
     createdAt?: string;
+}
+
+// Upload d'un PDF destiné à être lu et résumé pour un connecteur — bucket
+// dédié, distinct de story-images (types de fichiers différents).
+export async function uploadConnectorPdf(file: File): Promise<string> {
+    const uploaded = await storage.createFile(BUCKETS.CONNECTOR_DOCUMENTS, ID.unique(), file);
+    return uploaded.$id;
 }
 
 export const vanessaKnowledgeService = {
@@ -47,7 +59,7 @@ export const vanessaKnowledgeService = {
         return result.connectors;
     },
 
-    async createConnector(data: Omit<VanessaConnector, '$id' | 'createdAt'>): Promise<void> {
+    async createConnector(data: Omit<VanessaConnector, '$id' | 'createdAt' | 'lastSyncedAt'>): Promise<void> {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'create_connector', ...data });
     },
 
@@ -63,5 +75,11 @@ export const vanessaKnowledgeService = {
     async listActiveConnectors(): Promise<VanessaConnector[]> {
         const result = await callFunction<{ connectors: VanessaConnector[] }>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'list_active_connectors' });
         return result.connectors;
+    },
+
+    // --- Ingestion d'un PDF sur un connecteur ---
+    async ingestPdf(connectorId: string, file: File): Promise<void> {
+        const fileId = await uploadConnectorPdf(file);
+        await callFunction(FUNCTIONS.INGEST_CONNECTOR_PDF, { connectorId, fileId });
     },
 };

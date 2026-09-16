@@ -231,6 +231,7 @@ export const VanessaKnowledgeManager = () => {
                 <h2 className="text-base font-bold text-gray-800">🔮 Base de connaissances de Vanessa</h2>
                 <p className="text-xs text-gray-400">
                     Notes ajoutées manuellement pour personnaliser ses réponses et ses publications. Jamais de données privées d'utilisateurs.
+                    Catégorie <strong>publicite</strong> (rattachée à un connecteur) : Vanessa la mentionnera systématiquement en fin de message quand ce connecteur est actif.
                     Seules 8 notes générales sont vues à la fois — pour du vocabulaire, utilise plutôt le Lexique ci-dessus.
                 </p>
 
@@ -248,7 +249,7 @@ export const VanessaKnowledgeManager = () => {
                     <input
                         value={category}
                         onChange={(e) => setCategory(e.target.value)}
-                        placeholder="Catégorie (ex: expressions, événements, règles)"
+                        placeholder="Catégorie (ex: expressions, événements, règles, publicite)"
                         maxLength={50}
                         className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                     />

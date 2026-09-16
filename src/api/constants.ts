@@ -39,6 +39,7 @@ export const COLLECTIONS = {
 export const BUCKETS = {
     STORY_IMAGES: import.meta.env.VITE_APPWRITE_BUCKET_STORY_IMAGES || '',
     VOICE_MESSAGES: import.meta.env.VITE_APPWRITE_BUCKET_VOICE_MESSAGES || '',
+    CONNECTOR_DOCUMENTS: import.meta.env.VITE_APPWRITE_BUCKET_CONNECTOR_DOCUMENTS || '',
 } as const;
 
 // Compte utilisateur de Vanessa (l'IA de Ça Parle) — un vrai compte
@@ -66,4 +67,5 @@ export const FUNCTIONS = {
     MANAGE_VANESSA_MEMORY: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_VANESSA_MEMORY || '',
     CONFIRM_SPOT: import.meta.env.VITE_APPWRITE_FUNCTION_CONFIRM_SPOT || '',
     MODERATE_CA_SERT: import.meta.env.VITE_APPWRITE_FUNCTION_MODERATE_CA_SERT || '',
+    INGEST_CONNECTOR_PDF: import.meta.env.VITE_APPWRITE_FUNCTION_INGEST_CONNECTOR_PDF || '',
 } as const;
