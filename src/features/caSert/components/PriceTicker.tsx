@@ -1,4 +1,4 @@
-// src/features/caSert/components/PriceTicker.tsx — Ça Parle
+// src/features/caSert/components/PriceTicker.tsx — Ça Parle --
 import type { MarketPrice } from '../services/caSertService';
 
 interface Props {
@@ -55,4 +55,4 @@ export const PriceTicker = ({ prices }: Props) => {
             `}</style>
         </div>
     );
-};
+};  
