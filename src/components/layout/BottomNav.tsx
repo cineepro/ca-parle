@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 const TABS = [
     { to: '/accueil', icon: '🏠', label: 'Accueil' },
-    { to: '/tendances', icon: '⭐', label: 'Tendances' },
+    { to: '/ca-sert', icon: '🧰', label: 'Ça sert' },
     // Le bouton central flottant (Publier) est rendu séparément ci-dessous.
     { to: '/messages', icon: '💬', label: 'Messages' },
     { to: '/profil', icon: '👤', label: 'Profil' },

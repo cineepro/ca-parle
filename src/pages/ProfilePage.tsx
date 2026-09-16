@@ -40,6 +40,10 @@ export default function ProfilePage() {
                 <VanessaMemoryPanel />
 
                 <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
+                    <Link to="/tendances" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        ⭐ Tendances
+                        <span className="text-gray-300">›</span>
+                    </Link>
                     <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
                         🔎 Mes références suivies
                         <span className="text-gray-300">›</span>

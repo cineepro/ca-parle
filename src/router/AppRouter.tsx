@@ -15,6 +15,7 @@ import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
+import CaSertPage from '@/pages/CaSertPage';
 import MessagesPage from '@/pages/MessagesPage';
 import ConversationPage from '@/pages/ConversationPage';
 import TermsPage from '@/pages/TermsPage';
@@ -105,6 +106,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <TrendingPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/ca-sert"
+                    element={
+                        <ProtectedRoute>
+                            <CaSertPage />
                         </ProtectedRoute>
                     }
                 />

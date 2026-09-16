@@ -6,7 +6,7 @@ import { VanessaButton } from '@/features/vanessa/components/VanessaButton';
 
 const DESKTOP_LINKS = [
     { to: '/accueil', icon: '🏠', label: 'Accueil' },
-    { to: '/tendances', icon: '⭐', label: 'Tendances' },
+    { to: '/ca-sert', icon: '🧰', label: 'Ça sert' },
     { to: '/messages', icon: '💬', label: 'Messages' },
 ];
 
