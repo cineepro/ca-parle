@@ -16,6 +16,7 @@ import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import CaSertPage from '@/pages/CaSertPage';
+import MyCaSertContributionsPage from '@/pages/MyCaSertContributionsPage';
 import MessagesPage from '@/pages/MessagesPage';
 import ConversationPage from '@/pages/ConversationPage';
 import TermsPage from '@/pages/TermsPage';
@@ -114,6 +115,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <CaSertPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/ca-sert/mes-contributions"
+                    element={
+                        <ProtectedRoute>
+                            <MyCaSertContributionsPage />
                         </ProtectedRoute>
                     }
                 />

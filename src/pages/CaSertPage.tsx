@@ -1,5 +1,6 @@
 // src/pages/CaSertPage.tsx — Ça Parle
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { caSertService, type Spot, type MarketPrice } from '@/features/caSert/services/caSertService';
 import { SpotCard } from '@/features/caSert/components/SpotCard';
 import { PriceTicker } from '@/features/caSert/components/PriceTicker';
@@ -39,6 +40,9 @@ export default function CaSertPage() {
                 <div>
                     <h1 className="text-xl font-bold text-gray-800">🧰 Ça sert</h1>
                     <p className="text-xs text-gray-400">Les vrais plans, par la communauté</p>
+                    <Link to="/ca-sert/mes-contributions" className="text-xs text-[#FF4757] font-semibold hover:underline">
+                        Mes contributions →
+                    </Link>
                 </div>
                 <CountryFilter selected={country} onSelect={setCountry} />
             </div>

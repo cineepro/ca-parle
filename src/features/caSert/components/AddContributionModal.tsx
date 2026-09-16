@@ -11,7 +11,7 @@ interface Props {
     onDone: () => void;
 }
 
-type Step = 'choix' | 'lieu' | 'prix';
+type Step = 'choix' | 'lieu' | 'prix' | 'envoye';
 
 export const AddContributionModal = ({ onClose, onDone }: Props) => {
     const { user } = useAuth();
@@ -52,7 +52,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                 authorId: user.$id,
                 authorName: user.name || '',
             });
-            onDone();
+            setStep('envoye');
         } catch (err: any) {
             setError(err.message || "Impossible d'ajouter ce lieu, réessaie.");
         } finally {
@@ -74,7 +74,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                 country,
                 authorId: user.$id,
             });
-            onDone();
+            setStep('envoye');
         } catch (err: any) {
             setError(err.message || "Impossible d'ajouter ce prix, réessaie.");
         } finally {
@@ -239,6 +239,17 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             <Button type="button" variant="secondary" onClick={() => setStep('choix')}>Retour</Button>
                         </div>
                     </form>
+                )}
+
+                {step === 'envoye' && (
+                    <div className="text-center space-y-3 py-4">
+                        <div className="text-4xl">👀</div>
+                        <p className="text-sm font-semibold text-gray-800">Envoyé pour validation !</p>
+                        <p className="text-xs text-gray-500">
+                            On vérifie vite fait avant que ça apparaisse pour tout le monde. Tu peux suivre l'avancement dans "Mes contributions".
+                        </p>
+                        <Button onClick={onDone} className="w-full">Fermer</Button>
+                    </div>
                 )}
             </div>
         </div>
