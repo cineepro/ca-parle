@@ -1,15 +1,15 @@
 // functions/manage-vanessa-knowledge/src/main.js — Ça Parle
 // Appel HTTP explicite depuis le client :
 //   Notes   : { action: 'list'|'create'|'update'|'delete', id?, category?, content?, active?, connectorId? }
-//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, active? }
+//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, sourceUrl?, partnerUserId?, active? }
+//   Facturation (modérateur) : { action: 'recharge_connector_tokens', id, amount }
 //   Connecteurs (public)     : { action: 'list_active_connectors' }
+//   Espace partenaire (authentifié, non-modérateur) : { action: 'get_my_connector' }
 //
 // SÉCURITÉ : toutes les actions sont réservées aux modérateurs, SAUF
-// 'list_active_connectors' — volontairement publique (juste authentifiée),
-// car c'est elle qui alimente les pastilles de connecteurs affichées à
-// TOUS les utilisateurs dans le chat avec Vanessa. Elle ne renvoie que des
-// champs d'affichage (nom, icône, couleur, description), jamais le
-// contenu des notes elles-mêmes.
+// 'list_active_connectors' (alimente les pastilles de connecteurs pour
+// tous les utilisateurs) et 'get_my_connector' (permet à un partenaire de
+// suivre SA propre consommation, sans jamais voir celle des autres).
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
 export default async ({ req, res, error }) => {
@@ -33,8 +33,14 @@ export default async ({ req, res, error }) => {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
         const { action } = body;
 
-        // Seule action accessible à tout utilisateur authentifié, pas
-        // seulement aux modérateurs — nécessaire pour afficher les
+        // Un connecteur dont le quota est épuisé ne doit plus être
+        // proposé — sauf s'il n'a jamais reçu de quota du tout
+        // (tokensGranted à 0), auquel cas on le considère illimité, pour
+        // ne jamais casser les connecteurs créés avant ce système de
+        // facturation.
+        const isExhausted = (c) => (c.tokensGranted || 0) > 0 && (c.tokensUsed || 0) >= c.tokensGranted;
+
+        // Accessible à tout utilisateur authentifié — alimente les
         // pastilles de connecteurs dans le chat.
         if (action === 'list_active_connectors') {
             const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [
@@ -42,10 +48,33 @@ export default async ({ req, res, error }) => {
                 Query.orderAsc('name'),
                 Query.limit(50),
             ]);
-            const safe = result.documents.map((c) => ({
-                $id: c.$id, name: c.name, slug: c.slug, icon: c.icon, color: c.color, description: c.description,
-            }));
+            const safe = result.documents
+                .filter((c) => !isExhausted(c))
+                .map((c) => ({ $id: c.$id, name: c.name, slug: c.slug, icon: c.icon, color: c.color, description: c.description }));
             return res.json({ success: true, connectors: safe });
+        }
+
+        // Accessible à tout utilisateur authentifié — un partenaire suit
+        // UNIQUEMENT le connecteur qui lui est explicitement associé
+        // (partnerUserId), jamais les autres.
+        if (action === 'get_my_connector') {
+            const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [
+                Query.equal('partnerUserId', callerId),
+                Query.limit(1),
+            ]);
+            if (result.documents.length === 0) {
+                return res.json({ success: true, connector: null });
+            }
+            const c = result.documents[0];
+            return res.json({
+                success: true,
+                connector: {
+                    $id: c.$id, name: c.name, icon: c.icon, color: c.color,
+                    active: c.active,
+                    tokensGranted: c.tokensGranted || 0,
+                    tokensUsed: c.tokensUsed || 0,
+                },
+            });
         }
 
         // Tout le reste est réservé aux modérateurs.
@@ -54,7 +83,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, partnerUserId, amount } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -108,7 +137,10 @@ export default async ({ req, res, error }) => {
                     icon: icon || '🔗',
                     color: color || '#FF4757',
                     description: description || '',
-                    sourceUrl: sourceUrl || '',
+                    sourceUrl: sourceUrl || '', // laissable vide à la création, ajoutable/retirable ensuite via update_connector
+                    partnerUserId: partnerUserId || '',
+                    tokensGranted: 0, // 0 = illimité tant qu'aucune vente n'est enregistrée
+                    tokensUsed: 0,
                     processedItemHashes: [],
                     active: active !== undefined ? active : true,
                     createdAt: new Date().toISOString(),
@@ -123,7 +155,11 @@ export default async ({ req, res, error }) => {
                 if (icon !== undefined) updateData.icon = icon;
                 if (color !== undefined) updateData.color = color;
                 if (description !== undefined) updateData.description = description;
+                // sourceUrl accepte explicitement une chaîne vide : c'est
+                // ce qui permet de RETIRER un lien déjà en place, pas
+                // seulement d'en ajouter un.
                 if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
+                if (partnerUserId !== undefined) updateData.partnerUserId = partnerUserId;
                 if (active !== undefined) updateData.active = active;
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, updateData);
                 return res.json({ success: true, connector: doc });
@@ -132,6 +168,20 @@ export default async ({ req, res, error }) => {
                 if (!id) return res.json({ success: false, error: 'id requis.' }, 400);
                 await databases.deleteDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id);
                 return res.json({ success: true });
+            }
+
+            // --- Facturation ---
+            case 'recharge_connector_tokens': {
+                if (!id || !amount || amount <= 0) {
+                    return res.json({ success: false, error: 'id et amount (positif) requis.' }, 400);
+                }
+                const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id);
+                // Additif — le nouveau quota vient s'ajouter au restant,
+                // jamais l'écraser, même paiement anticipé avant épuisement.
+                const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, {
+                    tokensGranted: (connector.tokensGranted || 0) + Number(amount),
+                });
+                return res.json({ success: true, connector: doc });
             }
 
             default:

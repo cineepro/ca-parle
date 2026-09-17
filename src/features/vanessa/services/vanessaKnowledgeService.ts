@@ -31,6 +31,27 @@ export interface VanessaConnector {
     // d'afficher questionCount tel quel (voir formatMonthlyQuestionCount).
     questionCount?: number;
     questionCountMonth?: string;
+    // Facturation — tokensGranted à 0 = illimité (connecteur non facturé,
+    // comportement par défaut pour ne rien casser sur les connecteurs
+    // créés avant ce système). Dès que tokensGranted > 0, le connecteur
+    // devient indisponible une fois tokensUsed >= tokensGranted, jusqu'à
+    // une recharge.
+    tokensGranted?: number;
+    tokensUsed?: number;
+    // Compte Appwrite du partenaire autorisé à consulter l'espace
+    // partenaire pour CE connecteur précis (vide = aucun accès partenaire
+    // configuré).
+    partnerUserId?: string;
+}
+
+export interface MyConnectorUsage {
+    $id: string;
+    name: string;
+    icon: string;
+    color: string;
+    active: boolean;
+    tokensGranted: number;
+    tokensUsed: number;
 }
 
 // Upload d'un PDF destiné à être lu et résumé pour un connecteur — bucket
@@ -77,10 +98,21 @@ export const vanessaKnowledgeService = {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'delete_connector', id });
     },
 
+    // --- Facturation ---
+    async rechargeConnectorTokens(id: string, amount: number): Promise<void> {
+        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'recharge_connector_tokens', id, amount });
+    },
+
     // --- Connecteurs actifs (public, pour les pastilles dans le chat) ---
     async listActiveConnectors(): Promise<VanessaConnector[]> {
         const result = await callFunction<{ connectors: VanessaConnector[] }>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'list_active_connectors' });
         return result.connectors;
+    },
+
+    // --- Espace partenaire ---
+    async getMyConnector(): Promise<MyConnectorUsage | null> {
+        const result = await callFunction<{ connector: MyConnectorUsage | null }>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'get_my_connector' });
+        return result.connector;
     },
 
     // --- Ingestion d'un PDF sur un connecteur ---

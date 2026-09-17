@@ -17,6 +17,7 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import CaSertPage from '@/pages/CaSertPage';
 import MyCaSertContributionsPage from '@/pages/MyCaSertContributionsPage';
+import PartnerSpacePage from '@/pages/PartnerSpacePage';
 import MessagesPage from '@/pages/MessagesPage';
 import ConversationPage from '@/pages/ConversationPage';
 import TermsPage from '@/pages/TermsPage';
@@ -123,6 +124,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <MyCaSertContributionsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/espace-partenaire"
+                    element={
+                        <ProtectedRoute>
+                            <PartnerSpacePage />
                         </ProtectedRoute>
                     }
                 />

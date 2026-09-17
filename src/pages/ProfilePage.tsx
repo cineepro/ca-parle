@@ -44,6 +44,10 @@ export default function ProfilePage() {
                         ⭐ Tendances
                         <span className="text-gray-300">›</span>
                     </Link>
+                    <Link to="/espace-partenaire" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
+                        🤝 Espace partenaire
+                        <span className="text-gray-300">›</span>
+                    </Link>
                     <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
                         🔎 Mes références suivies
                         <span className="text-gray-300">›</span>

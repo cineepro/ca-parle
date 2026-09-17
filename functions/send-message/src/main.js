@@ -269,17 +269,60 @@ async function extractMemoryIfNeeded({ conversation, databases, DATABASE_ID, COL
     }
 }
 
+// Construit l'instruction de citation obligatoire pour les notes
+// "publicité" — factorisé ici car utilisé à la fois en mode connecteur et
+// en mode général. Le préfixe "PUB :" est imposé explicitement pour que ce
+// soit toujours reconnaissable comme un contenu sponsorisé, jamais confondu
+// avec une opinion spontanée de Vanessa.
+function buildPubliciteInstruction(documents) {
+    return '\n\nINFORMATION À MENTIONNER OBLIGATOIREMENT, À LA TOUTE FIN de ta réponse, sur sa propre ligne, en commençant EXACTEMENT par "PUB : " (reformule le reste dans ton ton, mais ne retire jamais ce préfixe et ne l\'omets JAMAIS) :\n' +
+        documents.map((a) => `- ${a.content}`).join('\n');
+}
+
 async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
     let knowledgeContext = '';
+    let publiciteContext = '';
+    // Connecteur RÉELLEMENT utilisé ce tour-ci (peut rester vide si le
+    // connecteur demandé s'avère inactif/épuisé — dans ce cas on retombe
+    // proprement en mode général plutôt que de planter ou de continuer à
+    // consommer un quota mort).
+    let effectiveConnectorId = '';
+    let connectorFellBack = false;
+
     try {
-        if (connectorId) {
+        let activeConnectorId = connectorId;
+
+        if (connectorId && COLLECTION_VANESSA_CONNECTORS) {
+            // Vérifie que le connecteur demandé est toujours utilisable —
+            // désactivé manuellement, ou quota épuisé (tokensGranted > 0
+            // et tokensUsed >= tokensGranted). Sans ce contrôle, désactiver
+            // un connecteur depuis /moderation ne l'empêchait pas de
+            // continuer à être utilisé par les conversations qui l'avaient
+            // déjà sélectionné.
+            try {
+                const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+                const exhausted = (connector.tokensGranted || 0) > 0 && (connector.tokensUsed || 0) >= connector.tokensGranted;
+                if (!connector.active || exhausted) {
+                    log(`⚠️ Connecteur "${connector.name}" ${!connector.active ? 'désactivé' : 'épuisé'} — retour au mode général.`);
+                    activeConnectorId = '';
+                    connectorFellBack = true;
+                }
+            } catch {
+                // Connecteur supprimé entre-temps — même traitement.
+                activeConnectorId = '';
+                connectorFellBack = true;
+            }
+        }
+
+        if (activeConnectorId) {
+            effectiveConnectorId = activeConnectorId;
             // Un connecteur est actif sur cette conversation : Vanessa ne
             // cherche QUE dans ce bloc de connaissances précis, comme
             // demandé — jamais mélangé avec les notes générales ni les
             // autres connecteurs.
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
-                Query.equal('connectorId', connectorId),
+                Query.equal('connectorId', activeConnectorId),
                 Query.notEqual('category', PUBLICITE_CATEGORY),
                 // Sans ce tri, Appwrite renvoie les 15 premières notes
                 // selon son ordre interne par défaut — pas les plus
@@ -291,24 +334,16 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
                 Query.limit(15),
             ]);
 
-            // Infos "publicité" — séparées du reste, toujours entièrement
-            // incluses (pas soumises à la limite de 15), avec une
-            // instruction FORTE de citation obligatoire. C'est la seule
-            // catégorie que Vanessa doit systématiquement mentionner,
-            // contrairement au reste du contexte qu'elle utilise seulement
-            // si pertinent.
-            let publiciteContext = '';
+            // Infos "publicité" DU CONNECTEUR — séparées du reste, toujours
+            // entièrement incluses (pas soumises à la limite de 15).
             try {
                 const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                     Query.equal('active', true),
-                    Query.equal('connectorId', connectorId),
+                    Query.equal('connectorId', activeConnectorId),
                     Query.equal('category', PUBLICITE_CATEGORY),
                     Query.limit(3),
                 ]);
-                if (ads.documents.length > 0) {
-                    publiciteContext = '\n\nINFORMATION À MENTIONNER OBLIGATOIREMENT, en une phrase courte, À LA TOUTE FIN de ta réponse (reformule dans ton ton, ne recopie jamais mot pour mot, mais ne l\'omets JAMAIS) :\n' +
-                        ads.documents.map((a) => `- ${a.content}`).join('\n');
-                }
+                if (ads.documents.length > 0) publiciteContext = buildPubliciteInstruction(ads.documents);
             } catch { /* collection pas encore configurée */ }
 
             // Récupère le nom du partenaire pour qu'elle sache
@@ -317,7 +352,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             let partnerLabel = 'un partenaire';
             if (COLLECTION_VANESSA_CONNECTORS) {
                 try {
-                    const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+                    const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, activeConnectorId);
                     partnerLabel = connector.name;
                 } catch { /* connecteur supprimé entre-temps, on garde le libellé générique */ }
             }
@@ -327,7 +362,6 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
                 knowledgeContext += '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
                     knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
-            knowledgeContext += publiciteContext;
         } else {
             // Mode général : notes qui n'appartiennent à AUCUN connecteur.
             // Filtré après coup plutôt que via Query.equal('connectorId','')
@@ -339,6 +373,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
                 Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                Query.notEqual('category', PUBLICITE_CATEGORY),
                 Query.orderDesc('createdAt'),
                 Query.limit(30),
             ]);
@@ -347,6 +382,21 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
                 knowledgeContext = '\n\nNotes internes (contexte, ne jamais citer mot pour mot) :\n' +
                     general.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
+
+            // Infos "publicité" GÉNÉRALES (pas liées à un connecteur) —
+            // pour l'instant peu utilisé en pratique (Vanessa n'a pas
+            // encore de partenariat "grand public" actif), mais prêt pour
+            // quand ce sera le cas : même mécanique que pour un connecteur,
+            // simplement sans filtre connectorId.
+            try {
+                const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                    Query.equal('active', true),
+                    Query.equal('category', PUBLICITE_CATEGORY),
+                    Query.limit(20),
+                ]);
+                const generalAds = ads.documents.filter((a) => !a.connectorId).slice(0, 3);
+                if (generalAds.length > 0) publiciteContext = buildPubliciteInstruction(generalAds);
+            } catch { /* collection pas encore configurée */ }
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
 
@@ -447,7 +497,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
         },
         body: JSON.stringify({
             model: 'claude-sonnet-5',
-            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext + memoryContext,
+            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: 300,
         }),
@@ -468,6 +518,8 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     return {
         text: textBlock?.text?.trim() || null,
         tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        effectiveConnectorId,
+        connectorFellBack,
     };
 }
 
@@ -817,6 +869,31 @@ export default async ({ req, res, log, error }) => {
                                 vanessaTokensUsedCount: newCount,
                             });
                             log(`📊 Quota tokens mis à jour : ${newCount}/${DAILY_VANESSA_TOKEN_LIMIT}.`);
+                        }
+
+                        // Décompte du quota du CONNECTEUR partenaire, si un
+                        // connecteur a réellement été utilisé ce tour-ci —
+                        // facturation indépendante du quota personnel
+                        // ci-dessus, les deux s'appliquent en parallèle.
+                        if (result.effectiveConnectorId && COLLECTION_VANESSA_CONNECTORS) {
+                            try {
+                                const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, result.effectiveConnectorId);
+                                await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, result.effectiveConnectorId, {
+                                    tokensUsed: (connector.tokensUsed || 0) + (result.tokensUsed || 0),
+                                });
+                            } catch (connErr) {
+                                log(`⚠️ Décompte du quota connecteur échoué (non bloquant) : ${connErr.message}`);
+                            }
+                        }
+
+                        // Si le connecteur demandé était désactivé/épuisé,
+                        // la conversation est réinitialisée en mode général
+                        // — sinon la pastille resterait affichée "active"
+                        // côté utilisateur alors qu'elle ne fait plus rien.
+                        if (result.connectorFellBack) {
+                            await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
+                                vanessaConnectorId: '',
+                            });
                         }
 
                         // Pas de notification ici volontairement : l'utilisateur
