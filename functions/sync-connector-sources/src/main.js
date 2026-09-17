@@ -18,6 +18,14 @@ import { convert as htmlToText } from 'html-to-text';
 const MAX_ITEMS_PER_SOURCE_PER_RUN = 5; // limite l'explosion de coût si une source publie beaucoup d'un coup
 const MAX_HASHES_KEPT = 300; // taille de l'historique de déduplication conservé par connecteur
 
+// Budget de temps INTERNE, volontairement bien en-dessous du timeout réel
+// configuré côté Appwrite. Dès qu'on l'approche, on arrête proprement le
+// travail restant (on ne le tente pas, on ne le perd pas) plutôt que de se
+// faire tuer par la plateforme en plein milieu d'un item — ce qui évite un
+// statut "Failed" et permet de reprendre exactement là où on s'est arrêté
+// au prochain run planifié.
+const SOFT_TIME_BUDGET_MS = 45_000;
+
 function hashOf(value) {
     return createHash('sha256').update(value).digest('hex').slice(0, 16);
 }
@@ -61,8 +69,20 @@ async function saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNO
     });
 }
 
+// Persiste IMMÉDIATEMENT le hash d'un item traité avec succès, au lieu
+// d'attendre la fin de la boucle du connecteur. C'est ce qui garantit
+// qu'un timeout au milieu du traitement ne fait pas retraiter — donc
+// dupliquer — les articles déjà traités avant l'interruption.
+async function persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, newHash) {
+    connector.processedItemHashes = appendHashes(connector.processedItemHashes, [newHash]);
+    await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector.$id, {
+        processedItemHashes: connector.processedItemHashes,
+        lastSyncedAt: new Date().toISOString(),
+    });
+}
+
 // --- Stratégie RSS ---
-async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log) {
+async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp) {
     const parser = new Parser();
     const feed = await parser.parseURL(connector.sourceUrl);
 
@@ -72,36 +92,67 @@ async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, con
         .slice(0, MAX_ITEMS_PER_SOURCE_PER_RUN);
 
     let newEntries = 0;
-    const newHashes = [];
+    let skipped = 0;
 
     for (const item of newItems) {
+        if (timeIsUp()) {
+            skipped = newItems.length - newEntries - skipped; // le reste sera repris au prochain run
+            log(`  ⏱ Budget de temps atteint, ${skipped} article(s) restant(s) reporté(s) au prochain run.`);
+            break;
+        }
         try {
             log(`  Article : ${item.title || item.link}`);
             let text = item.contentSnippet || item.content || '';
             if (text.length < 300 && item.link) {
-                const pageResponse = await fetch(item.link);
-                if (pageResponse.ok) text = htmlToText(await pageResponse.text(), { wordwrap: false });
+                // Timeout court dédié à cette seule requête, pour qu'une
+                // page lente ne consomme pas à elle seule tout le budget
+                // de temps restant de la fonction.
+                const controller = new AbortController();
+                const abortTimer = setTimeout(() => controller.abort(), 8_000);
+                try {
+                    const pageResponse = await fetch(item.link, { signal: controller.signal });
+                    if (pageResponse.ok) text = htmlToText(await pageResponse.text(), { wordwrap: false });
+                } finally {
+                    clearTimeout(abortTimer);
+                }
             }
-            if (text.trim().length < 100) continue;
+            if (text.trim().length < 100) {
+                // Pas de contenu exploitable : on marque quand même l'item
+                // comme traité pour ne pas retenter indéfiniment la même
+                // page trop courte à chaque run.
+                await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, hashOf(item.link));
+                continue;
+            }
 
             const summary = await summarizeForKnowledge(`${item.title}\n\n${text}`, connector.name, ANTHROPIC_API_KEY);
             if (summary) {
                 await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector.$id, summary);
                 newEntries++;
             }
-            newHashes.push(hashOf(item.link));
+            // Persisté immédiatement, item par item — plus d'attente de
+            // fin de boucle.
+            await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, hashOf(item.link));
         } catch (err) {
             log(`  Échec sur ${item.link} : ${err.message}`);
+            // On NE marque PAS l'item comme traité : un échec réseau
+            // ponctuel doit permettre une nouvelle tentative au run suivant.
         }
     }
 
-    return { newEntries, newHashes, isRss: true };
+    return { newEntries, isRss: true, handledIncrementally: true };
 }
 
 // --- Stratégie site web classique (une seule "page", retraitée seulement
 // si son contenu a changé depuis la dernière vérification) ---
 async function syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log) {
-    const response = await fetch(connector.sourceUrl);
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), 8_000);
+    let response;
+    try {
+        response = await fetch(connector.sourceUrl, { signal: controller.signal });
+    } finally {
+        clearTimeout(abortTimer);
+    }
     if (!response.ok) throw new Error(`Échec du téléchargement (${response.status})`);
 
     const text = htmlToText(await response.text(), { wordwrap: false });
@@ -136,6 +187,9 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+    const startedAt = Date.now();
+    const timeIsUp = () => Date.now() - startedAt > SOFT_TIME_BUDGET_MS;
+
     try {
         const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [
             Query.limit(100),
@@ -145,8 +199,14 @@ export default async ({ req, res, log, error }) => {
         log(`${connectors.length} connecteur(s) avec un lien à vérifier.`);
 
         let totalNewEntries = 0;
+        let connectorsChecked = 0;
 
         for (const connector of connectors) {
+            if (timeIsUp()) {
+                log(`⏱ Budget de temps interne atteint (${SOFT_TIME_BUDGET_MS / 1000}s). ${connectors.length - connectorsChecked} connecteur(s) restant(s) seront traités au prochain run planifié.`);
+                break;
+            }
+
             log(`Connecteur : ${connector.name} — ${connector.sourceUrl}`);
             let outcome;
 
@@ -155,7 +215,7 @@ export default async ({ req, res, log, error }) => {
                 // retombe sur une lecture de page classique si ce n'en
                 // est pas un.
                 try {
-                    outcome = await syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log);
+                    outcome = await syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp);
                 } catch {
                     log('  Pas un flux RSS valide, lecture en page classique...');
                     outcome = await syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log);
@@ -165,18 +225,24 @@ export default async ({ req, res, log, error }) => {
                 outcome = { newEntries: 0, newHashes: [] };
             }
 
-            const updates = { lastSyncedAt: new Date().toISOString() };
-            if (outcome.newHashes.length > 0) {
-                updates.processedItemHashes = appendHashes(connector.processedItemHashes, outcome.newHashes);
+            // syncRss gère désormais sa propre persistance incrémentale
+            // (Article par article) — on ne réécrit ici que pour la
+            // stratégie "site web classique", plus simple (un seul hash).
+            if (!outcome.handledIncrementally) {
+                const updates = { lastSyncedAt: new Date().toISOString() };
+                if (outcome.newHashes?.length > 0) {
+                    updates.processedItemHashes = appendHashes(connector.processedItemHashes, outcome.newHashes);
+                }
+                await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector.$id, updates);
             }
-            await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector.$id, updates);
 
             totalNewEntries += outcome.newEntries;
+            connectorsChecked++;
             log(`  -> ${outcome.newEntries} nouvelle(s) note(s) en attente de validation.`);
         }
 
-        log(`Terminé. ${totalNewEntries} note(s) créée(s) au total, à valider dans /moderation.`);
-        return res.json({ success: true, connectorsChecked: connectors.length, totalNewEntries });
+        log(`Terminé. ${totalNewEntries} note(s) créée(s) au total (sur ${connectorsChecked}/${connectors.length} connecteur(s) traités), à valider dans /moderation.`);
+        return res.json({ success: true, connectorsChecked, totalConnectors: connectors.length, totalNewEntries });
     } catch (err) {
         error(err.message);
         return res.json({ success: false, error: err.message }, 500);

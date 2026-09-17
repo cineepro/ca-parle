@@ -25,6 +25,12 @@ export interface VanessaConnector {
     lastSyncedAt?: string;
     active: boolean;
     createdAt?: string;
+    // Compteur mensuel de questions posées à ce connecteur (remis à zéro
+    // chaque mois côté backend). questionCountMonth est au format "AAAA-MM"
+    // — toujours vérifier qu'il correspond au mois en cours avant
+    // d'afficher questionCount tel quel (voir formatMonthlyQuestionCount).
+    questionCount?: number;
+    questionCountMonth?: string;
 }
 
 // Upload d'un PDF destiné à être lu et résumé pour un connecteur — bucket

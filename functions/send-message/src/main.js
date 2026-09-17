@@ -281,6 +281,13 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
                 Query.equal('active', true),
                 Query.equal('connectorId', connectorId),
                 Query.notEqual('category', PUBLICITE_CATEGORY),
+                // Sans ce tri, Appwrite renvoie les 15 premières notes
+                // selon son ordre interne par défaut — pas les plus
+                // récentes. Dès qu'un connecteur dépasse 15 notes actives
+                // (ce qui arrivera vite avec un flux qui se met à jour
+                // chaque jour), Vanessa risquait de rester bloquée sur de
+                // vieilles notes en ignorant les plus récentes.
+                Query.orderDesc('createdAt'),
                 Query.limit(15),
             ]);
 
@@ -508,6 +515,32 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
     };
 }
 
+// Compteur mensuel de questions posées PAR CONNECTEUR — argument concret
+// pour les partenaires/institutions ("voici combien de jeunes ont
+// interagi avec votre contenu via Vanessa ce mois-ci"). Remis à zéro
+// automatiquement à chaque changement de mois (clé "AAAA-MM"), jamais
+// mélangé avec le mois précédent. Lecture-puis-écriture volontairement
+// simple, dans le même esprit que le quota quotidien de tokens déjà en
+// place plus haut — un léger risque de write concurrent sous très forte
+// charge simultanée, largement suffisant pour un indicateur d'engagement.
+async function incrementConnectorQuestionCount(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId, log) {
+    if (!connectorId || !COLLECTION_VANESSA_CONNECTORS) return;
+    try {
+        const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+        const currentMonth = new Date().toISOString().slice(0, 7); // "2026-09"
+        const sameMonth = connector.questionCountMonth === currentMonth;
+        const nextCount = sameMonth ? (connector.questionCount || 0) + 1 : 1;
+        await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId, {
+            questionCount: nextCount,
+            questionCountMonth: currentMonth,
+        });
+    } catch (err) {
+        // Ne doit JAMAIS faire échouer l'envoi du message ou la réponse
+        // de Vanessa pour un simple souci de compteur statistique.
+        log(`⚠️ Compteur de questions non mis à jour pour le connecteur ${connectorId} : ${err.message}`);
+    }
+}
+
 export default async ({ req, res, log, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
     if (!callerId) {
@@ -683,6 +716,16 @@ export default async ({ req, res, log, error }) => {
         // conversation (et que ce n'est pas elle-même qui vient d'écrire).
         if (VANESSA_USER_ID && ANTHROPIC_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
             log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
+
+            // Comptabilisé dès qu'une question est posée avec un connecteur
+            // actif sur la conversation — indépendamment du quota de
+            // tokens ci-dessous : même si Vanessa ne peut pas répondre
+            // faute de quota, l'utilisateur a bien posé une question à ce
+            // connecteur, et c'est ce que l'indicateur mesure.
+            if (conversation.vanessaConnectorId) {
+                await incrementConnectorQuestionCount(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, conversation.vanessaConnectorId, log);
+            }
+
             try {
                 // Quota quotidien de tokens (façon Claude : "reviens plus
                 // tard une fois la limite atteinte") — protège le compte
