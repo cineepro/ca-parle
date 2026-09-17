@@ -12,6 +12,15 @@
 // suivre SA propre consommation, sans jamais voir celle des autres).
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
+// --- Grille tarifaire (voir Vanessa-API-Grille-Tarifaire.docx) ---
+// À remettre à jour manuellement ici si la grille change un jour (taux
+// USD/FCFA, tarif Anthropic, ou marge appliquée).
+const SELL_PRICE_PER_MILLION_TOKENS_FCFA = 5100; // coût réel (~1700 FCFA) × marge x3
+
+function fcfaToTokens(fcfa) {
+    return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
+}
+
 export default async ({ req, res, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
     if (!callerId) {
@@ -83,7 +92,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, partnerUserId, amount } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, partnerUserId, amountFcfa } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -172,16 +181,17 @@ export default async ({ req, res, error }) => {
 
             // --- Facturation ---
             case 'recharge_connector_tokens': {
-                if (!id || !amount || amount <= 0) {
-                    return res.json({ success: false, error: 'id et amount (positif) requis.' }, 400);
+                if (!id || !amountFcfa || amountFcfa <= 0) {
+                    return res.json({ success: false, error: 'id et amountFcfa (positif) requis.' }, 400);
                 }
                 const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id);
+                const tokensToAdd = fcfaToTokens(Number(amountFcfa));
                 // Additif — le nouveau quota vient s'ajouter au restant,
                 // jamais l'écraser, même paiement anticipé avant épuisement.
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, {
-                    tokensGranted: (connector.tokensGranted || 0) + Number(amount),
+                    tokensGranted: (connector.tokensGranted || 0) + tokensToAdd,
                 });
-                return res.json({ success: true, connector: doc });
+                return res.json({ success: true, connector: doc, tokensAdded: tokensToAdd });
             }
 
             default:

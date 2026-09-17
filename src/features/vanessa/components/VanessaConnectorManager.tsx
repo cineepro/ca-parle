@@ -3,6 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import { vanessaKnowledgeService, type VanessaConnector } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
 
+const SELL_PRICE_PER_MILLION_TOKENS_FCFA = 5100; // même taux que côté serveur — voir Vanessa-API-Grille-Tarifaire.docx
+
+function fcfaToTokens(fcfa: number): number {
+    return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
+}
+
 const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '', sourceUrl: '' };
 
 function formatDate(iso?: string) {
@@ -64,6 +70,7 @@ export const VanessaConnectorManager = () => {
     const [rechargingId, setRechargingId] = useState<string | null>(null);
     const [rechargeAmount, setRechargeAmount] = useState('');
     const [savingRecharge, setSavingRecharge] = useState(false);
+    const [rechargeConfirmation, setRechargeConfirmation] = useState<Record<string, string>>({});
 
     const load = async () => {
         setLoading(true);
@@ -134,11 +141,12 @@ export const VanessaConnectorManager = () => {
     };
 
     const saveRecharge = async (id: string) => {
-        const amount = parseInt(rechargeAmount, 10);
-        if (!amount || amount <= 0) return;
+        const fcfa = parseInt(rechargeAmount, 10);
+        if (!fcfa || fcfa <= 0) return;
         setSavingRecharge(true);
         try {
-            await vanessaKnowledgeService.rechargeConnectorTokens(id, amount);
+            const result = await vanessaKnowledgeService.rechargeConnectorTokens(id, fcfa);
+            setRechargeConfirmation((m) => ({ ...m, [id]: `✅ ${fcfa.toLocaleString('fr-FR')} FCFA → ${result.tokensAdded.toLocaleString('fr-FR')} tokens ajoutés.` }));
             setRechargingId(null);
             setRechargeAmount('');
             await load();
@@ -326,17 +334,24 @@ export const VanessaConnectorManager = () => {
                                             </div>
                                         </div>
                                     ) : rechargingId === c.$id ? (
-                                        <div className="flex items-center gap-1.5 bg-gray-50 rounded-xl p-2.5">
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                value={rechargeAmount}
-                                                onChange={(e) => setRechargeAmount(e.target.value)}
-                                                placeholder="Tokens à ajouter"
-                                                className="flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
-                                            />
-                                            <Button size="sm" onClick={() => saveRecharge(c.$id)} isLoading={savingRecharge}>Ajouter</Button>
-                                            <Button size="sm" variant="secondary" onClick={() => setRechargingId(null)}>Annuler</Button>
+                                        <div className="bg-gray-50 rounded-xl p-2.5 space-y-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    value={rechargeAmount}
+                                                    onChange={(e) => setRechargeAmount(e.target.value)}
+                                                    placeholder="Montant reçu (FCFA)"
+                                                    className="flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                                />
+                                                <Button size="sm" onClick={() => saveRecharge(c.$id)} isLoading={savingRecharge}>Ajouter</Button>
+                                                <Button size="sm" variant="secondary" onClick={() => setRechargingId(null)}>Annuler</Button>
+                                            </div>
+                                            {!!parseInt(rechargeAmount, 10) && (
+                                                <p className="text-[11px] text-gray-400">
+                                                    ≈ {fcfaToTokens(parseInt(rechargeAmount, 10)).toLocaleString('fr-FR')} tokens à ce tarif (x3)
+                                                </p>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-2 flex-wrap">
@@ -370,6 +385,9 @@ export const VanessaConnectorManager = () => {
                                     )}
                                     {uploadMessage[c.$id] && (
                                         <p className="text-xs text-gray-500">{uploadMessage[c.$id]}</p>
+                                    )}
+                                    {rechargeConfirmation[c.$id] && (
+                                        <p className="text-xs text-green-600">{rechargeConfirmation[c.$id]}</p>
                                     )}
                                 </div>
                             </div>

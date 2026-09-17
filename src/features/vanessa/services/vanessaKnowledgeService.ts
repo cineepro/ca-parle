@@ -99,8 +99,12 @@ export const vanessaKnowledgeService = {
     },
 
     // --- Facturation ---
-    async rechargeConnectorTokens(id: string, amount: number): Promise<void> {
-        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'recharge_connector_tokens', id, amount });
+    // amountFcfa : le montant reçu du partenaire — le serveur calcule
+    // lui-même l'équivalent en tokens selon la grille tarifaire en vigueur
+    // (voir Vanessa-API-Grille-Tarifaire.docx), pour garder un seul endroit
+    // où ce taux est défini.
+    async rechargeConnectorTokens(id: string, amountFcfa: number): Promise<{ tokensAdded: number }> {
+        return callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'recharge_connector_tokens', id, amountFcfa });
     },
 
     // --- Connecteurs actifs (public, pour les pastilles dans le chat) ---
