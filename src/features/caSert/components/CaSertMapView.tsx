@@ -19,6 +19,8 @@ export const CaSertMapView = ({ spots }: Props) => {
     const markersRef = useRef<maplibregl.Marker[]>([]);
     const [entered, setEntered] = useState(false);
     const [selected, setSelected] = useState<Spot | null>(null);
+    const [contextLost, setContextLost] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
     const spinFrame = useRef<number | null>(null);
 
     // Seules les fiches avec une vraie position posée par leur auteur
@@ -29,6 +31,7 @@ export const CaSertMapView = ({ spots }: Props) => {
 
     useEffect(() => {
         if (!containerRef.current || mapRef.current) return;
+        setContextLost(false);
 
         const map = new maplibregl.Map({
             container: containerRef.current,
@@ -42,6 +45,23 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.touchZoomRotate.disableRotation();
 
         map.on('style.load', () => map.setProjection({ type: 'globe' }));
+
+        // Le GPU peut "perdre" son contexte graphique à tout moment —
+        // souvent sans rapport avec notre code (mémoire vidéo saturée,
+        // bascule d'onglet, appareil bas de gamme...). MapLibre tente de
+        // s'auto-restaurer, mais si rien ne se passe après un court délai,
+        // on propose une vraie reconstruction plutôt que de laisser
+        // l'écran blanc indéfiniment.
+        let restored = false;
+        map.on('webglcontextrestored', () => { restored = true; });
+        map.on('webglcontextlost', (e: any) => {
+            e?.preventDefault?.();
+            restored = false;
+            setTimeout(() => {
+                if (!restored) setContextLost(true);
+            }, 2500);
+        });
+
         mapRef.current = map;
 
         const spin = () => {
@@ -58,7 +78,16 @@ export const CaSertMapView = ({ spots }: Props) => {
             mapRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [retryCount]);
+
+    const handleRetry = () => {
+        // Force la recréation complète de la carte — le simple événement
+        // "restored" ne suffit pas toujours à redessiner correctement une
+        // scène 3D après une vraie perte de contexte.
+        setContextLost(false);
+        setEntered(false);
+        setRetryCount((n) => n + 1);
+    };
 
     // Pose les repères une fois entré dans la carte, et à chaque
     // changement de la liste (nouvelle fiche validée par exemple).
@@ -99,7 +128,23 @@ export const CaSertMapView = ({ spots }: Props) => {
         <div className="relative w-full h-[calc(100vh-180px)] min-h-[420px] rounded-2xl overflow-hidden">
             <div ref={containerRef} className="absolute inset-0" />
 
-            {!entered && (
+            {contextLost && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-gray-900/95 px-6 text-center">
+                    <div className="text-3xl">🔌</div>
+                    <p className="text-white text-sm">
+                        La carte a été interrompue par ton appareil (mémoire graphique saturée, souvent après avoir
+                        déjà ouvert une carte juste avant).
+                    </p>
+                    <button
+                        onClick={handleRetry}
+                        className="bg-[#FF4757] hover:bg-[#e63e4d] text-white font-bold text-sm px-6 py-3 rounded-full"
+                    >
+                        🔄 Réessayer
+                    </button>
+                </div>
+            )}
+
+            {!entered && !contextLost && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 px-6 bg-gradient-to-t from-black/40 via-transparent to-transparent">
                     <p className="text-white/80 text-sm text-center max-w-xs mb-4">
                         {locatable.length > 0
