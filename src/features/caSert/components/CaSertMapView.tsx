@@ -195,7 +195,15 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.resize();
         LOG('Taille juste après resize() — canvas :', map.getCanvas().width, 'x', map.getCanvas().height);
 
-        map.on('idle', () => LOG('💤 "idle" reçu — plus rien en attente, tout devrait être dessiné à l\'écran'));
+        map.on('idle', () => {
+            LOG('💤 "idle" reçu — plus rien en attente, tout devrait être dessiné à l\'écran');
+            const canvas = map.getCanvas();
+            const style = window.getComputedStyle(canvas);
+            const rect = canvas.getBoundingClientRect();
+            LOG('Diagnostic canvas — display:', style.display, '| visibility:', style.visibility, '| opacity:', style.opacity, '| z-index:', style.zIndex, '| position réelle (top/left/w/h):', rect.top, rect.left, rect.width, rect.height);
+            const topElement = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            LOG('Élément réellement au centre de la carte à l\'écran :', topElement?.tagName, topElement?.className);
+        });
 
         requestAnimationFrame(() => {
             LOG('Lancement du flyTo vers', BENIN_ZOOMED);
@@ -219,7 +227,13 @@ export const CaSertMapView = ({ spots }: Props) => {
 
     return (
         <div className="relative w-full h-[calc(100vh-180px)] min-h-[420px] rounded-2xl overflow-hidden">
-            <div ref={containerRef} className="absolute inset-0" />
+            {/* 🔴 TEMPORAIRE — fond de diagnostic. Si on voit du rouge SANS
+                les tuiles de carte par-dessus : MapLibre ne dessine
+                vraiment rien (vrai souci de rendu). Si on ne voit MÊME PAS
+                le rouge : quelque chose d'opaque recouvre tout par-dessus
+                (souci de superposition CSS). À retirer une fois la cause
+                confirmée. */}
+            <div ref={containerRef} className="absolute inset-0" style={{ backgroundColor: 'red' }} />
 
             {contextLost && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-gray-900/95 px-6 text-center">
