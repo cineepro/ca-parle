@@ -1,9 +1,10 @@
 // src/features/caSert/services/routeService.ts — Ça Parle
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
+import type { LineString } from 'geojson';
 
 export interface RouteResult {
-    geometry: GeoJSON.LineString;
+    geometry: LineString;
     distanceKm: string;
     durationMin: number;
 }
