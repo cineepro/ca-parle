@@ -163,15 +163,24 @@ export const CaSertMapView = ({ spots }: Props) => {
         }
         map.dragRotate.enable();
         map.scrollZoom.enable();
-        LOG('Lancement du flyTo vers', BENIN_ZOOMED);
-        map.once('moveend', () => LOG('✅ "moveend" reçu — le flyTo est allé au bout'));
-        map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 0, duration: 2600, essential: true });
 
-        // Si rien ne bouge du tout après un délai large, on le sait
-        // explicitement plutôt que de deviner si c'est lent ou figé.
-        setTimeout(() => {
-            LOG('Vérification à +4s — la carte bouge encore ?', map.isMoving(), '— zoom actuel :', map.getZoom().toFixed(2));
-        }, 4000);
+        // Le passage globe → carte plate PENDANT un flyTo s'est avéré
+        // instable (le flyTo se termine sans jamais bouger). On force donc
+        // la projection à plat D'ABORD, séparément, puis on anime le
+        // déplacement sur une carte déjà en mode standard — un chemin
+        // beaucoup plus classique et fiable dans MapLibre.
+        LOG('Bascule forcée en projection mercator (à plat) avant animation...');
+        map.setProjection({ type: 'mercator' });
+
+        requestAnimationFrame(() => {
+            LOG('Lancement du flyTo vers', BENIN_ZOOMED);
+            map.once('moveend', () => LOG('✅ "moveend" reçu — le flyTo est allé au bout'));
+            map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
+
+            setTimeout(() => {
+                LOG('Vérification à +4s — la carte bouge encore ?', map.isMoving(), '— zoom actuel :', map.getZoom().toFixed(2));
+            }, 4000);
+        });
     };
 
     return (
