@@ -164,7 +164,14 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.dragRotate.enable();
         map.scrollZoom.enable();
         LOG('Lancement du flyTo vers', BENIN_ZOOMED);
-        map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
+        map.once('moveend', () => LOG('✅ "moveend" reçu — le flyTo est allé au bout'));
+        map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 0, duration: 2600, essential: true });
+
+        // Si rien ne bouge du tout après un délai large, on le sait
+        // explicitement plutôt que de deviner si c'est lent ou figé.
+        setTimeout(() => {
+            LOG('Vérification à +4s — la carte bouge encore ?', map.isMoving(), '— zoom actuel :', map.getZoom().toFixed(2));
+        }, 4000);
     };
 
     return (
