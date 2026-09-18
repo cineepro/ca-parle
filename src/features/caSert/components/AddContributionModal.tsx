@@ -1,6 +1,8 @@
 // src/features/caSert/components/AddContributionModal.tsx — Ça Parle
 import { useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { caSertService, uploadSpotImage } from '../services/caSertService';
+const LocationPicker = lazy(() => import('./LocationPicker').then((m) => ({ default: m.LocationPicker })));
 import { SPOT_CATEGORIES } from '../config/categories';
 import { COUNTRIES } from '@/config/countries';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -25,6 +27,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
     const [description, setDescription] = useState('');
     const [quartier, setQuartier] = useState('');
     const [country, setCountry] = useState('benin');
+    const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
     const [phone, setPhone] = useState('');
     const [photo, setPhoto] = useState<File | null>(null);
 
@@ -36,6 +39,10 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
     const handleSubmitSpot = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !name.trim()) return;
+        if (!position) {
+            setError('Touche la carte pour indiquer où se trouve ce lieu — obligatoire.');
+            return;
+        }
         setSaving(true);
         setError(null);
         try {
@@ -51,6 +58,8 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                 photoFileId,
                 authorId: user.$id,
                 authorName: user.name || '',
+                latitude: position.lat,
+                longitude: position.lng,
             });
             setStep('envoye');
         } catch (err: any) {
@@ -161,6 +170,11 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                                 ))}
                             </select>
                         </div>
+
+                        <Suspense fallback={<div className="w-full h-48 rounded-xl bg-gray-100 animate-pulse" />}>
+                            <LocationPicker onChange={(lat, lng) => setPosition({ lat, lng })} />
+                        </Suspense>
+
                         <input
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}

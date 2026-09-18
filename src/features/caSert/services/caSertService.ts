@@ -29,6 +29,11 @@ export interface Spot extends Models.Document {
     isVerified: boolean;
     moderationStatus: ModerationStatus;
     createdAt: string;
+    // Position posée par l'auteur lui-même sur la carte au moment de la
+    // publication — jamais devinée automatiquement, pour garantir des
+    // coordonnées réellement fiables (voir LocationPicker).
+    latitude?: number;
+    longitude?: number;
 }
 
 export interface CreateSpotInput {
@@ -41,6 +46,8 @@ export interface CreateSpotInput {
     photoFileId?: string;
     authorId: string;
     authorName?: string;
+    latitude: number;
+    longitude: number;
 }
 
 export interface MarketPrice extends Models.Document {
@@ -116,6 +123,8 @@ export const caSertService = {
                 photoFileId: data.photoFileId || '',
                 authorId: data.authorId,
                 authorName: data.authorName || '',
+                latitude: data.latitude,
+                longitude: data.longitude,
                 confirmCount: 0,
                 isVerified: false,
                 moderationStatus: 'attente',
