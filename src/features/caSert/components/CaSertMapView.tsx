@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Spot } from '../services/caSertService';
+import { routeService } from '../services/routeService';
 import { SpotCard } from './SpotCard';
 import { SPOT_CATEGORIES } from '../config/categories';
 
@@ -12,24 +13,26 @@ interface Props {
 
 const BENIN_CENTER: [number, number] = [2.42, 9.3];
 const BENIN_ZOOMED: [number, number] = [2.42, 6.38];
-
-const LOG = (...args: any[]) => console.log('[CaSertMap]', ...args);
+const SPOT_ZOOM = 15; // niveau de zoom pour bien voir un lieu précis, pas juste la ville
+const ROUTE_SOURCE_ID = 'ca-sert-route';
+const ROUTE_LAYER_ID = 'ca-sert-route-line';
 
 export const CaSertMapView = ({ spots }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
     const markersRef = useRef<maplibregl.Marker[]>([]);
+    const userMarkerRef = useRef<maplibregl.Marker | null>(null);
     const [entered, setEntered] = useState(false);
     const [selected, setSelected] = useState<Spot | null>(null);
     const [contextLost, setContextLost] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
+    const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
+    const [locating, setLocating] = useState(false);
+    const [routing, setRouting] = useState(false);
+    const [routeInfo, setRouteInfo] = useState<{ distanceKm: string; durationMin: number } | null>(null);
+    const [routeError, setRouteError] = useState<string | null>(null);
     const spinFrame = useRef<number | null>(null);
     const spinTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Vérifié à CHAQUE itération de la boucle de rotation — la façon fiable
-    // de l'arrêter. cancelAnimationFrame seul ne suffisait pas : il
-    // n'annulait que le rAF, jamais le setTimeout imbriqué dedans, donc la
-    // boucle continuait malgré tout et se battait avec le flyTo pour le
-    // contrôle de la caméra — c'était la vraie cause de l'écran figé.
     const spinningRef = useRef(true);
 
     // Seules les fiches avec une vraie position posée par leur auteur
@@ -39,31 +42,9 @@ export const CaSertMapView = ({ spots }: Props) => {
     const locatable = spots.filter((s) => s.latitude != null && s.longitude != null);
 
     useEffect(() => {
-        LOG('useEffect déclenché, retryCount =', retryCount, '— container prêt ?', !!containerRef.current, '— map déjà créée ?', !!mapRef.current);
-        if (!containerRef.current || mapRef.current) {
-            LOG('création annulée (container absent ou map déjà existante)');
-            return;
-        }
+        if (!containerRef.current || mapRef.current) return;
         setContextLost(false);
 
-        // Détecte le support WebGL AVANT même de tenter de créer la carte
-        // — si ça échoue ici, le souci n'est pas MapLibre, c'est
-        // l'appareil/navigateur lui-même qui ne fournit pas WebGL du tout.
-        try {
-            const testCanvas = document.createElement('canvas');
-            const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl');
-            LOG('Test WebGL direct :', gl ? '✅ disponible' : '❌ INDISPONIBLE sur cet appareil/navigateur');
-            if (gl) {
-                const debugInfo = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
-                if (debugInfo) {
-                    LOG('GPU détecté :', (gl as WebGLRenderingContext).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
-                }
-            }
-        } catch (testErr) {
-            LOG('❌ Erreur pendant le test WebGL direct :', testErr);
-        }
-
-        LOG('Création de l\'instance maplibregl.Map...');
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -74,37 +55,30 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.scrollZoom.disable();
         map.dragRotate.disable();
         map.touchZoomRotate.disableRotation();
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-        map.on('error', (e: any) => LOG('❌ Événement "error" MapLibre :', e?.error || e));
-        map.on('style.load', () => {
-            LOG('✅ "style.load" reçu — bascule en projection globe');
-            map.setProjection({ type: 'globe' });
-        });
+        map.on('style.load', () => map.setProjection({ type: 'globe' }));
 
         // Le GPU peut "perdre" son contexte graphique à tout moment —
-        // souvent sans rapport avec notre code (mémoire vidéo saturée,
-        // bascule d'onglet, appareil bas de gamme...). MapLibre tente de
-        // s'auto-restaurer, mais si rien ne se passe après un court délai,
-        // on propose une vraie reconstruction plutôt que de laisser
-        // l'écran blanc indéfiniment.
+        // souvent sans rapport avec notre code. MapLibre tente de
+        // s'auto-restaurer ; si rien ne se passe après un court délai, on
+        // propose une vraie reconstruction plutôt qu'un écran figé.
         let restored = false;
-        map.on('webglcontextrestored', () => {
-            LOG('✅ "webglcontextrestored" reçu — contexte rétabli par le navigateur');
-            restored = true;
-        });
+        map.on('webglcontextrestored', () => { restored = true; });
         map.on('webglcontextlost', (e: any) => {
-            LOG('⚠️ "webglcontextlost" reçu', e);
             e?.preventDefault?.();
             restored = false;
-            setTimeout(() => {
-                LOG('Vérification après 2.5s — restauré ?', restored);
-                if (!restored) setContextLost(true);
-            }, 2500);
+            setTimeout(() => { if (!restored) setContextLost(true); }, 2500);
         });
 
         mapRef.current = map;
         spinningRef.current = true;
 
+        // ⚠️ La rotation d'introduction doit impérativement s'arrêter dès
+        // le passage à la carte plate (voir handleEnter) — sinon elle
+        // continue de tourner en arrière-plan et empêche tout déplacement
+        // de caméra de se stabiliser. cancelAnimationFrame seul ne suffit
+        // pas : il faut aussi annuler le setTimeout imbriqué dedans.
         const spin = () => {
             if (!spinningRef.current || !mapRef.current || mapRef.current !== map) return;
             const c = map.getCenter();
@@ -113,15 +87,11 @@ export const CaSertMapView = ({ spots }: Props) => {
                 spinTimeout.current = setTimeout(spin, 16);
             });
         };
-        map.on('load', () => {
-            LOG('✅ "load" reçu — la carte est prête, démarrage de la rotation');
-            spin();
-        });
+        map.on('load', spin);
 
         return () => {
             spinningRef.current = false;
             if (spinTimeout.current) clearTimeout(spinTimeout.current);
-            LOG('Nettoyage — suppression de la carte (retryCount =', retryCount, ')');
             if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
             map.remove();
             mapRef.current = null;
@@ -130,10 +100,6 @@ export const CaSertMapView = ({ spots }: Props) => {
     }, [retryCount]);
 
     const handleRetry = () => {
-        LOG('Bouton "Réessayer" cliqué');
-        // Force la recréation complète de la carte — le simple événement
-        // "restored" ne suffit pas toujours à redessiner correctement une
-        // scène 3D après une vraie perte de contexte.
         setContextLost(false);
         setEntered(false);
         setRetryCount((n) => n + 1);
@@ -155,7 +121,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             el.style.fontSize = '22px';
             el.style.cursor = 'pointer';
             el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.35))';
-            el.addEventListener('click', () => setSelected(spot));
+            el.addEventListener('click', () => handleSelectSpot(spot));
 
             const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
                 .setLngLat([spot.longitude!, spot.latitude!])
@@ -166,73 +132,134 @@ export const CaSertMapView = ({ spots }: Props) => {
     }, [entered, spots]);
 
     const handleEnter = () => {
-        LOG('Bouton "Découvrir la carte" cliqué — map disponible ?', !!mapRef.current);
-        // Priorité absolue : couper la rotation AVANT toute autre chose.
-        // Tant qu'elle continue de tourner en arrière-plan, elle se bat
-        // avec le flyTo pour le contrôle de la caméra — c'est cette lutte
-        // silencieuse qui empêchait l'affichage de se stabiliser.
+        // Priorité absolue : couper la rotation AVANT toute autre chose —
+        // tant qu'elle continue en arrière-plan, elle se bat avec le
+        // déplacement de caméra qui suit.
         spinningRef.current = false;
         if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
         if (spinTimeout.current) clearTimeout(spinTimeout.current);
-        LOG('Rotation arrêtée.');
 
         setEntered(true);
         const map = mapRef.current;
-        if (!map) {
-            LOG('❌ Aucune instance de carte disponible au moment du clic !');
-            return;
-        }
+        if (!map) return;
         map.dragRotate.enable();
         map.scrollZoom.enable();
 
         // Le passage globe → carte plate PENDANT un flyTo s'est avéré
-        // instable (le flyTo se termine sans jamais bouger). On force donc
-        // la projection à plat D'ABORD, séparément, puis on anime le
-        // déplacement sur une carte déjà en mode standard — un chemin
-        // beaucoup plus classique et fiable dans MapLibre.
-        LOG('Bascule forcée en projection mercator (à plat) avant animation...');
+        // instable — on force donc la projection à plat D'ABORD,
+        // séparément, puis on anime le déplacement sur une carte déjà en
+        // mode standard.
         map.setProjection({ type: 'mercator' });
         map.resize();
-        LOG('Taille juste après resize() — canvas :', map.getCanvas().width, 'x', map.getCanvas().height);
-
-        map.on('idle', () => {
-            LOG('💤 "idle" reçu — plus rien en attente, tout devrait être dessiné à l\'écran');
-            const canvas = map.getCanvas();
-            const style = window.getComputedStyle(canvas);
-            const rect = canvas.getBoundingClientRect();
-            LOG('Diagnostic canvas — display:', style.display, '| visibility:', style.visibility, '| opacity:', style.opacity, '| z-index:', style.zIndex, '| position réelle (top/left/w/h):', rect.top, rect.left, rect.width, rect.height);
-            const topElement = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-            LOG('Élément réellement au centre de la carte à l\'écran :', topElement?.tagName, topElement?.className);
-        });
-
         requestAnimationFrame(() => {
-            LOG('Lancement du flyTo vers', BENIN_ZOOMED);
-            map.once('moveend', () => {
-                LOG('✅ "moveend" reçu — le flyTo est allé au bout');
-                map.resize();
-                map.triggerRepaint();
-                const canvas = map.getCanvas();
-                LOG('Après resize/repaint — canvas :', canvas.width, 'x', canvas.height, '— conteneur :', canvas.clientWidth, 'x', canvas.clientHeight);
-            });
             map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
-
-            setTimeout(() => {
-                const canvas = map.getCanvas();
-                LOG('Vérification à +4s — bouge encore ?', map.isMoving(), '— zoom :', map.getZoom().toFixed(2), '— canvas :', canvas.width, 'x', canvas.height);
-                map.resize();
-                map.triggerRepaint();
-            }, 4000);
         });
+    };
+
+    // Zoome sur le lieu choisi pour une vraie vue rapprochée — pas juste
+    // le niveau "ville" du survol général.
+    const handleSelectSpot = (spot: Spot) => {
+        setSelected(spot);
+        setRouteInfo(null);
+        setRouteError(null);
+        clearRoute();
+        const map = mapRef.current;
+        if (map && spot.latitude != null && spot.longitude != null) {
+            map.flyTo({ center: [spot.longitude, spot.latitude], zoom: SPOT_ZOOM, pitch: 45, duration: 1200 });
+        }
+    };
+
+    const clearRoute = () => {
+        const map = mapRef.current;
+        if (!map) return;
+        if (map.getLayer(ROUTE_LAYER_ID)) map.removeLayer(ROUTE_LAYER_ID);
+        if (map.getSource(ROUTE_SOURCE_ID)) map.removeSource(ROUTE_SOURCE_ID);
+    };
+
+    // Demande la position réelle de l'utilisateur — nécessite son
+    // autorisation explicite (le navigateur affiche sa propre demande de
+    // permission, on ne peut ni la forcer ni la contourner).
+    const handleLocateMe = () => {
+        if (!navigator.geolocation) {
+            setRouteError("La géolocalisation n'est pas disponible sur cet appareil.");
+            return;
+        }
+        setLocating(true);
+        setRouteError(null);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                setUserPosition({ lat, lng });
+                setLocating(false);
+
+                const map = mapRef.current;
+                if (!map) return;
+                if (userMarkerRef.current) userMarkerRef.current.remove();
+                const el = document.createElement('div');
+                el.style.width = '16px';
+                el.style.height = '16px';
+                el.style.borderRadius = '50%';
+                el.style.background = '#4285F4';
+                el.style.border = '3px solid white';
+                el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
+                userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+            },
+            (err) => {
+                setLocating(false);
+                setRouteError(
+                    err.code === err.PERMISSION_DENIED
+                        ? "Localisation refusée — active-la dans les paramètres de ton navigateur pour tracer un itinéraire."
+                        : 'Impossible de récupérer ta position pour le moment.'
+                );
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
+
+    // Trace l'itinéraire routier réel entre la position de l'utilisateur
+    // et le lieu sélectionné, façon Google Maps.
+    const handleShowRoute = async () => {
+        if (!selected || selected.latitude == null || selected.longitude == null) return;
+        if (!userPosition) {
+            handleLocateMe();
+            return;
+        }
+        setRouting(true);
+        setRouteError(null);
+        try {
+            const result = await routeService.getRoute(userPosition.lat, userPosition.lng, selected.latitude, selected.longitude);
+            const map = mapRef.current;
+            if (!map) return;
+
+            clearRoute();
+            map.addSource(ROUTE_SOURCE_ID, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: result.geometry } });
+            map.addLayer({
+                id: ROUTE_LAYER_ID,
+                type: 'line',
+                source: ROUTE_SOURCE_ID,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#4285F4', 'line-width': 5, 'line-opacity': 0.85 },
+            });
+
+            setRouteInfo({ distanceKm: result.distanceKm, durationMin: result.durationMin });
+
+            // Cadre la vue pour voir le trajet en entier, du départ à l'arrivée.
+            const coords = result.geometry.coordinates as [number, number][];
+            const bounds = coords.reduce(
+                (b, coord) => b.extend(coord as [number, number]),
+                new maplibregl.LngLatBounds(coords[0], coords[0])
+            );
+            map.fitBounds(bounds, { padding: 60, pitch: 0, duration: 1200 });
+        } catch (err: any) {
+            setRouteError(err.message || "Impossible de calculer l'itinéraire.");
+        } finally {
+            setRouting(false);
+        }
     };
 
     return (
         <div className="relative w-full">
-            {/* Conteneur de la carte — structure volontairement simple et
-                directement dimensionnée (comme LocationPicker, qui
-                fonctionne), plutôt que "absolute inset-0" sur un parent en
-                hauteur calculée dynamiquement (calc(100vh-...)), qui s'est
-                avéré ne jamais s'afficher correctement sur cette
-                configuration précise. */}
             <div
                 ref={containerRef}
                 className="w-full h-[480px] rounded-2xl overflow-hidden border border-gray-200 bg-gray-100"
@@ -270,16 +297,48 @@ export const CaSertMapView = ({ spots }: Props) => {
                 </div>
             )}
 
+            {/* Bouton "Ma position" — visible une fois entré dans la carte. */}
+            {entered && !contextLost && (
+                <button
+                    onClick={handleLocateMe}
+                    disabled={locating}
+                    className="absolute top-3 left-3 z-10 bg-white shadow-md rounded-full w-10 h-10 flex items-center justify-center text-lg disabled:opacity-50"
+                    title="Me localiser"
+                >
+                    {locating ? '⏳' : '📍'}
+                </button>
+            )}
+
             {selected && (
-                <div className="absolute left-3 right-3 bottom-3 z-10 max-w-sm">
+                <div className="absolute left-3 right-3 bottom-3 z-10 max-w-sm space-y-2">
                     <div className="relative">
                         <button
-                            onClick={() => setSelected(null)}
+                            onClick={() => { setSelected(null); clearRoute(); setRouteInfo(null); }}
                             className="absolute -top-3 -right-3 z-20 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 text-sm"
                         >
                             ✕
                         </button>
                         <SpotCard spot={selected} />
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-gray-100 p-3">
+                        {routeInfo ? (
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-700 font-semibold">
+                                    🚗 {routeInfo.distanceKm} km · {routeInfo.durationMin} min
+                                </span>
+                                <button onClick={handleShowRoute} className="text-xs text-[#4285F4] font-semibold">Actualiser</button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={handleShowRoute}
+                                disabled={routing || locating}
+                                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#4285F4] disabled:opacity-50"
+                            >
+                                {routing ? '⏳ Calcul de l\'itinéraire...' : locating ? '⏳ Localisation...' : '🧭 Itinéraire depuis ma position'}
+                            </button>
+                        )}
+                        {routeError && <p className="text-xs text-red-500 mt-1">{routeError}</p>}
                     </div>
                 </div>
             )}
