@@ -1,6 +1,6 @@
 // src/features/caSert/components/CaSertMapView.tsx — Ça Parle
 import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
+import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { Spot } from '../services/caSertService';
 import { SpotCard } from './SpotCard';

@@ -1,6 +1,6 @@
 // src/features/caSert/components/LocationPicker.tsx — Ça Parle
 import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
+import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface Props {
