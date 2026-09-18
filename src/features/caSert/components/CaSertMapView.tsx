@@ -226,17 +226,20 @@ export const CaSertMapView = ({ spots }: Props) => {
     };
 
     return (
-        <div className="relative w-full h-[calc(100vh-180px)] min-h-[420px] rounded-2xl overflow-hidden">
-            {/* 🔴 TEMPORAIRE — fond de diagnostic. Si on voit du rouge SANS
-                les tuiles de carte par-dessus : MapLibre ne dessine
-                vraiment rien (vrai souci de rendu). Si on ne voit MÊME PAS
-                le rouge : quelque chose d'opaque recouvre tout par-dessus
-                (souci de superposition CSS). À retirer une fois la cause
-                confirmée. */}
-            <div ref={containerRef} className="absolute inset-0" style={{ backgroundColor: 'red' }} />
+        <div className="relative w-full">
+            {/* Conteneur de la carte — structure volontairement simple et
+                directement dimensionnée (comme LocationPicker, qui
+                fonctionne), plutôt que "absolute inset-0" sur un parent en
+                hauteur calculée dynamiquement (calc(100vh-...)), qui s'est
+                avéré ne jamais s'afficher correctement sur cette
+                configuration précise. */}
+            <div
+                ref={containerRef}
+                className="w-full h-[480px] rounded-2xl overflow-hidden border border-gray-200 bg-gray-100"
+            />
 
             {contextLost && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-gray-900/95 px-6 text-center">
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-gray-900/95 px-6 text-center rounded-2xl">
                     <div className="text-3xl">🔌</div>
                     <p className="text-white text-sm">
                         La carte a été interrompue par ton appareil (mémoire graphique saturée, souvent après avoir
@@ -252,7 +255,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             )}
 
             {!entered && !contextLost && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 px-6 bg-gradient-to-t from-black/40 via-transparent to-transparent">
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 px-6 bg-gradient-to-t from-black/40 via-transparent to-transparent rounded-2xl">
                     <p className="text-white/80 text-sm text-center max-w-xs mb-4">
                         {locatable.length > 0
                             ? `${locatable.length} bon${locatable.length > 1 ? 's' : ''} plan${locatable.length > 1 ? 's' : ''} placé${locatable.length > 1 ? 's' : ''} sur la carte.`
