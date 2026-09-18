@@ -171,14 +171,27 @@ export const CaSertMapView = ({ spots }: Props) => {
         // beaucoup plus classique et fiable dans MapLibre.
         LOG('Bascule forcée en projection mercator (à plat) avant animation...');
         map.setProjection({ type: 'mercator' });
+        map.resize();
+        LOG('Taille juste après resize() — canvas :', map.getCanvas().width, 'x', map.getCanvas().height);
+
+        map.on('idle', () => LOG('💤 "idle" reçu — plus rien en attente, tout devrait être dessiné à l\'écran'));
 
         requestAnimationFrame(() => {
             LOG('Lancement du flyTo vers', BENIN_ZOOMED);
-            map.once('moveend', () => LOG('✅ "moveend" reçu — le flyTo est allé au bout'));
+            map.once('moveend', () => {
+                LOG('✅ "moveend" reçu — le flyTo est allé au bout');
+                map.resize();
+                map.triggerRepaint();
+                const canvas = map.getCanvas();
+                LOG('Après resize/repaint — canvas :', canvas.width, 'x', canvas.height, '— conteneur :', canvas.clientWidth, 'x', canvas.clientHeight);
+            });
             map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
 
             setTimeout(() => {
-                LOG('Vérification à +4s — la carte bouge encore ?', map.isMoving(), '— zoom actuel :', map.getZoom().toFixed(2));
+                const canvas = map.getCanvas();
+                LOG('Vérification à +4s — bouge encore ?', map.isMoving(), '— zoom :', map.getZoom().toFixed(2), '— canvas :', canvas.width, 'x', canvas.height);
+                map.resize();
+                map.triggerRepaint();
             }, 4000);
         });
     };
