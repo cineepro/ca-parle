@@ -13,6 +13,8 @@ interface Props {
 const BENIN_CENTER: [number, number] = [2.42, 9.3];
 const BENIN_ZOOMED: [number, number] = [2.42, 6.38];
 
+const LOG = (...args: any[]) => console.log('[CaSertMap]', ...args);
+
 export const CaSertMapView = ({ spots }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
@@ -30,9 +32,31 @@ export const CaSertMapView = ({ spots }: Props) => {
     const locatable = spots.filter((s) => s.latitude != null && s.longitude != null);
 
     useEffect(() => {
-        if (!containerRef.current || mapRef.current) return;
+        LOG('useEffect déclenché, retryCount =', retryCount, '— container prêt ?', !!containerRef.current, '— map déjà créée ?', !!mapRef.current);
+        if (!containerRef.current || mapRef.current) {
+            LOG('création annulée (container absent ou map déjà existante)');
+            return;
+        }
         setContextLost(false);
 
+        // Détecte le support WebGL AVANT même de tenter de créer la carte
+        // — si ça échoue ici, le souci n'est pas MapLibre, c'est
+        // l'appareil/navigateur lui-même qui ne fournit pas WebGL du tout.
+        try {
+            const testCanvas = document.createElement('canvas');
+            const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl');
+            LOG('Test WebGL direct :', gl ? '✅ disponible' : '❌ INDISPONIBLE sur cet appareil/navigateur');
+            if (gl) {
+                const debugInfo = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info');
+                if (debugInfo) {
+                    LOG('GPU détecté :', (gl as WebGLRenderingContext).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL));
+                }
+            }
+        } catch (testErr) {
+            LOG('❌ Erreur pendant le test WebGL direct :', testErr);
+        }
+
+        LOG('Création de l\'instance maplibregl.Map...');
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -44,7 +68,11 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.dragRotate.disable();
         map.touchZoomRotate.disableRotation();
 
-        map.on('style.load', () => map.setProjection({ type: 'globe' }));
+        map.on('error', (e: any) => LOG('❌ Événement "error" MapLibre :', e?.error || e));
+        map.on('style.load', () => {
+            LOG('✅ "style.load" reçu — bascule en projection globe');
+            map.setProjection({ type: 'globe' });
+        });
 
         // Le GPU peut "perdre" son contexte graphique à tout moment —
         // souvent sans rapport avec notre code (mémoire vidéo saturée,
@@ -53,11 +81,16 @@ export const CaSertMapView = ({ spots }: Props) => {
         // on propose une vraie reconstruction plutôt que de laisser
         // l'écran blanc indéfiniment.
         let restored = false;
-        map.on('webglcontextrestored', () => { restored = true; });
+        map.on('webglcontextrestored', () => {
+            LOG('✅ "webglcontextrestored" reçu — contexte rétabli par le navigateur');
+            restored = true;
+        });
         map.on('webglcontextlost', (e: any) => {
+            LOG('⚠️ "webglcontextlost" reçu', e);
             e?.preventDefault?.();
             restored = false;
             setTimeout(() => {
+                LOG('Vérification après 2.5s — restauré ?', restored);
                 if (!restored) setContextLost(true);
             }, 2500);
         });
@@ -70,9 +103,13 @@ export const CaSertMapView = ({ spots }: Props) => {
             map.easeTo({ center: [c.lng + 0.3, c.lat], duration: 16, easing: (t: number) => t });
             spinFrame.current = requestAnimationFrame(() => setTimeout(spin, 16));
         };
-        map.on('load', spin);
+        map.on('load', () => {
+            LOG('✅ "load" reçu — la carte est prête, démarrage de la rotation');
+            spin();
+        });
 
         return () => {
+            LOG('Nettoyage — suppression de la carte (retryCount =', retryCount, ')');
             if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
             map.remove();
             mapRef.current = null;
@@ -81,6 +118,7 @@ export const CaSertMapView = ({ spots }: Props) => {
     }, [retryCount]);
 
     const handleRetry = () => {
+        LOG('Bouton "Réessayer" cliqué');
         // Force la recréation complète de la carte — le simple événement
         // "restored" ne suffit pas toujours à redessiner correctement une
         // scène 3D après une vraie perte de contexte.
@@ -116,11 +154,16 @@ export const CaSertMapView = ({ spots }: Props) => {
     }, [entered, spots]);
 
     const handleEnter = () => {
+        LOG('Bouton "Découvrir la carte" cliqué — map disponible ?', !!mapRef.current);
         setEntered(true);
         const map = mapRef.current;
-        if (!map) return;
+        if (!map) {
+            LOG('❌ Aucune instance de carte disponible au moment du clic !');
+            return;
+        }
         map.dragRotate.enable();
         map.scrollZoom.enable();
+        LOG('Lancement du flyTo vers', BENIN_ZOOMED);
         map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
     };
 
