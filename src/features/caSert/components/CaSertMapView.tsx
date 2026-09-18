@@ -24,6 +24,13 @@ export const CaSertMapView = ({ spots }: Props) => {
     const [contextLost, setContextLost] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const spinFrame = useRef<number | null>(null);
+    const spinTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Vérifié à CHAQUE itération de la boucle de rotation — la façon fiable
+    // de l'arrêter. cancelAnimationFrame seul ne suffisait pas : il
+    // n'annulait que le rAF, jamais le setTimeout imbriqué dedans, donc la
+    // boucle continuait malgré tout et se battait avec le flyTo pour le
+    // contrôle de la caméra — c'était la vraie cause de l'écran figé.
+    const spinningRef = useRef(true);
 
     // Seules les fiches avec une vraie position posée par leur auteur
     // apparaissent sur la carte — les plus anciennes, créées avant ce
@@ -96,12 +103,15 @@ export const CaSertMapView = ({ spots }: Props) => {
         });
 
         mapRef.current = map;
+        spinningRef.current = true;
 
         const spin = () => {
-            if (!mapRef.current || mapRef.current !== map) return;
+            if (!spinningRef.current || !mapRef.current || mapRef.current !== map) return;
             const c = map.getCenter();
             map.easeTo({ center: [c.lng + 0.3, c.lat], duration: 16, easing: (t: number) => t });
-            spinFrame.current = requestAnimationFrame(() => setTimeout(spin, 16));
+            spinFrame.current = requestAnimationFrame(() => {
+                spinTimeout.current = setTimeout(spin, 16);
+            });
         };
         map.on('load', () => {
             LOG('✅ "load" reçu — la carte est prête, démarrage de la rotation');
@@ -109,6 +119,8 @@ export const CaSertMapView = ({ spots }: Props) => {
         });
 
         return () => {
+            spinningRef.current = false;
+            if (spinTimeout.current) clearTimeout(spinTimeout.current);
             LOG('Nettoyage — suppression de la carte (retryCount =', retryCount, ')');
             if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
             map.remove();
@@ -155,6 +167,15 @@ export const CaSertMapView = ({ spots }: Props) => {
 
     const handleEnter = () => {
         LOG('Bouton "Découvrir la carte" cliqué — map disponible ?', !!mapRef.current);
+        // Priorité absolue : couper la rotation AVANT toute autre chose.
+        // Tant qu'elle continue de tourner en arrière-plan, elle se bat
+        // avec le flyTo pour le contrôle de la caméra — c'est cette lutte
+        // silencieuse qui empêchait l'affichage de se stabiliser.
+        spinningRef.current = false;
+        if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
+        if (spinTimeout.current) clearTimeout(spinTimeout.current);
+        LOG('Rotation arrêtée.');
+
         setEntered(true);
         const map = mapRef.current;
         if (!map) {
