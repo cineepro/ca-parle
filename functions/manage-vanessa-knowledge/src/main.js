@@ -59,7 +59,14 @@ export default async ({ req, res, error }) => {
             ]);
             const safe = result.documents
                 .filter((c) => !isExhausted(c))
-                .map((c) => ({ $id: c.$id, name: c.name, slug: c.slug, icon: c.icon, color: c.color, description: c.description }));
+                .map((c) => ({
+                    $id: c.$id, name: c.name, slug: c.slug, icon: c.icon, color: c.color, description: c.description,
+                    // Ajoutés après coup — ce sont eux qui manquaient pour
+                    // que le compteur mensuel de questions s'affiche aussi
+                    // dans le chat, pas seulement en modération.
+                    questionCount: c.questionCount || 0,
+                    questionCountMonth: c.questionCountMonth || '',
+                }));
             return res.json({ success: true, connectors: safe });
         }
 

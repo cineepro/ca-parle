@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { vanessaKnowledgeService, type VanessaConnector } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
+import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '../utils/questionCount';
 
 const SELL_PRICE_PER_MILLION_TOKENS_FCFA = 5100; // même taux que côté serveur — voir Vanessa-API-Grille-Tarifaire.docx
 
@@ -14,35 +15,6 @@ const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', descrip
 function formatDate(iso?: string) {
     if (!iso) return null;
     return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
-const MONTH_LABELS = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
-
-// "AAAA-MM" du mois en cours, ex. "2026-09" — même format que celui écrit
-// côté backend (send-message) pour le compteur.
-function currentMonthKey(): string {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
-
-// 1 → "1" · 100 → "100" · 1000 → "1K" · 1500 → "1.5K"
-function formatQuestionCount(n: number): string {
-    if (n < 1000) return String(n);
-    const thousands = n / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}K`;
-}
-
-// Le compteur stocké peut appartenir à un mois déjà terminé (il n'est remis
-// à zéro qu'à la PROCHAINE question posée, pas par une tâche planifiée) —
-// on ne l'affiche donc que s'il correspond bien au mois en cours, sinon on
-// affiche 0 : le mois vient de commencer, aucune question n'y a encore été
-// posée.
-function monthlyQuestionCount(c: VanessaConnector): number {
-    if (c.questionCountMonth !== currentMonthKey()) return 0;
-    return c.questionCount || 0;
 }
 
 // tokensGranted à 0 = jamais facturé, considéré illimité (voir backend).

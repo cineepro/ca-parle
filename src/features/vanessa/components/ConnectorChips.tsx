@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { VanessaConnector } from '../services/vanessaKnowledgeService';
 import { conversationService } from '@/features/messaging/services/conversationService';
+import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '../utils/questionCount';
 
 interface Props {
     conversationId: string;
@@ -33,13 +34,14 @@ export const ConnectorChips = ({ conversationId, connectors, activeConnectorId, 
         <div className="flex items-center gap-2 px-3 pt-2 overflow-x-auto">
             {connectors.map((c) => {
                 const isActive = activeConnectorId === c.$id;
+                const count = monthlyQuestionCount(c);
                 return (
                     <button
                         key={c.$id}
                         type="button"
                         onClick={() => handleTap(c.$id)}
                         disabled={switching}
-                        title={c.description}
+                        title={`${c.description}${count > 0 ? ` — ${count} question(s) posée(s) en ${MONTH_LABELS[new Date().getMonth()]}` : ''}`}
                         className="shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all disabled:opacity-50"
                         style={
                             isActive
@@ -49,6 +51,19 @@ export const ConnectorChips = ({ conversationId, connectors, activeConnectorId, 
                     >
                         <span>{c.icon}</span>
                         {c.name}
+                        {/* Preuve concrète d'engagement — visible par tous,
+                            pas seulement en modération. C'est cet indicateur
+                            qu'un partenaire peut montrer à ses propres
+                            clients/institutions. */}
+                        {count > 0 && (
+                            <span
+                                className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
+                                    isActive ? 'bg-white/25 text-white' : 'bg-[#FF4757] text-white'
+                                }`}
+                            >
+                                {formatQuestionCount(count)}
+                            </span>
+                        )}
                     </button>
                 );
             })}
