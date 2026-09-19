@@ -7,6 +7,7 @@ import { CookieConsentBanner } from '@/features/onboarding/components/CookieCons
 import { CommunityRulesModal } from '@/features/onboarding/components/CommunityRulesModal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { initPushNotifications } from '@/features/notifications/services/pushService';
+import { geolocationService } from '@/services/geolocationService';
 
 export const AppLayout = ({ children }: { children: React.ReactNode }) => {
     const { user } = useAuth();
@@ -21,6 +22,16 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
             initPushNotifications(user.$id, (url) => navigate(url));
         }
     }, [user?.$id, navigate]);
+
+    // Demande la permission de localisation dès l'entrée dans l'app — sur
+    // Android, ça déclenche le vrai dialogue système natif (comme pour les
+    // notifications ci-dessus), plutôt que d'attendre que l'utilisateur
+    // tombe sur la carte Ça sert et découvre que ça ne marche pas.
+    useEffect(() => {
+        if (user?.$id) {
+            geolocationService.requestPermission();
+        }
+    }, [user?.$id]);
 
     return (
         <div className="min-h-screen bg-gray-50">

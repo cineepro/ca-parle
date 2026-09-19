@@ -41,4 +41,7 @@
     <!-- Nécessaire pour les messages vocaux (enregistrement micro) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Nécessaire pour "Ma position" et le suivi en direct sur la carte Ça sert -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 </manifest>

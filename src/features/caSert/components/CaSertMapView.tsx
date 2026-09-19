@@ -7,6 +7,7 @@ import { routeService } from '../services/routeService';
 import { SpotCard } from './SpotCard';
 import { SPOT_CATEGORIES } from '../config/categories';
 import { FUNCTIONS } from '@/api/constants';
+import { geolocationService } from '@/services/geolocationService';
 
 interface Props {
     spots: Spot[];
@@ -35,7 +36,11 @@ export const CaSertMapView = ({ spots }: Props) => {
     const [routeInfo, setRouteInfo] = useState<{ distanceKm: string; durationMin: number } | null>(null);
     const [routeError, setRouteError] = useState<string | null>(null);
     const [liveTracking, setLiveTracking] = useState(false);
-    const watchIdRef = useRef<number | null>(null);
+    // Fonction d'arrêt renvoyée par geolocationService.watchPosition — pas
+    // un simple numéro d'ID, puisque le service unifie web (numéro natif)
+    // et Android (identifiant du plugin Capacitor) derrière une seule
+    // fonction de nettoyage.
+    const stopWatchRef = useRef<(() => void) | null>(null);
     const spinFrame = useRef<number | null>(null);
     const spinTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const spinningRef = useRef(true);
@@ -98,7 +103,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             spinningRef.current = false;
             if (spinTimeout.current) clearTimeout(spinTimeout.current);
             if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
-            if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+            stopWatchRef.current?.();
             map.remove();
             mapRef.current = null;
         };
@@ -183,13 +188,10 @@ export const CaSertMapView = ({ spots }: Props) => {
     // en sélectionnant un nouveau lieu) — seule LA POSITION bouge en
     // temps réel, pour rester raisonnable sur le quota gratuit d'appels
     // à l'API d'itinéraire.
-    const startLiveTracking = () => {
-        if (!navigator.geolocation) return;
+    const startLiveTracking = async () => {
         setLiveTracking(true);
-        watchIdRef.current = navigator.geolocation.watchPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
+        stopWatchRef.current = await geolocationService.watchPosition(
+            ({ lat, lng }) => {
                 setUserPosition({ lat, lng });
 
                 const map = mapRef.current;
@@ -212,16 +214,13 @@ export const CaSertMapView = ({ spots }: Props) => {
             () => {
                 setRouteError('Suivi en direct interrompu — vérifie que la localisation reste autorisée.');
                 setLiveTracking(false);
-            },
-            { enableHighAccuracy: true }
+            }
         );
     };
 
     const stopLiveTracking = () => {
-        if (watchIdRef.current != null) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-        }
+        stopWatchRef.current?.();
+        stopWatchRef.current = null;
         setLiveTracking(false);
     };
 
@@ -239,48 +238,39 @@ export const CaSertMapView = ({ spots }: Props) => {
     // obtenue — c'est ce qui permet à handleShowRoute d'enchaîner
     // automatiquement sur le calcul de l'itinéraire, sans exiger un
     // second clic une fois la localisation terminée.
-    const handleLocateMe = (onDone?: (lat: number, lng: number) => void) => {
-        RLOG('handleLocateMe appelé — navigator.geolocation disponible ?', !!navigator.geolocation);
-        if (!navigator.geolocation) {
-            setRouteError("La géolocalisation n'est pas disponible sur cet appareil.");
-            return;
-        }
+    const handleLocateMe = async (onDone?: (lat: number, lng: number) => void) => {
+        RLOG('handleLocateMe appelé');
         setLocating(true);
         setRouteError(null);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                RLOG('✅ Position obtenue :', lat, lng, '— callback onDone fourni ?', !!onDone);
-                setUserPosition({ lat, lng });
-                setLocating(false);
+        try {
+            const { lat, lng } = await geolocationService.getCurrentPosition();
+            RLOG('✅ Position obtenue :', lat, lng, '— callback onDone fourni ?', !!onDone);
+            setUserPosition({ lat, lng });
+            setLocating(false);
 
-                const map = mapRef.current;
-                if (map) {
-                    if (userMarkerRef.current) userMarkerRef.current.remove();
-                    const el = document.createElement('div');
-                    el.style.width = '16px';
-                    el.style.height = '16px';
-                    el.style.borderRadius = '50%';
-                    el.style.background = '#4285F4';
-                    el.style.border = '3px solid white';
-                    el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
-                    userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-                }
-                RLOG('Appel du callback onDone maintenant...');
-                onDone?.(lat, lng);
-            },
-            (err) => {
-                RLOG('❌ Échec de la géolocalisation — code:', err.code, '— message:', err.message);
-                setLocating(false);
-                setRouteError(
-                    err.code === err.PERMISSION_DENIED
-                        ? "Localisation refusée — active-la dans les paramètres de ton navigateur pour tracer un itinéraire."
-                        : 'Impossible de récupérer ta position pour le moment.'
-                );
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+            const map = mapRef.current;
+            if (map) {
+                if (userMarkerRef.current) userMarkerRef.current.remove();
+                const el = document.createElement('div');
+                el.style.width = '16px';
+                el.style.height = '16px';
+                el.style.borderRadius = '50%';
+                el.style.background = '#4285F4';
+                el.style.border = '3px solid white';
+                el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
+                userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+            }
+            RLOG('Appel du callback onDone maintenant...');
+            onDone?.(lat, lng);
+        } catch (err: any) {
+            RLOG('❌ Échec de la géolocalisation :', err);
+            setLocating(false);
+            setRouteError(
+                err?.code === 1 || err?.message?.toLowerCase().includes('denied')
+                    ? "Localisation refusée — active-la dans les paramètres de ton téléphone/navigateur pour tracer un itinéraire."
+                    : 'Impossible de récupérer ta position pour le moment.'
+            );
+        }
     };
 
     // Trace l'itinéraire routier réel entre la position de l'utilisateur
