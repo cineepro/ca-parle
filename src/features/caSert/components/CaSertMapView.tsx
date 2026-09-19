@@ -34,6 +34,8 @@ export const CaSertMapView = ({ spots }: Props) => {
     const [routing, setRouting] = useState(false);
     const [routeInfo, setRouteInfo] = useState<{ distanceKm: string; durationMin: number } | null>(null);
     const [routeError, setRouteError] = useState<string | null>(null);
+    const [liveTracking, setLiveTracking] = useState(false);
+    const watchIdRef = useRef<number | null>(null);
     const spinFrame = useRef<number | null>(null);
     const spinTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const spinningRef = useRef(true);
@@ -96,6 +98,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             spinningRef.current = false;
             if (spinTimeout.current) clearTimeout(spinTimeout.current);
             if (spinFrame.current) cancelAnimationFrame(spinFrame.current);
+            if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
             map.remove();
             mapRef.current = null;
         };
@@ -171,6 +174,55 @@ export const CaSertMapView = ({ spots }: Props) => {
         if (map && spot.latitude != null && spot.longitude != null) {
             map.flyTo({ center: [spot.longitude, spot.latitude], zoom: SPOT_ZOOM, pitch: 45, duration: 1200 });
         }
+    };
+
+    // Suivi en direct — met à jour la position en continu (contrairement à
+    // handleLocateMe qui ne la prend qu'une fois), et recentre doucement la
+    // carte sur l'utilisateur à chaque déplacement, comme Google Maps en
+    // mode navigation. Le tracé lui-même reste fixe (recalculé seulement
+    // en sélectionnant un nouveau lieu) — seule LA POSITION bouge en
+    // temps réel, pour rester raisonnable sur le quota gratuit d'appels
+    // à l'API d'itinéraire.
+    const startLiveTracking = () => {
+        if (!navigator.geolocation) return;
+        setLiveTracking(true);
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                setUserPosition({ lat, lng });
+
+                const map = mapRef.current;
+                if (!map) return;
+                if (userMarkerRef.current) {
+                    userMarkerRef.current.setLngLat([lng, lat]);
+                } else {
+                    const el = document.createElement('div');
+                    el.style.width = '16px';
+                    el.style.height = '16px';
+                    el.style.borderRadius = '50%';
+                    el.style.background = '#4285F4';
+                    el.style.border = '3px solid white';
+                    el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
+                    userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+                }
+                // Suit doucement l'utilisateur sans changer le zoom qu'il a choisi.
+                map.easeTo({ center: [lng, lat], duration: 800 });
+            },
+            () => {
+                setRouteError('Suivi en direct interrompu — vérifie que la localisation reste autorisée.');
+                setLiveTracking(false);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
+
+    const stopLiveTracking = () => {
+        if (watchIdRef.current != null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        setLiveTracking(false);
     };
 
     const clearRoute = () => {
@@ -344,36 +396,57 @@ export const CaSertMapView = ({ spots }: Props) => {
             )}
 
             {selected && (
-                <div className="absolute left-3 right-3 bottom-3 z-10 max-w-sm space-y-2">
-                    <div className="relative">
-                        <button
-                            onClick={() => { setSelected(null); clearRoute(); setRouteInfo(null); }}
-                            className="absolute -top-3 -right-3 z-20 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 text-sm"
-                        >
-                            ✕
-                        </button>
-                        <SpotCard spot={selected} />
-                    </div>
+                <div className="absolute left-3 right-3 bottom-3 z-10 max-w-sm">
+                    <button
+                        onClick={() => setSelected(null)}
+                        className="absolute -top-3 -right-3 z-20 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 text-sm"
+                    >
+                        ✕
+                    </button>
+                    <SpotCard spot={selected} />
+                </div>
+            )}
 
-                    <div className="bg-white rounded-2xl border border-gray-100 p-3">
-                        {routeInfo ? (
+            {/* Panneau d'itinéraire — volontairement INDÉPENDANT de la
+                fiche du lieu : fermer la fiche (le "✕" ci-dessus) ne
+                l'efface plus, comme demandé. Il reste visible tant que
+                l'utilisateur ne l'efface pas lui-même, ou qu'il ne
+                sélectionne pas un autre lieu (qui recalcule un nouvel
+                itinéraire à la place). */}
+            {(routeInfo || routing || (selected && !liveTracking)) && (
+                <div className={`absolute left-3 right-3 z-10 max-w-sm bg-white rounded-2xl border border-gray-100 p-3 ${selected ? 'bottom-24' : 'bottom-3'}`}>
+                    {routeInfo ? (
+                        <>
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700 font-semibold">
                                     🚗 {routeInfo.distanceKm} km · {routeInfo.durationMin} min
                                 </span>
-                                <button onClick={() => handleShowRoute()} className="text-xs text-[#4285F4] font-semibold">Actualiser</button>
+                                <button
+                                    onClick={() => { clearRoute(); setRouteInfo(null); stopLiveTracking(); }}
+                                    className="text-gray-300 hover:text-gray-500 text-sm"
+                                >
+                                    ✕
+                                </button>
                             </div>
-                        ) : (
                             <button
-                                onClick={() => handleShowRoute()}
-                                disabled={routing || locating}
-                                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#4285F4] disabled:opacity-50"
+                                onClick={liveTracking ? stopLiveTracking : startLiveTracking}
+                                className={`w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-full py-2 ${
+                                    liveTracking ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-[#4285F4]'
+                                }`}
                             >
-                                {routing ? '⏳ Calcul de l\'itinéraire...' : locating ? '⏳ Localisation...' : '🧭 Itinéraire depuis ma position'}
+                                {liveTracking ? '🔴 Suivi en direct actif — arrêter' : '📡 Me suivre en direct sur la carte'}
                             </button>
-                        )}
-                        {routeError && <p className="text-xs text-red-500 mt-1">{routeError}</p>}
-                    </div>
+                        </>
+                    ) : selected && (
+                        <button
+                            onClick={() => handleShowRoute()}
+                            disabled={routing || locating}
+                            className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#4285F4] disabled:opacity-50"
+                        >
+                            {routing ? '⏳ Calcul de l\'itinéraire...' : locating ? '⏳ Localisation...' : '🧭 Itinéraire depuis ma position'}
+                        </button>
+                    )}
+                    {routeError && <p className="text-xs text-red-500 mt-1">{routeError}</p>}
                 </div>
             )}
         </div>
