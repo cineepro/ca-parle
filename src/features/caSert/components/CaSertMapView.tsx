@@ -55,7 +55,7 @@ export const CaSertMapView = ({ spots }: Props) => {
         map.scrollZoom.disable();
         map.dragRotate.disable();
         map.touchZoomRotate.disableRotation();
-        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
 
         map.on('style.load', () => map.setProjection({ type: 'globe' }));
 
@@ -143,6 +143,7 @@ export const CaSertMapView = ({ spots }: Props) => {
         const map = mapRef.current;
         if (!map) return;
         map.dragRotate.enable();
+        map.touchZoomRotate.enableRotation();
         map.scrollZoom.enable();
 
         // Le passage globe → carte plate PENDANT un flyTo s'est avéré
@@ -179,7 +180,11 @@ export const CaSertMapView = ({ spots }: Props) => {
     // Demande la position réelle de l'utilisateur — nécessite son
     // autorisation explicite (le navigateur affiche sa propre demande de
     // permission, on ne peut ni la forcer ni la contourner).
-    const handleLocateMe = () => {
+    // Accepte un callback optionnel, déclenché une fois la position
+    // obtenue — c'est ce qui permet à handleShowRoute d'enchaîner
+    // automatiquement sur le calcul de l'itinéraire, sans exiger un
+    // second clic une fois la localisation terminée.
+    const handleLocateMe = (onDone?: (lat: number, lng: number) => void) => {
         if (!navigator.geolocation) {
             setRouteError("La géolocalisation n'est pas disponible sur cet appareil.");
             return;
@@ -194,16 +199,18 @@ export const CaSertMapView = ({ spots }: Props) => {
                 setLocating(false);
 
                 const map = mapRef.current;
-                if (!map) return;
-                if (userMarkerRef.current) userMarkerRef.current.remove();
-                const el = document.createElement('div');
-                el.style.width = '16px';
-                el.style.height = '16px';
-                el.style.borderRadius = '50%';
-                el.style.background = '#4285F4';
-                el.style.border = '3px solid white';
-                el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
-                userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+                if (map) {
+                    if (userMarkerRef.current) userMarkerRef.current.remove();
+                    const el = document.createElement('div');
+                    el.style.width = '16px';
+                    el.style.height = '16px';
+                    el.style.borderRadius = '50%';
+                    el.style.background = '#4285F4';
+                    el.style.border = '3px solid white';
+                    el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
+                    userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+                }
+                onDone?.(lat, lng);
             },
             (err) => {
                 setLocating(false);
@@ -218,17 +225,23 @@ export const CaSertMapView = ({ spots }: Props) => {
     };
 
     // Trace l'itinéraire routier réel entre la position de l'utilisateur
-    // et le lieu sélectionné, façon Google Maps.
-    const handleShowRoute = async () => {
+    // et le lieu sélectionné, façon Google Maps. Si la position n'est pas
+    // encore connue, la demande puis enchaîne directement sur le calcul —
+    // un seul clic suffit, pas besoin de cliquer deux fois.
+    const handleShowRoute = async (fromLat?: number, fromLng?: number) => {
         if (!selected || selected.latitude == null || selected.longitude == null) return;
-        if (!userPosition) {
-            handleLocateMe();
+
+        const lat = fromLat ?? userPosition?.lat;
+        const lng = fromLng ?? userPosition?.lng;
+        if (lat == null || lng == null) {
+            handleLocateMe((l, g) => handleShowRoute(l, g));
             return;
         }
+
         setRouting(true);
         setRouteError(null);
         try {
-            const result = await routeService.getRoute(userPosition.lat, userPosition.lng, selected.latitude, selected.longitude);
+            const result = await routeService.getRoute(lat, lng, selected.latitude, selected.longitude);
             const map = mapRef.current;
             if (!map) return;
 
@@ -300,7 +313,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             {/* Bouton "Ma position" — visible une fois entré dans la carte. */}
             {entered && !contextLost && (
                 <button
-                    onClick={handleLocateMe}
+                    onClick={() => handleLocateMe()}
                     disabled={locating}
                     className="absolute top-3 left-3 z-10 bg-white shadow-md rounded-full w-10 h-10 flex items-center justify-center text-lg disabled:opacity-50"
                     title="Me localiser"
@@ -327,11 +340,11 @@ export const CaSertMapView = ({ spots }: Props) => {
                                 <span className="text-gray-700 font-semibold">
                                     🚗 {routeInfo.distanceKm} km · {routeInfo.durationMin} min
                                 </span>
-                                <button onClick={handleShowRoute} className="text-xs text-[#4285F4] font-semibold">Actualiser</button>
+                                <button onClick={() => handleShowRoute()} className="text-xs text-[#4285F4] font-semibold">Actualiser</button>
                             </div>
                         ) : (
                             <button
-                                onClick={handleShowRoute}
+                                onClick={() => handleShowRoute()}
                                 disabled={routing || locating}
                                 className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#4285F4] disabled:opacity-50"
                             >
