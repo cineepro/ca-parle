@@ -172,7 +172,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                         </div>
 
                         <Suspense fallback={<div className="w-full h-48 rounded-xl bg-gray-100 animate-pulse" />}>
-                            <LocationPicker onChange={(lat, lng) => setPosition({ lat, lng })} />
+                            <LocationPicker country={country} onChange={(lat, lng) => setPosition({ lat, lng })} />
                         </Suspense>
 
                         <input

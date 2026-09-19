@@ -37,6 +37,11 @@ export default function PrivacyPage() {
                             <li>Enregistrements audio, lorsque tu utilises la fonctionnalité de
                                 message vocal — transcrits automatiquement en texte pour le
                                 fonctionnement du service</li>
+                            <li>Position géographique (latitude/longitude) — uniquement lorsque tu
+                                choisis explicitement de l'utiliser : pour poser un lieu sur la carte
+                                "Ça sert" en publiant un bon plan, pour afficher ta position sur cette
+                                même carte, ou pour calculer un itinéraire. Jamais collectée en
+                                arrière-plan ni sans action volontaire de ta part.</li>
                         </ul>
                         <p className="mt-2"><strong>Données collectées automatiquement :</strong></p>
                         <ul className="list-disc pl-5 space-y-1">
@@ -74,6 +79,12 @@ export default function PrivacyPage() {
                             Le contenu d'une conversation privée avec Vanessa n'est jamais réutilisé
                             pour répondre à un autre utilisateur ou alimenter une publication, sauf
                             action volontaire et explicite de ta part.
+                        </p>
+                        <p>
+                            Vanessa retient certains éléments factuels d'une conversation à l'autre
+                            (sa "mémoire"), pour des échanges plus naturels. Tu peux à tout moment
+                            consulter et effacer entièrement ce qu'elle a retenu de toi, depuis ton
+                            profil.
                         </p>
                     </section>
 

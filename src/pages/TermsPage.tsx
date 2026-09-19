@@ -162,6 +162,17 @@ export default function TermsPage() {
                             contenu. L'éditeur ne garantit pas l'exactitude des informations publiées
                             par les utilisateurs.
                         </p>
+                        <p>
+                            La fonctionnalité "Ça sert" (bons plans, lieux, services, prix) fonctionne
+                            selon le même principe : chaque contribution est soumise à une vérification
+                            avant publication, mais reste une information fournie par un tiers, que
+                            l'éditeur ne garantit ni exacte ni à jour. La position géographique d'un
+                            lieu est indiquée par son auteur, sous sa seule responsabilité — vérifie
+                            toujours sur place avant de t'y fier entièrement. Publier une position ou
+                            une information volontairement fausse ou trompeuse constitue un manquement
+                            aux présentes conditions et peut entraîner la suppression du contenu et/ou
+                            une sanction du compte.
+                        </p>
                     </section>
 
                     <section className="space-y-2">

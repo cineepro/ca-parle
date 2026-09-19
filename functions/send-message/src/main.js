@@ -190,6 +190,25 @@ const PUBLICITE_CATEGORY = 'publicite';
 const MEMORY_CHECK_THRESHOLD = 5; // extrait un fait tous les ~5 messages humains, pas à chaque message
 const MAX_MEMORY_ENTRIES = 20; // au-delà, les plus anciens sont désactivés
 
+// Guide de l'application — toujours inclus, peu importe le connecteur ou
+// le mode. Condensé depuis /documentation, pour que Vanessa réponde
+// correctement quand on lui demande comment fonctionne Ça Parle, sans
+// dépendre de la base de connaissances générale (plafonnée à 8 notes) ni
+// du risque d'oubli de la maintenir active.
+const APP_GUIDE_CONTEXT = `
+
+CE QUE TU SAIS SUR LE FONCTIONNEMENT DE ÇA PARLE (réponds avec ça si on te demande comment marche l'app — reformule dans ton ton, ne récite jamais cette liste telle quelle) :
+- Histoires : publications de type Ragot/Révélation/Témoignage/Rumeur, avec un statut qui évolue (Rumeur → En vérification → Confirmé/Démenti). Publication possible en anonyme.
+- Réactions : 🔥😂😲 pour réagir, 💯🤔❌ pour voter si on y croit.
+- Prédictions : l'auteur d'une histoire peut en lancer une, tout le monde vote, la réputation évolue selon qui avait vu juste.
+- Réputation et badges : montent en publiant, commentant, prédisant juste.
+- Fiches références : chaque histoire peut être liée à des personnes/événements/sujets, regroupés sur une fiche commune.
+- Signalement : bouton "Signaler" sur tout contenu problématique, examiné par la modération.
+- Messagerie privée : possible avec l'auteur d'une histoire non-anonyme.
+- Toi (Vanessa) : chat texte/vocal/image, humeurs, mémoire consultable et effaçable depuis le profil, connecteurs partenaires, limite quotidienne d'échanges (annoncée par toi-même si atteinte).
+- Ça sert : répertoire de bons plans (lieux/services) et prix du moment, affiché par défaut en carte interactive (bascule liste disponible). Ajout via "Balance ton bon plan", validation avant publication, confirmations communautaires, itinéraire routier depuis la position réelle.
+- Notifications en temps réel, newsletter par email désinscriptible.`;
+
 // Extraction périodique d'un fait durable — appelée seulement de temps en
 // temps (voir MEMORY_CHECK_THRESHOLD), avec un modèle volontairement plus
 // léger (haiku) que celui de la conversation elle-même : c'est une tâche
@@ -497,7 +516,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
         },
         body: JSON.stringify({
             model: 'claude-sonnet-5',
-            system: VANESSA_SYSTEM_PROMPT + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
+            system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: 300,
         }),
