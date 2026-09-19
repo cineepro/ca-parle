@@ -337,7 +337,7 @@ export const CaSertMapView = ({ spots }: Props) => {
                     onClick={() => handleLocateMe()}
                     disabled={locating}
                     className="absolute top-3 left-3 z-10 bg-white shadow-md rounded-full w-10 h-10 flex items-center justify-center text-lg disabled:opacity-50"
-                    title="Me localiser"
+                    title="Afficher ma position sur la carte (pour tracer un itinéraire, clique d'abord un lieu, puis le bouton qui apparaît en bas)"
                 >
                     {locating ? '⏳' : '📍'}
                 </button>
