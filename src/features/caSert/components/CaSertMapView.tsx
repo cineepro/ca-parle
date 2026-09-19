@@ -6,6 +6,7 @@ import type { Spot } from '../services/caSertService';
 import { routeService } from '../services/routeService';
 import { SpotCard } from './SpotCard';
 import { SPOT_CATEGORIES } from '../config/categories';
+import { FUNCTIONS } from '@/api/constants';
 
 interface Props {
     spots: Spot[];
@@ -16,6 +17,8 @@ const BENIN_ZOOMED: [number, number] = [2.42, 6.38];
 const SPOT_ZOOM = 15; // niveau de zoom pour bien voir un lieu précis, pas juste la ville
 const ROUTE_SOURCE_ID = 'ca-sert-route';
 const ROUTE_LAYER_ID = 'ca-sert-route-line';
+
+const RLOG = (...args: any[]) => console.log('[CaSertRoute]', ...args);
 
 export const CaSertMapView = ({ spots }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -185,6 +188,7 @@ export const CaSertMapView = ({ spots }: Props) => {
     // automatiquement sur le calcul de l'itinéraire, sans exiger un
     // second clic une fois la localisation terminée.
     const handleLocateMe = (onDone?: (lat: number, lng: number) => void) => {
+        RLOG('handleLocateMe appelé — navigator.geolocation disponible ?', !!navigator.geolocation);
         if (!navigator.geolocation) {
             setRouteError("La géolocalisation n'est pas disponible sur cet appareil.");
             return;
@@ -195,6 +199,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
+                RLOG('✅ Position obtenue :', lat, lng, '— callback onDone fourni ?', !!onDone);
                 setUserPosition({ lat, lng });
                 setLocating(false);
 
@@ -210,9 +215,11 @@ export const CaSertMapView = ({ spots }: Props) => {
                     el.style.boxShadow = '0 0 0 4px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3)';
                     userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
                 }
+                RLOG('Appel du callback onDone maintenant...');
                 onDone?.(lat, lng);
             },
             (err) => {
+                RLOG('❌ Échec de la géolocalisation — code:', err.code, '— message:', err.message);
                 setLocating(false);
                 setRouteError(
                     err.code === err.PERMISSION_DENIED
@@ -229,19 +236,32 @@ export const CaSertMapView = ({ spots }: Props) => {
     // encore connue, la demande puis enchaîne directement sur le calcul —
     // un seul clic suffit, pas besoin de cliquer deux fois.
     const handleShowRoute = async (fromLat?: number, fromLng?: number) => {
-        if (!selected || selected.latitude == null || selected.longitude == null) return;
+        RLOG('handleShowRoute appelé avec', fromLat, fromLng, '— selected ?', !!selected, '— FUNCTIONS.GET_ROUTE =', JSON.stringify(FUNCTIONS.GET_ROUTE));
+        if (!selected || selected.latitude == null || selected.longitude == null) {
+            RLOG('❌ Arrêt : pas de fiche sélectionnée ou sans coordonnées.');
+            return;
+        }
 
         const lat = fromLat ?? userPosition?.lat;
         const lng = fromLng ?? userPosition?.lng;
         if (lat == null || lng == null) {
+            RLOG('Pas de position connue — déclenchement de handleLocateMe...');
             handleLocateMe((l, g) => handleShowRoute(l, g));
             return;
         }
 
+        if (!FUNCTIONS.GET_ROUTE) {
+            RLOG('❌❌❌ FUNCTIONS.GET_ROUTE est VIDE — la variable VITE_APPWRITE_FUNCTION_GET_ROUTE n\'est pas dans ce build. Il faut redéployer après l\'avoir ajoutée.');
+            setRouteError("Configuration manquante (VITE_APPWRITE_FUNCTION_GET_ROUTE) — le site doit être reconstruit après l'ajout de cette variable.");
+            return;
+        }
+
+        RLOG('Départ de l\'appel routeService.getRoute avec', lat, lng, '→', selected.latitude, selected.longitude);
         setRouting(true);
         setRouteError(null);
         try {
             const result = await routeService.getRoute(lat, lng, selected.latitude, selected.longitude);
+            RLOG('✅ Réponse reçue de get-route :', result);
             const map = mapRef.current;
             if (!map) return;
 
@@ -265,6 +285,7 @@ export const CaSertMapView = ({ spots }: Props) => {
             );
             map.fitBounds(bounds, { padding: 60, pitch: 0, duration: 1200 });
         } catch (err: any) {
+            RLOG('❌ Erreur attrapée :', err.message, err);
             setRouteError(err.message || "Impossible de calculer l'itinéraire.");
         } finally {
             setRouting(false);
