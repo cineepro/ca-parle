@@ -104,7 +104,7 @@ export default function CaSertPage() {
                 </div>
             ) : viewMode === 'carte' ? (
                 <Suspense fallback={<p className="text-sm text-gray-400 text-center py-10">Chargement de la carte...</p>}>
-                    <CaSertMapView spots={spots} />
+                    <CaSertMapView spots={spots} country={country} />
                 </Suspense>
             ) : (
                 <div className="grid grid-cols-2 gap-3">

@@ -8,20 +8,36 @@ import { SpotCard } from './SpotCard';
 import { SPOT_CATEGORIES } from '../config/categories';
 import { FUNCTIONS } from '@/api/constants';
 import { geolocationService } from '@/services/geolocationService';
+import { COUNTRY_MAP_CENTERS } from '../config/countryMapCenters';
 
 interface Props {
     spots: Spot[];
+    // Pays choisi dans le filtre de la page — la carte doit s'y recentrer,
+    // exactement comme le sélecteur de position du formulaire d'ajout
+    // (voir LocationPicker), plutôt que rester bloquée sur Cotonou.
+    country?: string;
 }
 
 const BENIN_CENTER: [number, number] = [2.42, 9.3];
-const BENIN_ZOOMED: [number, number] = [2.42, 6.38];
 const SPOT_ZOOM = 15; // niveau de zoom pour bien voir un lieu précis, pas juste la ville
 const ROUTE_SOURCE_ID = 'ca-sert-route';
 const ROUTE_LAYER_ID = 'ca-sert-route-line';
 
+// "tous" (aucun pays précis choisi) ou une valeur inconnue → même repli que
+// LocationPicker pour 'autre' : vue large plutôt que zoomée sur un pays
+// précis, puisqu'on ne sait pas lequel privilégier.
+function getCountryTarget(country?: string): { center: [number, number]; zoom: number; pitch: number } {
+    if (country && country !== 'tous' && COUNTRY_MAP_CENTERS[country]) {
+        const { center, zoom } = COUNTRY_MAP_CENTERS[country];
+        return { center, zoom, pitch: 40 };
+    }
+    const fallback = COUNTRY_MAP_CENTERS.autre;
+    return { center: fallback.center, zoom: fallback.zoom, pitch: 0 };
+}
+
 const RLOG = (...args: any[]) => console.log('[CaSertRoute]', ...args);
 
-export const CaSertMapView = ({ spots }: Props) => {
+export const CaSertMapView = ({ spots, country }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
     const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -142,6 +158,19 @@ export const CaSertMapView = ({ spots }: Props) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [entered, spots]);
 
+    // Recentre quand le pays change APRÈS être entré sur la carte (filtre
+    // changé sans quitter la vue) — seulement si aucun lieu n'est
+    // actuellement sélectionné, pour ne pas faire sauter la carte sous les
+    // pieds de quelqu'un qui regarde un itinéraire. Avant l'entrée, c'est
+    // handleEnter qui s'en charge directement.
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !entered || selected) return;
+        const target = getCountryTarget(country);
+        map.flyTo({ center: target.center, zoom: target.zoom, pitch: target.pitch, duration: 1200 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [country]);
+
     const handleEnter = () => {
         // Priorité absolue : couper la rotation AVANT toute autre chose —
         // tant qu'elle continue en arrière-plan, elle se bat avec le
@@ -163,8 +192,9 @@ export const CaSertMapView = ({ spots }: Props) => {
         // mode standard.
         map.setProjection({ type: 'mercator' });
         map.resize();
+        const target = getCountryTarget(country);
         requestAnimationFrame(() => {
-            map.flyTo({ center: BENIN_ZOOMED, zoom: 11, pitch: 40, duration: 2600, essential: true });
+            map.flyTo({ center: target.center, zoom: target.zoom, pitch: target.pitch, duration: 2600, essential: true });
         });
     };
 
