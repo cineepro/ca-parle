@@ -1,4 +1,4 @@
-// src/router/ModeratorRoute.tsx — Ça Parle
+// src/router/ModeratorRoute.tsx — Vanessa
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';

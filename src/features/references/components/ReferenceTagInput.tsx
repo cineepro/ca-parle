@@ -1,4 +1,4 @@
-// src/features/references/components/ReferenceTagInput.tsx — Ça Parle
+// src/features/references/components/ReferenceTagInput.tsx — Vanessa
 // Utilisé dans le formulaire de création d'histoire : permet de rattacher
 // l'histoire à une ou plusieurs fiches (personnes, événements...). Si le
 // nom tapé ne correspond à rien d'existant, une nouvelle fiche est créée

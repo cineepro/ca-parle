@@ -1,4 +1,4 @@
-// src/features/stories/components/CreateStoryForm.tsx — Ça Parle
+// src/features/stories/components/CreateStoryForm.tsx — Vanessa
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCreateStory } from '../hooks/useCreateStory';

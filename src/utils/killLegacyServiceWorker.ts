@@ -1,4 +1,4 @@
-// src/utils/killLegacyServiceWorker.ts — Ça Parle
+// src/utils/killLegacyServiceWorker.ts — Vanessa
 // Filet de sécurité supplémentaire côté client, en plus du kill switch
 // public/sw.js : si jamais un Service Worker est encore actif au moment où
 // notre JS s'exécute (donc que le kill switch n'a pas encore fini son

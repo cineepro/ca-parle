@@ -1,4 +1,4 @@
-// src/features/vanessa/utils/questionCount.ts — Ça Parle
+// src/features/vanessa/utils/questionCount.ts — Vanessa
 import type { VanessaConnector } from '../services/vanessaKnowledgeService';
 
 export const MONTH_LABELS = [

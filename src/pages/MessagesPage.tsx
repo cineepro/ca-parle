@@ -1,4 +1,4 @@
-// src/pages/MessagesPage.tsx — Ça Parle
+// src/pages/MessagesPage.tsx — Vanessa
 import { useState } from 'react';
 import { useConversations } from '@/features/messaging/hooks/useConversations';
 import { ConversationListItem } from '@/features/messaging/components/ConversationListItem';

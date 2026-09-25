@@ -1,4 +1,4 @@
-// src/features/reputation/services/reputationService.ts — Ça Parle
+// src/features/reputation/services/reputationService.ts — Vanessa
 // Écriture (recalcul du score, incrémentation des compteurs) désormais
 // gérée côté serveur par les Functions `on-story-created`,
 // `on-comment-created` et `resolve-prediction`. Ce service ne fait plus

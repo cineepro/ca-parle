@@ -1,4 +1,4 @@
-// src/pages/ReferencePage.tsx — Ça Parle
+// src/pages/ReferencePage.tsx — Vanessa
 import { useParams, Link } from 'react-router-dom';
 import { useReference } from '@/features/references/hooks/useReference';
 import { StoryCard } from '@/features/stories/components/StoryCard';
@@ -27,7 +27,7 @@ export default function ReferencePage() {
         return (
             <div className="min-h-screen flex items-center justify-center flex-col gap-3">
                 <p className="text-gray-500">{error}</p>
-                <Link to="/accueil" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
+                <Link to="/ca-parle" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
             </div>
         );
     }
@@ -35,7 +35,7 @@ export default function ReferencePage() {
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-8">
             <div className="max-w-2xl mx-auto space-y-4">
-                <Link to="/accueil" className="text-gray-400 hover:text-gray-600 text-sm">← Retour au fil</Link>
+                <Link to="/ca-parle" className="text-gray-400 hover:text-gray-600 text-sm">← Retour au fil</Link>
 
                 <div className="bg-white rounded-3xl p-6 space-y-3">
                     <div className="flex items-start justify-between">

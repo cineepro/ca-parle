@@ -1,4 +1,4 @@
-// functions/set-vanessa-connector/src/main.js — Ça Parle
+// functions/set-vanessa-connector/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('set-vanessa-connector', JSON.stringify({ conversationId, connectorId }))
 //   connectorId : '' pour revenir en mode "Général" (aucun connecteur).

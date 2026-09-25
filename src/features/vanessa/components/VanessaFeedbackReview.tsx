@@ -1,4 +1,4 @@
-// src/features/vanessa/components/VanessaFeedbackReview.tsx — Ça Parle
+// src/features/vanessa/components/VanessaFeedbackReview.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
@@ -37,7 +37,7 @@ export const VanessaFeedbackReview = () => {
     return (
         <div className="bg-white rounded-3xl p-6 space-y-4">
             <div>
-                <h2 className="text-base font-bold text-gray-800">👍👎 Avis sur les réponses de Vanessa</h2>
+                <h2 className="text-base font-bold text-gray-800">Avis sur les réponses de Vanessa</h2>
                 <p className="text-xs text-gray-400 mt-1">
                     Ce que les utilisateurs pensent réellement de ses réponses — pour repérer où elle dérape et
                     ajuster le lexique ou le prompt en conséquence.
@@ -49,13 +49,13 @@ export const VanessaFeedbackReview = () => {
                     onClick={() => setTab('down')}
                     className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${tab === 'down' ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500'}`}
                 >
-                    👎 À revoir
+                    À revoir
                 </button>
                 <button
                     onClick={() => setTab('up')}
                     className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${tab === 'up' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}
                 >
-                    👍 Ce qui marche bien
+                    Ce qui marche bien
                 </button>
             </div>
 

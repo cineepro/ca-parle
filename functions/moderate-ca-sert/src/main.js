@@ -1,4 +1,4 @@
-// functions/moderate-ca-sert/src/main.js — Ça Parle
+// functions/moderate-ca-sert/src/main.js — Vanessa
 // Réservé aux modérateurs (isModerator === true sur le document `users`).
 //   { action: 'list_pending' }
 //   { action: 'approve', type: 'spot'|'price', id }

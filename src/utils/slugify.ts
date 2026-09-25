@@ -1,4 +1,4 @@
-// src/utils/slugify.ts — Ça Parle
+// src/utils/slugify.ts — Vanessa
 export function slugify(text: string): string {
     const base = text
         .trim()

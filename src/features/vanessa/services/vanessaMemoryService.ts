@@ -1,4 +1,4 @@
-// src/features/vanessa/services/vanessaMemoryService.ts — Ça Parle
+// src/features/vanessa/services/vanessaMemoryService.ts — Vanessa
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
 

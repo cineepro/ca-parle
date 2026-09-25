@@ -1,4 +1,4 @@
-// src/features/references/services/referenceService.ts — Ça Parle
+// src/features/references/services/referenceService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

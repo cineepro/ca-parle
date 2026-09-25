@@ -1,4 +1,4 @@
-// src/features/messaging/components/MessageBubble.tsx — Ça Parle
+// src/features/messaging/components/MessageBubble.tsx — Vanessa
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Message } from '../services/messageService';

@@ -1,4 +1,4 @@
-// src/features/stories/components/CategoryFilter.tsx — Ça Parle
+// src/features/stories/components/CategoryFilter.tsx — Vanessa
 import { CATEGORIES } from '@/config/categories';
 
 interface Props {

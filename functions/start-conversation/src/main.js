@@ -1,4 +1,4 @@
-// functions/start-conversation/src/main.js — Ça Parle
+// functions/start-conversation/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('start-conversation', JSON.stringify({ otherUserId }))
 //

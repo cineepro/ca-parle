@@ -1,4 +1,4 @@
-// src/pages/NotificationsPage.tsx — Ça Parle
+// src/pages/NotificationsPage.tsx — Vanessa
 import { Link, useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import type { AppNotification } from '@/features/notifications/services/notificationService';

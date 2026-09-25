@@ -1,4 +1,4 @@
-// src/features/stories/components/ShareButton.tsx — Ça Parle
+// src/features/stories/components/ShareButton.tsx — Vanessa
 import { useState } from 'react';
 
 interface Props {
@@ -18,7 +18,7 @@ export const ShareButton = ({ storyId, title }: Props) => {
         // simple détection du support navigateur.
         if (navigator.share) {
             try {
-                await navigator.share({ title: `Ça Parle — ${title}`, url });
+                await navigator.share({ title: `Vanessa — ${title}`, url });
             } catch {
                 // L'utilisateur a annulé le partage — rien à faire.
             }

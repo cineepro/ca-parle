@@ -1,4 +1,4 @@
-// src/features/stories/hooks/useStoryFeed.ts — Ça Parle
+// src/features/stories/hooks/useStoryFeed.ts — Vanessa
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { storyService, type Story } from '../services/storyService';
 

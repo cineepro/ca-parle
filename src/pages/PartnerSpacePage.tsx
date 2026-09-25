@@ -1,4 +1,4 @@
-// src/pages/PartnerSpacePage.tsx — Ça Parle
+// src/pages/PartnerSpacePage.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { vanessaKnowledgeService, type MyConnectorUsage } from '@/features/vanessa/services/vanessaKnowledgeService';
@@ -28,7 +28,7 @@ export default function PartnerSpacePage() {
                     <div className="text-3xl">🔒</div>
                     <p className="text-sm text-gray-500">
                         Aucun connecteur partenaire n'est associé à ton compte. Si tu penses que c'est une erreur,
-                        contacte l'équipe Ça Parle.
+                        contacte l'équipe Vanessa.
                     </p>
                 </div>
             ) : (
@@ -71,14 +71,14 @@ export default function PartnerSpacePage() {
                                 <div className={`mt-3 rounded-xl p-3 text-xs text-center ${percent >= 95 ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-700'}`}>
                                     {percent >= 100
                                         ? "Le quota est épuisé — Vanessa n'est plus disponible sur ce connecteur en attendant une recharge."
-                                        : 'Le quota approche de sa limite — pense à contacter Ça Parle pour une recharge.'}
+                                        : 'Le quota approche de sa limite — pense à contacter Vanessa pour une recharge.'}
                                 </div>
                             )}
                         </div>
                     )}
 
                     <p className="text-xs text-gray-400 text-center pt-2">
-                        Pour recharger ou ajuster ton quota, contacte directement l'équipe Ça Parle.
+                        Pour recharger ou ajuster ton quota, contacte directement l'équipe Vanessa.
                     </p>
                 </div>
             )}

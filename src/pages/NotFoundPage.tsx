@@ -1,4 +1,4 @@
-// src/pages/NotFoundPage.tsx — Ça Parle
+// src/pages/NotFoundPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
 
 export default function NotFoundPage() {

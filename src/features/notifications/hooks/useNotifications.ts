@@ -1,4 +1,4 @@
-// src/features/notifications/hooks/useNotifications.ts — Ça Parle
+// src/features/notifications/hooks/useNotifications.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { notificationService, type AppNotification } from '../services/notificationService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

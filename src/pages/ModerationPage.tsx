@@ -1,4 +1,4 @@
-// src/pages/ModerationPage.tsx — Ça Parle
+// src/pages/ModerationPage.tsx — Vanessa
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useModerationQueue } from '@/features/moderation/hooks/useModerationQueue';
@@ -15,13 +15,13 @@ export default function ModerationPage() {
     const { items, loading, refresh } = useModerationQueue();
     const [tab, setTab] = useState<Tab>('signalements');
 
-    const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
-        { id: 'signalements', icon: '🛡️', label: 'Signalements', badge: items.length },
-        { id: 'ca-sert', icon: '🧰', label: 'Ça sert' },
-        { id: 'avis', icon: '👍👎', label: 'Avis sur Vanessa' },
-        { id: 'newsletter', icon: '📧', label: 'Newsletter' },
-        { id: 'connecteurs', icon: '🔗', label: 'Connecteurs' },
-        { id: 'connaissances', icon: '🔮', label: 'Connaissances' },
+    const tabs: { id: Tab; label: string; badge?: number }[] = [
+        { id: 'signalements', label: 'Signalements', badge: items.length },
+        { id: 'ca-sert', label: 'Ça sert' },
+        { id: 'avis', label: 'Avis sur Vanessa' },
+        { id: 'newsletter', label: 'Newsletter' },
+        { id: 'connecteurs', label: 'Connecteurs' },
+        { id: 'connaissances', label: 'Connaissances' },
     ];
 
     return (
@@ -30,7 +30,7 @@ export default function ModerationPage() {
             <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
                 <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
                     <Link to="/accueil" className="text-gray-400 hover:text-gray-600">←</Link>
-                    <h1 className="text-lg font-bold text-gray-800">🛡️ Espace de modération</h1>
+                    <h1 className="text-lg font-bold text-gray-800">Espace de modération</h1>
                 </div>
 
                 {/* Barre d'onglets — façon logiciel, chaque section dans son
@@ -44,7 +44,6 @@ export default function ModerationPage() {
                                 tab === t.id ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         >
-                            <span>{t.icon}</span>
                             {t.label}
                             {!!t.badge && (
                                 <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${tab === t.id ? 'bg-white/25' : 'bg-[#FF4757] text-white'}`}>

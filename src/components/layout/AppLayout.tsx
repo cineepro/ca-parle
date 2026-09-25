@@ -1,4 +1,4 @@
-// src/components/layout/AppLayout.tsx — Ça Parle
+// src/components/layout/AppLayout.tsx — Vanessa
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TopNav } from './TopNav';

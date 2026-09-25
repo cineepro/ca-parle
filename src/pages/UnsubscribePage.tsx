@@ -1,4 +1,4 @@
-// src/pages/UnsubscribePage.tsx — Ça Parle
+// src/pages/UnsubscribePage.tsx — Vanessa
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { newsletterService } from '@/features/newsletter/services/newsletterService';
@@ -34,7 +34,7 @@ export default function UnsubscribePage() {
                 {status === 'success' && (
                     <>
                         <div className="text-4xl">✅</div>
-                        <p className="text-sm text-gray-700">Tu ne recevras plus la newsletter de Ça Parle.</p>
+                        <p className="text-sm text-gray-700">Tu ne recevras plus la newsletter de Vanessa.</p>
                     </>
                 )}
                 {status === 'error' && (
@@ -44,7 +44,7 @@ export default function UnsubscribePage() {
                     </>
                 )}
                 <Link to="/" className="text-[#FF4757] font-semibold hover:underline text-sm">
-                    Retour à Ça Parle
+                    Retour à Vanessa
                 </Link>
             </div>
         </div>

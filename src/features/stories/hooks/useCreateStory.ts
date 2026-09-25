@@ -1,4 +1,4 @@
-// src/features/stories/hooks/useCreateStory.ts — Ça Parle
+// src/features/stories/hooks/useCreateStory.ts — Vanessa
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storyService, type StoryType } from '../services/storyService';

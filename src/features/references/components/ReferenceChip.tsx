@@ -1,4 +1,4 @@
-// src/features/references/components/ReferenceChip.tsx — Ça Parle
+// src/features/references/components/ReferenceChip.tsx — Vanessa
 import { Link } from 'react-router-dom';
 import type { Reference, ReferenceType } from '../services/referenceService';
 

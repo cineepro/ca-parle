@@ -1,4 +1,4 @@
-// src/features/reactions/services/reactionService.ts — Ça Parle
+// src/features/reactions/services/reactionService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

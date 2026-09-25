@@ -1,4 +1,4 @@
-// src/features/onboarding/components/CommunityRulesModal.tsx — Ça Parle
+// src/features/onboarding/components/CommunityRulesModal.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
@@ -38,7 +38,7 @@ export const CommunityRulesModal = () => {
             <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-4 max-h-[85vh] overflow-y-auto">
                 <div className="text-center">
                     <div className="text-3xl mb-2">👋</div>
-                    <h2 className="text-lg font-bold text-gray-800">Bienvenue sur Ça Parle</h2>
+                    <h2 className="text-lg font-bold text-gray-800">Bienvenue sur Vanessa</h2>
                     <p className="text-xs text-gray-400 mt-1">Quelques règles avant de commencer</p>
                 </div>
 

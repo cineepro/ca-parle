@@ -1,4 +1,4 @@
-// src/config/categories.ts — Ça Parle
+// src/config/categories.ts — Vanessa
 export interface Category {
     slug: string;
     name: string;

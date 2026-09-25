@@ -1,4 +1,4 @@
-// src/features/reactions/hooks/useReactions.ts — Ça Parle
+// src/features/reactions/hooks/useReactions.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { reactionService, type ReactionType, type TargetType, type ReactionCounts } from '../services/reactionService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

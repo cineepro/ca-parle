@@ -1,4 +1,4 @@
-// src/features/predictions/components/PredictionCard.tsx — Ça Parle
+// src/features/predictions/components/PredictionCard.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { predictionService, type Prediction } from '../services/predictionService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

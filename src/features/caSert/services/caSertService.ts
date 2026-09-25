@@ -1,4 +1,4 @@
-// src/features/caSert/services/caSertService.ts — Ça Parle
+// src/features/caSert/services/caSertService.ts — Vanessa
 import { databases, storage } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { BUCKETS } from '@/api/constants';

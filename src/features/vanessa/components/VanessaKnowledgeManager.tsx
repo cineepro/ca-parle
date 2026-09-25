@@ -1,4 +1,4 @@
-// src/features/vanessa/components/VanessaKnowledgeManager.tsx — Ça Parle
+// src/features/vanessa/components/VanessaKnowledgeManager.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { vanessaKnowledgeService, type VanessaKnowledge, type VanessaConnector } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';

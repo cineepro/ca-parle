@@ -1,4 +1,4 @@
-// src/features/vanessa/components/VanessaConnectorManager.tsx — Ça Parle
+// src/features/vanessa/components/VanessaConnectorManager.tsx — Vanessa
 import { useState, useEffect, useRef } from 'react';
 import { vanessaKnowledgeService, type VanessaConnector } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
@@ -148,7 +148,7 @@ export const VanessaConnectorManager = () => {
     return (
         <div className="bg-white rounded-3xl p-6 space-y-4">
             <div>
-                <h2 className="text-base font-bold text-gray-800">🔗 Connecteurs de partenaires</h2>
+                <h2 className="text-base font-bold text-gray-800">Connecteurs de partenaires</h2>
                 <p className="text-xs text-gray-400 mt-1">
                     Chaque connecteur apparaît comme une pastille sélectionnable dans le chat avec Vanessa. Le lien à
                     surveiller (site ou flux RSS) est facultatif à la création — ajoutable, modifiable ou retirable à
@@ -276,13 +276,13 @@ export const VanessaConnectorManager = () => {
                                 <div className="mt-2 pl-11 space-y-1.5">
                                     {c.sourceUrl && editingId !== c.$id && (
                                         <p className="text-xs text-gray-400">
-                                            🔄 Lien surveillé : <span className="text-gray-600">{c.sourceUrl}</span>
+                                            Lien surveillé : <span className="text-gray-600">{c.sourceUrl}</span>
                                             {c.lastSyncedAt && ` — dernière vérification : ${formatDate(c.lastSyncedAt)}`}
                                         </p>
                                     )}
                                     {c.partnerUserId && editingId !== c.$id && (
                                         <p className="text-xs text-gray-400">
-                                            🤝 Compte partenaire relié : <span className="text-gray-600 font-mono">{c.partnerUserId}</span>
+                                            Compte partenaire relié : <span className="text-gray-600 font-mono">{c.partnerUserId}</span>
                                         </p>
                                     )}
 
@@ -339,19 +339,19 @@ export const VanessaConnectorManager = () => {
                                                 disabled={uploadingFor === c.$id}
                                                 className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1 disabled:opacity-50"
                                             >
-                                                {uploadingFor === c.$id ? 'Lecture en cours...' : '📄 Ajouter un PDF'}
+                                                {uploadingFor === c.$id ? 'Lecture en cours...' : 'Ajouter un PDF'}
                                             </button>
                                             <button
                                                 onClick={() => startEdit(c)}
                                                 className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1"
                                             >
-                                                🔗 Lien / Partenaire
+                                                Lien / Partenaire
                                             </button>
                                             <button
                                                 onClick={() => setRechargingId(c.$id)}
                                                 className="text-xs font-semibold text-green-600 bg-green-50 hover:bg-green-100 rounded-full px-3 py-1"
                                             >
-                                                💳 Recharger des tokens
+                                                Recharger des tokens
                                             </button>
                                         </div>
                                     )}

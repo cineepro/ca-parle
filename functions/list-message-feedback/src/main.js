@@ -1,4 +1,4 @@
-// functions/list-message-feedback/src/main.js — Ça Parle
+// functions/list-message-feedback/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client (modérateur uniquement) :
 //   functions.createExecution('list-message-feedback', JSON.stringify({ type: 'down'|'up', limit? }))
 //

@@ -1,4 +1,4 @@
-// src/api/functionsClient.ts — Ça Parle
+// src/api/functionsClient.ts — Vanessa
 import { functions } from './appwrite';
 
 export class FunctionCallError extends Error {}

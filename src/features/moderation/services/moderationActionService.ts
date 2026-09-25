@@ -1,4 +1,4 @@
-// src/features/moderation/services/moderationActionService.ts — Ça Parle
+// src/features/moderation/services/moderationActionService.ts — Vanessa
 // Toutes les actions ci-dessous sont désormais déléguées à la Function
 // serveur `moderate-content`, qui vérifie isModerator === true sur
 // l'appelant (via son identité de session, infalsifiable) avant d'agir.

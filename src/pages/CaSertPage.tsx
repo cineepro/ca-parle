@@ -1,4 +1,4 @@
-// src/pages/CaSertPage.tsx — Ça Parle
+// src/pages/CaSertPage.tsx — Vanessa
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { caSertService, type Spot, type MarketPrice } from '@/features/caSert/services/caSertService';
@@ -47,7 +47,7 @@ export default function CaSertPage() {
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-xl font-bold text-gray-800">🧰 Ça sert</h1>
+                    <h1 className="text-xl font-bold text-gray-800">Ça sert</h1>
                     <p className="text-xs text-gray-400">Les vrais plans, par la communauté</p>
                     <Link to="/ca-sert/mes-contributions" className="text-xs text-[#FF4757] font-semibold hover:underline">
                         Mes contributions →
@@ -68,7 +68,6 @@ export default function CaSertPage() {
                                 category === c.slug ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-600'
                             }`}
                         >
-                            <span>{c.icon}</span>
                             {c.label}
                         </button>
                     ))}
@@ -82,7 +81,7 @@ export default function CaSertPage() {
                             viewMode === 'carte' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400'
                         }`}
                     >
-                        🗺️ Carte
+                        Carte
                     </button>
                     <button
                         onClick={() => setViewMode('liste')}
@@ -90,7 +89,7 @@ export default function CaSertPage() {
                             viewMode === 'liste' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400'
                         }`}
                     >
-                        📋 Liste
+                        Liste
                     </button>
                 </div>
             </div>
@@ -98,8 +97,7 @@ export default function CaSertPage() {
             {loading ? (
                 <p className="text-sm text-gray-400 text-center py-10">Chargement...</p>
             ) : spots.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center space-y-2">
-                    <div className="text-3xl">🧰</div>
+                <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
                     <p className="text-sm text-gray-500">Rien par ici pour l'instant. Sois le premier à balancer un bon plan !</p>
                 </div>
             ) : viewMode === 'carte' ? (
@@ -118,7 +116,7 @@ export default function CaSertPage() {
                 onClick={() => setShowAddModal(true)}
                 className="fixed bottom-24 md:bottom-8 right-4 md:right-8 flex items-center gap-2 bg-[#FF4757] text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg hover:bg-[#e63e4d] transition-colors z-30"
             >
-                ➕ Balance ton bon plan
+                Balance ton bon plan
             </button>
 
             {showAddModal && (

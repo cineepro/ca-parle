@@ -1,4 +1,4 @@
-// src/features/messaging/components/NewConversationModal.tsx — Ça Parle
+// src/features/messaging/components/NewConversationModal.tsx — Vanessa
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserSearch } from '../hooks/useUserSearch';

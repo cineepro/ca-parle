@@ -1,4 +1,4 @@
-// src/features/reputation/hooks/useReputation.ts — Ça Parle
+// src/features/reputation/hooks/useReputation.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { reputationService, type ReputationStats } from '../services/reputationService';
 import { badgeService, type BadgeDoc, type UserBadge } from '../services/badgeService';

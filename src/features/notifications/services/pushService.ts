@@ -1,4 +1,4 @@
-// src/features/notifications/services/pushService.ts — Ça Parle
+// src/features/notifications/services/pushService.ts — Vanessa
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type Token, type PushNotificationSchema, type ActionPerformed } from '@capacitor/push-notifications';
 import { account } from '@/api/appwrite';

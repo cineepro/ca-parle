@@ -1,4 +1,4 @@
-// src/features/story-updates/services/storyUpdateService.ts — Ça Parle
+// src/features/story-updates/services/storyUpdateService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

@@ -1,4 +1,4 @@
-// src/features/reputation/components/ReputationCard.tsx — Ça Parle
+// src/features/reputation/components/ReputationCard.tsx — Vanessa
 import type { ReputationStats } from '../services/reputationService';
 
 const GOSSIP_TITLES: Record<number, string> = {
@@ -7,7 +7,7 @@ const GOSSIP_TITLES: Record<number, string> = {
     3: 'Bavard confirmé',
     4: 'Expert du ragot',
     5: 'Roi du commérage',
-    6: 'Légende de Ça Parle',
+    6: 'Légende de Vanessa',
 };
 
 export const ReputationCard = ({ stats, name }: { stats: ReputationStats; name?: string }) => {

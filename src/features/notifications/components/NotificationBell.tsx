@@ -1,4 +1,4 @@
-// src/features/notifications/components/NotificationBell.tsx — Ça Parle
+// src/features/notifications/components/NotificationBell.tsx — Vanessa
 import { Link } from 'react-router-dom';
 import { useNotifications } from '../hooks/useNotifications';
 

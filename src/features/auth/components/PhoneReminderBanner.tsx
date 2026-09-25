@@ -1,4 +1,4 @@
-// src/features/auth/components/PhoneReminderBanner.tsx — Ça Parle
+// src/features/auth/components/PhoneReminderBanner.tsx — Vanessa
 // S'affiche uniquement pour les utilisateurs connectés dont `phone` est
 // vide (typiquement les anciens comptes Kinema+ qui n'avaient pas ce
 // champ). Non bloquant : l'utilisateur peut fermer et continuer.

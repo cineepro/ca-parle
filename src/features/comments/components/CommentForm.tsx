@@ -1,4 +1,4 @@
-// src/features/comments/components/CommentForm.tsx — Ça Parle
+// src/features/comments/components/CommentForm.tsx — Vanessa
 import { useState } from 'react';
 import type { CommentType } from '../services/commentService';
 import { Button } from '@/components/ui/button';

@@ -1,4 +1,4 @@
-// src/components/ui/avatar.tsx — Ça Parle
+// src/components/ui/avatar.tsx — Vanessa
 import { VANESSA_USER_ID, VANESSA_AVATAR_URL } from '@/api/constants';
 
 interface AvatarProps {

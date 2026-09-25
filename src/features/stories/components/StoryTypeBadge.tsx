@@ -1,4 +1,4 @@
-// src/features/stories/components/StoryTypeBadge.tsx — Ça Parle
+// src/features/stories/components/StoryTypeBadge.tsx — Vanessa
 import type { StoryType } from '../services/storyService';
 
 const TYPE_CONFIG: Record<StoryType, { label: string; icon: string; className: string }> = {

@@ -1,4 +1,4 @@
-// src/features/follow/components/FollowButton.tsx — Ça Parle
+// src/features/follow/components/FollowButton.tsx — Vanessa
 import { useFollow } from '../hooks/useFollow';
 import type { FollowingType } from '../services/followService';
 import { Button } from '@/components/ui/button';

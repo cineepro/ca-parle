@@ -1,4 +1,4 @@
-// src/api/appwrite.ts — Ça Parle
+// src/api/appwrite.ts — Vanessa
 // ⚠️ IMPORTANT : on utilise le MÊME projet Appwrite que Kinema+ pour
 // conserver l'Auth (comptes, sessions, vérification email) et les
 // utilisateurs déjà inscrits. Ne PAS créer un nouveau projet Appwrite.

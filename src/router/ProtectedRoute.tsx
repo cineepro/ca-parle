@@ -1,4 +1,4 @@
-// src/router/ProtectedRoute.tsx — Ça Parle
+// src/router/ProtectedRoute.tsx — Vanessa
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { AppLayout } from '@/components/layout/AppLayout';

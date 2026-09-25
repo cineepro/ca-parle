@@ -1,4 +1,4 @@
-// src/features/stories/components/StoryFeed.tsx — Ça Parle
+// src/features/stories/components/StoryFeed.tsx — Vanessa
 import { useStoryFeed } from '../hooks/useStoryFeed';
 import { StoryCard } from './StoryCard';
 import { Button } from '@/components/ui/button';

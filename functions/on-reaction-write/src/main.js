@@ -1,4 +1,4 @@
-// functions/on-reaction-write/src/main.js — Ça Parle
+// functions/on-reaction-write/src/main.js — Vanessa
 // Déclencheurs :
 //   databases.*.collections.<REACTIONS>.documents.*.create
 //   databases.*.collections.<REACTIONS>.documents.*.update

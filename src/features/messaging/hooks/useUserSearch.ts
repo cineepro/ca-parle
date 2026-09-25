@@ -1,4 +1,4 @@
-// src/features/messaging/hooks/useUserSearch.ts — Ça Parle
+// src/features/messaging/hooks/useUserSearch.ts — Vanessa
 import { useState, useEffect } from 'react';
 import { dbService } from '@/api/database';
 import { useAuth } from '@/features/auth/hooks/useAuth';

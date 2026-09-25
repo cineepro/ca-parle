@@ -1,4 +1,4 @@
-// src/features/messaging/components/ConversationListItem.tsx — Ça Parle
+// src/features/messaging/components/ConversationListItem.tsx — Vanessa
 import { Link } from 'react-router-dom';
 import type { ConversationWithParticipant } from '../hooks/useConversations';
 import { useAuth } from '@/features/auth/hooks/useAuth';

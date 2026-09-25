@@ -1,4 +1,4 @@
-// functions/confirm-spot/src/main.js — Ça Parle
+// functions/confirm-spot/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('confirm-spot', JSON.stringify({ spotId }))
 //

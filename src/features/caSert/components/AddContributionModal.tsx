@@ -1,4 +1,4 @@
-// src/features/caSert/components/AddContributionModal.tsx — Ça Parle
+// src/features/caSert/components/AddContributionModal.tsx — Vanessa
 import { useState } from 'react';
 import { lazy, Suspense } from 'react';
 import { caSertService, uploadSpotImage } from '../services/caSertService';
@@ -141,7 +141,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                         >
                             {SPOT_CATEGORIES.filter((c) => c.slug !== 'tout').map((c) => (
-                                <option key={c.slug} value={c.slug}>{c.icon} {c.label}</option>
+                                <option key={c.slug} value={c.slug}>{c.label}</option>
                             ))}
                         </select>
                         <textarea

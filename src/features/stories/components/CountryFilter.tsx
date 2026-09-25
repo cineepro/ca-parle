@@ -1,4 +1,4 @@
-// src/features/stories/components/CountryFilter.tsx — Ça Parle
+// src/features/stories/components/CountryFilter.tsx — Vanessa
 import { COUNTRIES } from '@/config/countries';
 
 interface Props {

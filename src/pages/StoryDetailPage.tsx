@@ -1,4 +1,4 @@
-// src/pages/StoryDetailPage.tsx — Ça Parle
+// src/pages/StoryDetailPage.tsx — Vanessa
 // Affiche déjà le contenu complet de l'histoire. Les réactions, votes
 // "Tu y crois ?", commentaires et chronologie seront branchés à l'étape
 // suivante (features reactions/comments/predictions).
@@ -72,7 +72,7 @@ export default function StoryDetailPage() {
         return (
             <div className="min-h-screen flex items-center justify-center flex-col gap-3">
                 <p className="text-gray-500">{error}</p>
-                <Link to="/accueil" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
+                <Link to="/ca-parle" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
             </div>
         );
     }
@@ -93,7 +93,7 @@ export default function StoryDetailPage() {
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-8">
             <div className="max-w-2xl mx-auto space-y-4">
-                <Link to="/accueil" className="text-gray-400 hover:text-gray-600 text-sm">← Retour au fil</Link>
+                <Link to="/ca-parle" className="text-gray-400 hover:text-gray-600 text-sm">← Retour au fil</Link>
 
                 <div className="bg-white rounded-3xl p-6">
                     <div className="flex items-center justify-between mb-3">

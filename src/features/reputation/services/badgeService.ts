@@ -1,4 +1,4 @@
-// src/features/reputation/services/badgeService.ts — Ça Parle
+// src/features/reputation/services/badgeService.ts — Vanessa
 // L'attribution des badges (checkAndAward) est désormais gérée côté
 // serveur par les Functions `on-story-created`, `on-comment-created` et
 // `resolve-prediction`. Ce service ne fait plus que LIRE le catalogue et

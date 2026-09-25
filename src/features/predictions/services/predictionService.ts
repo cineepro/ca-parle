@@ -1,4 +1,4 @@
-// src/features/predictions/services/predictionService.ts — Ça Parle
+// src/features/predictions/services/predictionService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

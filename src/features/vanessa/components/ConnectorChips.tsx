@@ -1,4 +1,4 @@
-// src/features/vanessa/components/ConnectorChips.tsx — Ça Parle
+// src/features/vanessa/components/ConnectorChips.tsx — Vanessa
 import { useState } from 'react';
 import type { VanessaConnector } from '../services/vanessaKnowledgeService';
 import { conversationService } from '@/features/messaging/services/conversationService';

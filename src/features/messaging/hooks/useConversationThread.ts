@@ -1,4 +1,4 @@
-// src/features/messaging/hooks/useConversationThread.ts — Ça Parle
+// src/features/messaging/hooks/useConversationThread.ts — Vanessa
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { messageService, type Message } from '../services/messageService';
 import { conversationService, type Conversation } from '../services/conversationService';

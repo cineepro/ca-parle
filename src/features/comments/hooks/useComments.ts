@@ -1,4 +1,4 @@
-// src/features/comments/hooks/useComments.ts — Ça Parle
+// src/features/comments/hooks/useComments.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { commentService, type Comment, type CommentType } from '../services/commentService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

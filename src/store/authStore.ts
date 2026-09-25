@@ -1,4 +1,4 @@
-// src/store/authStore.ts — Ça Parle
+// src/store/authStore.ts — Vanessa
 // isAuthenticated est strictement lié à emailVerification === true.
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';

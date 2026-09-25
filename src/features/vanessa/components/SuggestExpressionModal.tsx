@@ -1,4 +1,4 @@
-// src/features/vanessa/components/SuggestExpressionModal.tsx — Ça Parle
+// src/features/vanessa/components/SuggestExpressionModal.tsx — Vanessa
 import { useState } from 'react';
 import { vanessaKnowledgeService } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ export const SuggestExpressionModal = ({ onClose }: Props) => {
             <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-4">
                 {done ? (
                     <div className="text-center space-y-3 py-4">
-                        <div className="text-4xl">💡</div>
+                        
                         <p className="text-sm font-semibold text-gray-800">Merci, c'est transmis !</p>
                         <p className="text-xs text-gray-500">
                             On vérifie vite fait avant que Vanessa commence à l'utiliser — ça évite les doublons et
@@ -44,7 +44,7 @@ export const SuggestExpressionModal = ({ onClose }: Props) => {
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-3">
                         <div>
-                            <h2 className="text-base font-bold text-gray-800">💡 Proposer une expression à Vanessa</h2>
+                            <h2 className="text-base font-bold text-gray-800">Proposer une expression à Vanessa</h2>
                             <p className="text-xs text-gray-400 mt-1">
                                 Une expression, un mot, un ton qu'elle devrait utiliser — dans ton style, comme tu lui
                                 apprendrais toi-même.

@@ -1,4 +1,4 @@
-// src/features/stories/components/StoryStatusBadge.tsx — Ça Parle
+// src/features/stories/components/StoryStatusBadge.tsx — Vanessa
 import type { StoryStatus } from '../services/storyService';
 
 const STATUS_CONFIG: Record<StoryStatus, { label: string; dot: string }> = {

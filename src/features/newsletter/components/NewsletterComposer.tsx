@@ -1,4 +1,4 @@
-// src/features/newsletter/components/NewsletterComposer.tsx — Ça Parle
+// src/features/newsletter/components/NewsletterComposer.tsx — Vanessa
 import { useState } from 'react';
 import { newsletterService } from '../services/newsletterService';
 import { RecipientPicker } from './RecipientPicker';

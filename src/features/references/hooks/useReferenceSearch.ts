@@ -1,4 +1,4 @@
-// src/features/references/hooks/useReferenceSearch.ts — Ça Parle
+// src/features/references/hooks/useReferenceSearch.ts — Vanessa
 import { useState, useEffect } from 'react';
 import { referenceService, type Reference } from '../services/referenceService';
 

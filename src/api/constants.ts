@@ -1,4 +1,4 @@
-// src/api/constants.ts — Ça Parle
+// src/api/constants.ts — Vanessa
 // Source de vérité unique pour la base de données et les IDs de
 // collections. Regroupé ici (et non dans auth.ts) car la majorité de ces
 // collections n'ont rien à voir avec l'authentification — seule USERS en

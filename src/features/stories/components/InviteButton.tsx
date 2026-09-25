@@ -1,4 +1,4 @@
-// src/features/stories/components/InviteButton.tsx — Ça Parle
+// src/features/stories/components/InviteButton.tsx — Vanessa
 // Partage un lien vers la plateforme (pas une histoire précise), avec un
 // paramètre ?ref=<userId> pour garder une trace basique de qui invite qui
 // — non exploité pour l'instant (pas de système de récompense de
@@ -16,12 +16,12 @@ export const InviteButton = () => {
         ? `${window.location.origin}/register?ref=${user.$id}`
         : window.location.origin;
 
-    const message = "Rejoins-moi sur Ça Parle 👀 « Ça parle de quoi aujourd'hui ? »";
+    const message = "Rejoins-moi sur Vanessa — celle qui vous ressemble et vous rassemble";
 
     const handleInvite = async () => {
         if (navigator.share) {
             try {
-                await navigator.share({ title: 'Ça Parle', text: message, url });
+                await navigator.share({ title: 'Vanessa', text: message, url });
             } catch {
                 // Annulé par l'utilisateur.
             }

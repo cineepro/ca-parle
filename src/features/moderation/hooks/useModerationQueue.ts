@@ -1,4 +1,4 @@
-// src/features/moderation/hooks/useModerationQueue.ts — Ça Parle
+// src/features/moderation/hooks/useModerationQueue.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { reportService, type Report } from '../services/reportService';
 import { storyService, type Story } from '@/features/stories/services/storyService';

@@ -1,4 +1,4 @@
-// src/features/auth/services/authService.ts — Ça Parle
+// src/features/auth/services/authService.ts — Vanessa
 // Reprend le flux Kinema+ (éprouvé) :
 //   1. Un compte non vérifié n'a JAMAIS de session valide ni de profil
 //      applicatif accessible.

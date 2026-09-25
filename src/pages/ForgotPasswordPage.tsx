@@ -1,4 +1,4 @@
-// src/pages/ForgotPasswordPage.tsx — Ça Parle
+// src/pages/ForgotPasswordPage.tsx — Vanessa
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { account } from '@/api/appwrite';
@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-md bg-white rounded-3xl shadow-sm p-8">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-[#FF4757]">Ça Parle</h1>
+                    <h1 className="text-2xl font-bold text-[#FF4757]">Vanessa</h1>
                     <p className="text-sm text-gray-500 mt-1">Mot de passe oublié</p>
                 </div>
 

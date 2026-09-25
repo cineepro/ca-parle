@@ -1,4 +1,4 @@
-// src/pages/TermsPage.tsx — Ça Parle
+// src/pages/TermsPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
 
 export default function TermsPage() {
@@ -21,7 +21,7 @@ export default function TermsPage() {
                         <h2 className="font-bold text-gray-800">Article 1 — Objet et acceptation</h2>
                         <p>
                             Les présentes Conditions Générales d'Utilisation (ci-après "CGU") régissent
-                            l'accès et l'utilisation de la plateforme "Ça Parle" (ci-après "la
+                            l'accès et l'utilisation de la plateforme "Vanessa" (ci-après "la
                             Plateforme"), éditée par ASILLIA, accessible notamment via le site kinemaplus.com et les
                             applications mobiles associées.
                         </p>
@@ -35,14 +35,15 @@ export default function TermsPage() {
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">Article 2 — Description du service</h2>
                         <p>
-                            Ça Parle est un service de réseau social permettant à ses utilisateurs de
-                            publier, consulter, commenter et réagir à des contenus de type témoignages,
-                            rumeurs, révélations et commentaires ("le Contenu"), organisés notamment
-                            autour de fiches de référence (personnes publiques, sujets, événements). La
-                            Plateforme intègre également un assistant conversationnel automatisé
-                            ("Vanessa") reposant sur un modèle d'intelligence artificielle, une
-                            messagerie privée, et des fonctionnalités de gamification (badges,
-                            réputation, prédictions).
+                            Vanessa est un assistant conversationnel automatisé reposant sur un modèle
+                            d'intelligence artificielle. La Plateforme héberge également "Ça Parle", un
+                            service de réseau social permettant à ses utilisateurs de publier, consulter,
+                            commenter et réagir à des contenus de type témoignages, rumeurs, révélations
+                            et commentaires ("le Contenu"), organisés notamment autour de fiches de
+                            référence (personnes publiques, sujets, événements), ainsi que "Ça sert", un
+                            répertoire local de bons plans. La Plateforme intègre en outre une messagerie
+                            privée et des fonctionnalités de gamification (badges, réputation,
+                            prédictions).
                         </p>
                     </section>
 

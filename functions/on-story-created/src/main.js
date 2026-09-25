@@ -1,4 +1,4 @@
-// functions/on-story-created/src/main.js — Ça Parle
+// functions/on-story-created/src/main.js — Vanessa
 // Déclencheur : databases.*.collections.<STORIES>.documents.*.create
 //
 // Recalcule storiesCount / revelationsCount / reputationScore / gossipLevel

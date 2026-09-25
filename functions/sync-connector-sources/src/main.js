@@ -1,4 +1,4 @@
-// functions/sync-connector-sources/src/main.js — Ça Parle
+// functions/sync-connector-sources/src/main.js — Vanessa
 // Déclencheur : PLANIFIÉ (cron), ex. "0 6 * * *" pour 6h chaque matin.
 //
 // Pour chaque connecteur ayant un `sourceUrl` renseigné, va chercher du

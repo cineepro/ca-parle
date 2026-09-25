@@ -1,4 +1,4 @@
-// src/features/comments/components/CommentItem.tsx — Ça Parle
+// src/features/comments/components/CommentItem.tsx — Vanessa
 import { useState } from 'react';
 import type { Comment } from '../services/commentService';
 import { commentService } from '../services/commentService';

@@ -1,4 +1,4 @@
-// src/features/follow/hooks/useFollow.ts — Ça Parle
+// src/features/follow/hooks/useFollow.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { followService, type FollowingType } from '../services/followService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

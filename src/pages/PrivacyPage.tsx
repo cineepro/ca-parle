@@ -1,4 +1,4 @@
-// src/pages/PrivacyPage.tsx — Ça Parle
+// src/pages/PrivacyPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPage() {
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
                         <h2 className="font-bold text-gray-800">1. Qui sommes-nous</h2>
                         <p>
                             La présente politique décrit comment ASILLIA
-                            ("nous"), éditeur de la plateforme Ça Parle, collecte, utilise et protège
+                            ("nous"), éditeur de la plateforme Vanessa, collecte, utilise et protège
                             les données personnelles des utilisateurs ("toi", "tu").
                         </p>
                     </section>

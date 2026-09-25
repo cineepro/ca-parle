@@ -1,4 +1,4 @@
-// src/pages/SearchPage.tsx — Ça Parle
+// src/pages/SearchPage.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { globalSearchService, type GlobalSearchResults } from '@/features/search/services/globalSearchService';

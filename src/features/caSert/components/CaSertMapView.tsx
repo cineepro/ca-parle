@@ -1,4 +1,4 @@
-// src/features/caSert/components/CaSertMapView.tsx — Ça Parle
+// src/features/caSert/components/CaSertMapView.tsx — Vanessa
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -373,7 +373,7 @@ export const CaSertMapView = ({ spots, country }: Props) => {
 
             {contextLost && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-gray-900/95 px-6 text-center rounded-2xl">
-                    <div className="text-3xl">🔌</div>
+                    
                     <p className="text-white text-sm">
                         La carte a été interrompue par ton appareil (mémoire graphique saturée, souvent après avoir
                         déjà ouvert une carte juste avant).
@@ -454,7 +454,7 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                                     liveTracking ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-[#4285F4]'
                                 }`}
                             >
-                                {liveTracking ? '🔴 Suivi en direct actif — arrêter' : '📡 Me suivre en direct sur la carte'}
+                                {liveTracking ? 'Suivi en direct actif — arrêter' : 'Me suivre en direct sur la carte'}
                             </button>
                         </>
                     ) : selected && (
@@ -463,7 +463,7 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                             disabled={routing || locating}
                             className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#4285F4] disabled:opacity-50"
                         >
-                            {routing ? '⏳ Calcul de l\'itinéraire...' : locating ? '⏳ Localisation...' : '🧭 Itinéraire depuis ma position'}
+                            {routing ? '⏳ Calcul de l\'itinéraire...' : locating ? '⏳ Localisation...' : 'Itinéraire depuis ma position'}
                         </button>
                     )}
                     {routeError && <p className="text-xs text-red-500 mt-1">{routeError}</p>}

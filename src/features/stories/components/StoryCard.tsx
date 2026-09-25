@@ -1,4 +1,4 @@
-// src/features/stories/components/StoryCard.tsx — Ça Parle
+// src/features/stories/components/StoryCard.tsx — Vanessa
 import { Link } from 'react-router-dom';
 import type { Story } from '../services/storyService';
 import { StoryTypeBadge } from './StoryTypeBadge';

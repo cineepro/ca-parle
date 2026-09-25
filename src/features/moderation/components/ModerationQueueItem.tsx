@@ -1,4 +1,4 @@
-// src/features/moderation/components/ModerationQueueItem.tsx — Ça Parle
+// src/features/moderation/components/ModerationQueueItem.tsx — Vanessa
 import { useState } from 'react';
 import type { ReportWithContent } from '../hooks/useModerationQueue';
 import { REPORT_REASON_LABELS } from '../services/reportService';

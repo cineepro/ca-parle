@@ -1,4 +1,4 @@
-// src/pages/MyReferencesPage.tsx — Ça Parle
+// src/pages/MyReferencesPage.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';

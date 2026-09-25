@@ -1,4 +1,4 @@
-// src/App.tsx — Ça Parle
+// src/App.tsx — Vanessa
 import { AppRouter } from '@/router/AppRouter';
 
 export default function App() {

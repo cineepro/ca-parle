@@ -1,4 +1,4 @@
-// src/features/reputation/components/BadgeGrid.tsx — Ça Parle
+// src/features/reputation/components/BadgeGrid.tsx — Vanessa
 import type { BadgeDoc } from '../services/badgeService';
 
 interface Props {

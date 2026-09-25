@@ -1,4 +1,4 @@
-// src/features/auth/components/LoginForm.tsx — Ça Parle
+// src/features/auth/components/LoginForm.tsx — Vanessa
 import { useState } from 'react';
 import { useLogin } from '../hooks/useLogin';
 import { Input } from '@/components/ui/input';

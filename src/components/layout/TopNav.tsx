@@ -1,13 +1,12 @@
-// src/components/layout/TopNav.tsx — Ça Parle
+// src/components/layout/TopNav.tsx — Vanessa
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
-import { VanessaButton } from '@/features/vanessa/components/VanessaButton';
 
 const DESKTOP_LINKS = [
-    { to: '/accueil', icon: '🏠', label: 'Accueil' },
-    { to: '/ca-sert', icon: '🧰', label: 'Ça sert' },
-    { to: '/messages', icon: '💬', label: 'Messages' },
+    { to: '/ca-parle', label: 'Ça Parle' },
+    { to: '/ca-sert', label: 'Ça sert' },
+    { to: '/messages', label: 'Messages' },
 ];
 
 export const TopNav = () => {
@@ -19,7 +18,7 @@ export const TopNav = () => {
         <header className="sticky top-0 z-30 bg-white border-b border-gray-100">
             <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
                 <Link to="/accueil" className="text-lg font-bold text-[#FF4757]">
-                    Ça Parle
+                    Vanessa
                 </Link>
 
                 {/* Liens complets, desktop uniquement */}
@@ -28,27 +27,19 @@ export const TopNav = () => {
                         <Link
                             key={link.to}
                             to={link.to}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                                 isActive(link.to) ? 'bg-[#FF4757]/10 text-[#FF4757]' : 'text-gray-500 hover:bg-gray-50'
                             }`}
                         >
-                            <span>{link.icon}</span>
                             {link.label}
                         </Link>
                     ))}
-                    <Link
-                        to="/publier"
-                        className="flex items-center gap-1.5 bg-[#FF4757] text-white px-3.5 py-1.5 rounded-full text-sm font-semibold hover:bg-[#e63e4d] transition-colors ml-1"
-                    >
-                        ✍️ Publier
-                    </Link>
                 </nav>
 
                 <div className="flex items-center gap-3">
                     <Link to="/recherche" className="text-gray-500 hover:text-gray-700" title="Rechercher">
-                        🔎
+                        Rechercher
                     </Link>
-                    <VanessaButton />
                     <NotificationBell />
 
                     {/* Profil + modération + déconnexion, desktop uniquement
@@ -56,11 +47,11 @@ export const TopNav = () => {
                         actions secondaires vivent sur la page profil). */}
                     <div className="hidden md:flex items-center gap-3">
                         <Link to="/profil" className="text-sm text-gray-500 hover:text-gray-700">
-                            👤 Profil
+                            Profil
                         </Link>
                         {user?.isModerator && (
                             <Link to="/moderation" className="text-sm text-gray-500 hover:text-gray-700">
-                                🛡️
+                                Modération
                             </Link>
                         )}
                         <button onClick={logout} className="text-sm text-gray-400 hover:text-gray-600">

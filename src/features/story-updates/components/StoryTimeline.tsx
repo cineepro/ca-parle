@@ -1,4 +1,4 @@
-// src/features/story-updates/components/StoryTimeline.tsx — Ça Parle
+// src/features/story-updates/components/StoryTimeline.tsx — Vanessa
 import { useState } from 'react';
 import { useStoryUpdates } from '../hooks/useStoryUpdates';
 import type { StoryUpdateType } from '../services/storyUpdateService';
@@ -37,7 +37,7 @@ export const StoryTimeline = ({ storyId, isStoryAuthor }: Props) => {
 
     return (
         <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">🕰️ Ce que Ça Parle sait</h2>
+            <h2 className="text-sm font-bold text-gray-700">Ce que Ça Parle sait</h2>
 
             {updates.length === 0 ? (
                 <p className="text-sm text-gray-400">Aucune mise à jour pour l'instant.</p>

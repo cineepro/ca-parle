@@ -1,4 +1,4 @@
-// src/features/caSert/components/LocationPicker.tsx — Ça Parle
+// src/features/caSert/components/LocationPicker.tsx — Vanessa
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';

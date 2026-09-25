@@ -1,4 +1,4 @@
-// src/features/moderation/services/reportService.ts — Ça Parle
+// src/features/moderation/services/reportService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

@@ -1,4 +1,4 @@
-// src/components/ui/input.tsx — Ça Parle
+// src/components/ui/input.tsx — Vanessa
 import { forwardRef } from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {

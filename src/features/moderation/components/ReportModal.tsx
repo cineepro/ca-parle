@@ -1,4 +1,4 @@
-// src/features/moderation/components/ReportModal.tsx — Ça Parle
+// src/features/moderation/components/ReportModal.tsx — Vanessa
 import { useState } from 'react';
 import { useReport } from '../hooks/useReport';
 import { REPORT_REASON_LABELS, type ReportReason, type ReportTargetType } from '../services/reportService';

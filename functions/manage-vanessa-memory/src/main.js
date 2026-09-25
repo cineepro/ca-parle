@@ -1,4 +1,4 @@
-// functions/manage-vanessa-memory/src/main.js — Ça Parle
+// functions/manage-vanessa-memory/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client, par l'utilisateur lui-même sur
 // SES PROPRES données uniquement (pas d'accès aux souvenirs d'autrui,
 // même pour un modérateur — c'est une donnée personnelle, pas de contenu

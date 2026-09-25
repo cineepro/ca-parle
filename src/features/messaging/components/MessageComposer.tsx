@@ -1,4 +1,4 @@
-// src/features/messaging/components/MessageComposer.tsx — Ça Parle
+// src/features/messaging/components/MessageComposer.tsx — Vanessa
 import { useState, useRef, useEffect } from 'react';
 
 interface Props {

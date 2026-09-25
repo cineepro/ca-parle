@@ -1,4 +1,4 @@
-// src/features/caSert/lib/maplibreWorker.ts — Ça Parle
+// src/features/caSert/lib/maplibreWorker.ts — Vanessa
 //
 // ⚠️ Bug connu de MapLibre GL JS v6 avec Vite : le worker interne (chargé
 // via `new URL('./maplibre-gl-worker.mjs', import.meta.url)`) n'est pas

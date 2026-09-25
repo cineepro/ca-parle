@@ -1,4 +1,4 @@
-// src/features/newsletter/services/recipientService.ts — Ça Parle
+// src/features/newsletter/services/recipientService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { Query } from 'appwrite';

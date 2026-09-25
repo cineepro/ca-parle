@@ -1,4 +1,4 @@
-// src/services/geolocationService.ts — Ça Parle
+// src/services/geolocationService.ts — Vanessa
 //
 // Sur Android, `navigator.geolocation` du navigateur ne déclenche pas
 // fiablement la vraie demande de permission native — il faut passer par

@@ -1,4 +1,4 @@
-// src/router/AppRouter.tsx — Ça Parle
+// src/router/AppRouter.tsx — Vanessa
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ModeratorRoute } from './ModeratorRoute';
@@ -8,6 +8,7 @@ import RegisterPage from '@/pages/RegisterPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import EmailConfirmedPage from '@/pages/EmailConfirmedPage';
 import HomePage from '@/pages/HomePage';
+import VanessaHomePage from '@/pages/VanessaHomePage';
 import CreateStoryPage from '@/pages/CreateStoryPage';
 import StoryDetailPage from '@/pages/StoryDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
@@ -49,6 +50,14 @@ export const AppRouter = () => {
                 {/* Protégées */}
                 <Route
                     path="/accueil"
+                    element={
+                        <ProtectedRoute>
+                            <VanessaHomePage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/ca-parle"
                     element={
                         <ProtectedRoute>
                             <HomePage />

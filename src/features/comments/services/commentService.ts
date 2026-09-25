@@ -1,4 +1,4 @@
-// src/features/comments/services/commentService.ts — Ça Parle
+// src/features/comments/services/commentService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

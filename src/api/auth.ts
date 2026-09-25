@@ -1,4 +1,4 @@
-// src/api/auth.ts — Ça Parle
+// src/api/auth.ts — Vanessa
 // Reprend le modèle Kinema+ : la collection USERS est PARTAGÉE entre les
 // deux plateformes. On y ajoute simplement de nouveaux attributs optionnels
 // (phone, gossipLevel, reliabilityIndex, etc.) — voir database.ts.

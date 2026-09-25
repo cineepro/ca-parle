@@ -1,4 +1,4 @@
-// src/components/ui/button.tsx — Ça Parle
+// src/components/ui/button.tsx — Vanessa
 import { forwardRef } from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

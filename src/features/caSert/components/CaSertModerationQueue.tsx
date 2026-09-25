@@ -1,4 +1,4 @@
-// src/features/caSert/components/CaSertModerationQueue.tsx — Ça Parle
+// src/features/caSert/components/CaSertModerationQueue.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { moderateCaSertService } from '../services/moderateCaSertService';
 import type { Spot, MarketPrice } from '../services/caSertService';
@@ -68,8 +68,8 @@ export const CaSertModerationQueue = () => {
                 return (
                     <div key={spot.$id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-purple-600 bg-purple-50 rounded-full px-2.5 py-1">📍 Lieu/service</span>
-                            <span className="text-xs text-gray-400">{category?.icon} {category?.label}</span>
+                            <span className="text-xs font-semibold text-purple-600 bg-purple-50 rounded-full px-2.5 py-1">Lieu/service</span>
+                            <span className="text-xs text-gray-400">{category?.label}</span>
                         </div>
                         <p className="text-sm font-semibold text-gray-800">{spot.name}</p>
                         {spot.description && <p className="text-xs text-gray-500">{spot.description}</p>}
@@ -80,10 +80,10 @@ export const CaSertModerationQueue = () => {
                         <p className="text-xs text-gray-300">Par {spot.authorName || spot.authorId}</p>
                         <div className="flex gap-2 pt-1">
                             <Button size="sm" onClick={() => handleApprove('spot', spot.$id)} isLoading={processingId === spot.$id}>
-                                ✅ Valider
+                                Valider
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => handleReject('spot', spot.$id)} disabled={processingId === spot.$id}>
-                                ❌ Refuser
+                                Refuser
                             </Button>
                         </div>
                     </div>
@@ -92,7 +92,7 @@ export const CaSertModerationQueue = () => {
 
             {prices.map((price) => (
                 <div key={price.$id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
-                    <span className="text-xs font-semibold text-amber-600 bg-amber-50 rounded-full px-2.5 py-1">💰 Prix</span>
+                    <span className="text-xs font-semibold text-amber-600 bg-amber-50 rounded-full px-2.5 py-1">Prix</span>
                     <p className="text-sm font-semibold text-gray-800">
                         {price.item} — <span className="text-[#FF4757]">{price.price.toLocaleString('fr-FR')} F{price.unit ? `/${price.unit}` : ''}</span>
                     </p>
@@ -100,10 +100,10 @@ export const CaSertModerationQueue = () => {
                     <p className="text-xs text-gray-300">Par {price.authorId}</p>
                     <div className="flex gap-2 pt-1">
                         <Button size="sm" onClick={() => handleApprove('price', price.$id)} isLoading={processingId === price.$id}>
-                            ✅ Valider
+                            Valider
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => handleReject('price', price.$id)} disabled={processingId === price.$id}>
-                            ❌ Refuser
+                            Refuser
                         </Button>
                     </div>
                 </div>

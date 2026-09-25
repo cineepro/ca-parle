@@ -1,4 +1,4 @@
-// src/features/predictions/components/CreatePredictionForm.tsx — Ça Parle
+// src/features/predictions/components/CreatePredictionForm.tsx — Vanessa
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 

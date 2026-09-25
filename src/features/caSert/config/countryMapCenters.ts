@@ -1,4 +1,4 @@
-// src/features/caSert/config/countryMapCenters.ts — Ça Parle
+// src/features/caSert/config/countryMapCenters.ts — Vanessa
 // Centre approximatif (ville principale) de chaque pays couvert — sert à
 // recentrer automatiquement la carte du sélecteur de position quand
 // l'utilisateur change de pays dans le formulaire d'ajout, plutôt que de

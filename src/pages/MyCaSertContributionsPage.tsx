@@ -1,4 +1,4 @@
-// src/pages/MyCaSertContributionsPage.tsx — Ça Parle
+// src/pages/MyCaSertContributionsPage.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { caSertService, type Spot, type MarketPrice } from '@/features/caSert/services/caSertService';

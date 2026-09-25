@@ -1,4 +1,4 @@
-// src/features/caSert/services/moderateCaSertService.ts — Ça Parle
+// src/features/caSert/services/moderateCaSertService.ts — Vanessa
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/auth';
 import type { Spot, MarketPrice } from './caSertService';

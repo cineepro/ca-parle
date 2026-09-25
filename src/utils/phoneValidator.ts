@@ -1,4 +1,4 @@
-// src/utils/phoneValidator.ts — Ça Parle
+// src/utils/phoneValidator.ts — Vanessa
 // Le téléphone est OPTIONNEL partout (voir décision produit). Ce validateur
 // sert uniquement à éviter de stocker n'importe quoi quand l'utilisateur
 // choisit de le renseigner.

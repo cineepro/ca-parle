@@ -1,4 +1,4 @@
-// src/features/comments/components/CommentThread.tsx — Ça Parle
+// src/features/comments/components/CommentThread.tsx — Vanessa
 import { useState } from 'react';
 import { useComments } from '../hooks/useComments';
 import { CommentForm } from './CommentForm';

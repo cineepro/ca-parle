@@ -1,4 +1,4 @@
-// src/features/follow/services/followService.ts — Ça Parle
+// src/features/follow/services/followService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
 import { ID, Query } from 'appwrite';

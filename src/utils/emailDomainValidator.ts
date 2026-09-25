@@ -1,4 +1,4 @@
-// src/utils/emailDomainValidator.ts — Ça Parle
+// src/utils/emailDomainValidator.ts — Vanessa
 // Repris tel quel du principe Kinema+ : on vérifie qu'un domaine email a un
 // enregistrement DNS MX (ou A en repli) avant de créer un compte, pour
 // bloquer les fautes de frappe évidentes (ex: "gmil.co").

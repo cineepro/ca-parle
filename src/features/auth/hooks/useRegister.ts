@@ -1,4 +1,4 @@
-// src/features/auth/hooks/useRegister.ts — Ça Parle
+// src/features/auth/hooks/useRegister.ts — Vanessa
 import { useState } from 'react';
 import { authService } from '../services/authService';
 import { account } from '@/api/appwrite';

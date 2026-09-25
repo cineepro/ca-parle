@@ -1,4 +1,4 @@
-// src/features/auth/hooks/useAuth.ts — Ça Parle
+// src/features/auth/hooks/useAuth.ts — Vanessa
 import { useEffect, useState, useCallback } from 'react';
 import { authService } from '../services/authService';
 import { useAuthStore } from '@/store/authStore';

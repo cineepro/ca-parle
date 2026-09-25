@@ -1,4 +1,4 @@
-// src/config/countries.ts — Ça Parle
+// src/config/countries.ts — Vanessa
 export interface Country {
     slug: string;
     name: string;

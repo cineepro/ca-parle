@@ -1,4 +1,4 @@
-// functions/unsubscribe-newsletter/src/main.js — Ça Parle
+// functions/unsubscribe-newsletter/src/main.js — Vanessa
 // Appel HTTP depuis la page publique /unsubscribe :
 //   functions.createExecution('unsubscribe-newsletter', JSON.stringify({ userId, token }))
 //

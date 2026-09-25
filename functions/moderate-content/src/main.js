@@ -1,4 +1,4 @@
-// functions/moderate-content/src/main.js — Ça Parle
+// functions/moderate-content/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('moderate-content', JSON.stringify({ action, targetId, reportId }))
 //   action ∈ 'hide_story' | 'delete_story' | 'hide_comment' | 'delete_comment' | 'ban_author' | 'reject_report'

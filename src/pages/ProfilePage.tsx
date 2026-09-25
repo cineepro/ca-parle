@@ -1,4 +1,4 @@
-// src/pages/ProfilePage.tsx — Ça Parle
+// src/pages/ProfilePage.tsx — Vanessa
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -44,18 +44,18 @@ export default function ProfilePage() {
 
                 <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
                     <Link to="/tendances" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        ⭐ Tendances
+                        Tendances
                         <span className="text-gray-300">›</span>
                     </Link>
                     <Link to="/espace-partenaire" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        🤝 Espace partenaire
+                        Espace partenaire
                         <span className="text-gray-300">›</span>
                     </Link>
                     <button
                         onClick={() => setShowSuggestExpression(true)}
                         className="w-full flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50 text-left"
                     >
-                        💡 Proposer une expression à Vanessa
+                        Proposer une expression à Vanessa
                         <span className="text-gray-300">›</span>
                     </button>
                     <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">

@@ -1,4 +1,4 @@
-// src/features/newsletter/services/newsletterService.ts — Ça Parle
+// src/features/newsletter/services/newsletterService.ts — Vanessa
 import { callFunction } from '@/api/functionsClient';
 import { FUNCTIONS } from '@/api/constants';
 

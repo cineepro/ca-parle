@@ -1,4 +1,4 @@
-// src/pages/EmailConfirmedPage.tsx — Ça Parle
+// src/pages/EmailConfirmedPage.tsx — Vanessa
 // Appelée quand l'utilisateur clique sur le lien reçu par email :
 // Appwrite redirige vers /email-confirmed?userId=...&secret=...
 import { useEffect, useState } from 'react';

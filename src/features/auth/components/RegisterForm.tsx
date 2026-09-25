@@ -1,4 +1,4 @@
-// src/features/auth/components/RegisterForm.tsx — Ça Parle
+// src/features/auth/components/RegisterForm.tsx — Vanessa
 import { useState } from 'react';
 import { useRegister } from '../hooks/useRegister';
 import { Input } from '@/components/ui/input';
@@ -77,7 +77,7 @@ export const RegisterForm = () => {
                     <Link to="/terms" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
                         conditions d'utilisation
                     </Link>{' '}
-                    de Ça Parle. Je comprends que mon email sera vérifié avant l'activation du compte.
+                    de Vanessa. Je comprends que mon email sera vérifié avant l'activation du compte.
                 </label>
             </div>
 

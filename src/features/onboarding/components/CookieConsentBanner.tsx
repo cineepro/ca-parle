@@ -1,4 +1,4 @@
-// src/features/onboarding/components/CookieConsentBanner.tsx — Ça Parle
+// src/features/onboarding/components/CookieConsentBanner.tsx — Vanessa
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'ca_parle_cookie_consent';
@@ -23,7 +23,7 @@ export const CookieConsentBanner = () => {
         <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 shadow-lg px-4 py-4">
             <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-3">
                 <p className="text-xs text-gray-600 flex-1">
-                    🍪 Ça Parle utilise le stockage local de ton navigateur pour te garder connecté(e) et te souvenir de tes préférences.
+                    Vanessa utilise le stockage local de ton navigateur pour te garder connecté(e) et te souvenir de tes préférences.
                     Pas de cookie publicitaire tiers. Voir notre{' '}
                     <a href="/privacy" className="text-[#FF4757] underline">politique de confidentialité</a>.
                 </p>

@@ -1,4 +1,4 @@
-// functions/send-newsletter/src/main.js — Ça Parle
+// functions/send-newsletter/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('send-newsletter', JSON.stringify({ subject, htmlBody }))
 //
@@ -176,7 +176,7 @@ export default async ({ req, res, log, error }) => {
                     html: `${htmlBody}
                         <hr style="margin-top:32px;border:none;border-top:1px solid #eee;">
                         <p style="font-size:12px;color:#999;">
-                            Tu reçois cet email car tu es inscrit(e) sur Ça Parle.
+                            Tu reçois cet email car tu es inscrit(e) sur Vanessa.
                             <a href="${link}">Se désabonner</a>
                         </p>`,
                     text: `${stripHtml(htmlBody)}\n\nSe désabonner : ${link}`,

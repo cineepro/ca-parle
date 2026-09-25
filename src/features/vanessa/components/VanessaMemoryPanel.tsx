@@ -1,4 +1,4 @@
-// src/features/vanessa/components/VanessaMemoryPanel.tsx — Ça Parle
+// src/features/vanessa/components/VanessaMemoryPanel.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { vanessaMemoryService, type VanessaMemoryEntry } from '../services/vanessaMemoryService';
 import { Button } from '@/components/ui/button';

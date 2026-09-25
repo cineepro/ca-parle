@@ -1,4 +1,4 @@
-// src/features/predictions/hooks/usePredictions.ts — Ça Parle
+// src/features/predictions/hooks/usePredictions.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { predictionService, type Prediction } from '../services/predictionService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

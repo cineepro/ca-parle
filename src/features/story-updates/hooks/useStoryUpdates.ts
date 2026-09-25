@@ -1,4 +1,4 @@
-// src/features/story-updates/hooks/useStoryUpdates.ts — Ça Parle
+// src/features/story-updates/hooks/useStoryUpdates.ts — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { storyUpdateService, type StoryUpdate, type StoryUpdateType } from '../services/storyUpdateService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

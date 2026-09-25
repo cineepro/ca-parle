@@ -1,4 +1,4 @@
-// functions/ingest-connector-pdf/src/main.js — Ça Parle
+// functions/ingest-connector-pdf/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client (modérateur uniquement) :
 //   functions.createExecution('ingest-connector-pdf', JSON.stringify({ connectorId, fileId }))
 //

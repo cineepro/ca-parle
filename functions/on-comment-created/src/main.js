@@ -1,4 +1,4 @@
-// functions/on-comment-created/src/main.js — Ça Parle
+// functions/on-comment-created/src/main.js — Vanessa
 // Déclencheur : databases.*.collections.<COMMENTS>.documents.*.create
 //
 // Fait tout ce que useComments.ts faisait côté client (de façon

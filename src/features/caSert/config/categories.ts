@@ -1,4 +1,4 @@
-// src/features/caSert/config/categories.ts — Ça Parle
+// src/features/caSert/config/categories.ts — Vanessa
 export interface SpotCategory {
     slug: string;
     label: string;

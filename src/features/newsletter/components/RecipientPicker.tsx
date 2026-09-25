@@ -1,4 +1,4 @@
-// src/features/newsletter/components/RecipientPicker.tsx — Ça Parle
+// src/features/newsletter/components/RecipientPicker.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { recipientService, type RecipientUser, type SortOption } from '../services/recipientService';
 

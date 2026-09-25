@@ -1,4 +1,4 @@
-// src/features/reputation/badgeCatalog.ts — Ça Parle
+// src/features/reputation/badgeCatalog.ts — Vanessa
 // ⚠️ Ce fichier n'est plus importé par le code applicatif : la logique
 // d'attribution vit désormais dans les Functions serveur
 // (`on-story-created`, `on-comment-created`, `resolve-prediction`), qui

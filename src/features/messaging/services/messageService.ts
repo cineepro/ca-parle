@@ -1,4 +1,4 @@
-// src/features/messaging/services/messageService.ts — Ça Parle
+// src/features/messaging/services/messageService.ts — Vanessa
 import { databases, client, storage } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { BUCKETS } from '@/api/constants';

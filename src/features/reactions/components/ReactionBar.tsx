@@ -1,4 +1,4 @@
-// src/features/reactions/components/ReactionBar.tsx — Ça Parle
+// src/features/reactions/components/ReactionBar.tsx — Vanessa
 import { useReactions } from '../hooks/useReactions';
 import type { ReactionType } from '../services/reactionService';
 

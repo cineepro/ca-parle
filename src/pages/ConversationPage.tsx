@@ -1,4 +1,4 @@
-// src/pages/ConversationPage.tsx — Ça Parle
+// src/pages/ConversationPage.tsx — Vanessa
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
@@ -153,7 +153,7 @@ export default function ConversationPage() {
                             onClick={() => setWritingPrefill(`Vanessa, aide-moi à rédiger un post pour les réseaux sur : `)}
                             className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1.5"
                         >
-                            ✍️ Demande-lui de rédiger quelque chose
+                            Demande-lui de rédiger quelque chose
                         </button>
                     </div>
                 )}

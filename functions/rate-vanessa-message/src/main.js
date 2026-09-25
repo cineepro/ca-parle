@@ -1,4 +1,4 @@
-// functions/rate-vanessa-message/src/main.js — Ça Parle
+// functions/rate-vanessa-message/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('rate-vanessa-message', JSON.stringify({ messageId, feedback }))
 //   feedback : 'up' | 'down' | '' (chaîne vide pour retirer un avis déjà donné)

@@ -1,4 +1,4 @@
-// src/features/search/services/globalSearchService.ts — Ça Parle
+// src/features/search/services/globalSearchService.ts — Vanessa
 import { storyService, type Story } from '@/features/stories/services/storyService';
 import { referenceService, type Reference } from '@/features/references/services/referenceService';
 import { dbService, type UserProfile } from '@/api/database';

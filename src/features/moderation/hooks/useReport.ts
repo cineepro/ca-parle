@@ -1,4 +1,4 @@
-// src/features/moderation/hooks/useReport.ts — Ça Parle
+// src/features/moderation/hooks/useReport.ts — Vanessa
 import { useState } from 'react';
 import { reportService, type ReportTargetType, type ReportReason } from '../services/reportService';
 import { useAuth } from '@/features/auth/hooks/useAuth';

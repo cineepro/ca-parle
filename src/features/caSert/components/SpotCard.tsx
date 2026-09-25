@@ -1,4 +1,4 @@
-// src/features/caSert/components/SpotCard.tsx — Ça Parle
+// src/features/caSert/components/SpotCard.tsx — Vanessa
 import { useState } from 'react';
 import { caSertService, getSpotImageUrl, type Spot } from '../services/caSertService';
 import { SPOT_CATEGORIES } from '../config/categories';

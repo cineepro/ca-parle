@@ -1,4 +1,4 @@
-// functions/resolve-prediction/src/main.js — Ça Parle
+// functions/resolve-prediction/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   functions.createExecution('resolve-prediction', JSON.stringify({ predictionId, correctOptionIndex }))
 //

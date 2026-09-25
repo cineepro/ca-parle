@@ -1,4 +1,4 @@
-// src/features/messaging/services/conversationService.ts — Ça Parle
+// src/features/messaging/services/conversationService.ts — Vanessa
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { Query } from 'appwrite';

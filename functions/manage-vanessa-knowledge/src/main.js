@@ -1,4 +1,4 @@
-// functions/manage-vanessa-knowledge/src/main.js — Ça Parle
+// functions/manage-vanessa-knowledge/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   Notes   : { action: 'list'|'create'|'update'|'delete', id?, category?, content?, active?, connectorId? }
 //   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, sourceUrl?, partnerUserId?, active? }
