@@ -4,6 +4,8 @@ import { useRegister } from '../hooks/useRegister';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { authService } from '@/features/auth/services/authService';
+import { GoogleIcon } from './GoogleIcon';
 
 export const RegisterForm = () => {
     const { register, loading, error } = useRegister();
@@ -12,6 +14,7 @@ export const RegisterForm = () => {
     const [password, setPassword] = useState('');
     const [phone, setPhone] = useState('');
     const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -19,97 +22,123 @@ export const RegisterForm = () => {
         register(name, email, password, phone || undefined);
     };
 
-    return (
-        <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-                label="Nom complet"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jean Dupont"
-                required
-            />
-            <Input
-                label="Adresse email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ton@email.com"
-                required
-            />
-            <div>
-                <Input
-                    label="Numéro de téléphone (optionnel)"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+229 XX XX XX XX"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                    Pas obligatoire, mais utile pour sécuriser ton compte.
-                </p>
-            </div>
-            <Input
-                label="Mot de passe"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 8 caractères"
-                required
-                minLength={8}
-            />
+    const handleGoogle = () => {
+        setGoogleLoading(true);
+        authService.loginWithGoogle();
+    };
 
-            <div className="flex items-start gap-3 bg-gray-50 rounded-2xl p-4">
-                <input
-                    type="checkbox"
-                    id="accept-privacy"
-                    checked={acceptedPrivacy}
-                    onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-[#FF4757] cursor-pointer shrink-0"
+    return (
+        <div className="space-y-5">
+            <button
+                type="button"
+                onClick={handleGoogle}
+                disabled={googleLoading}
+                className="w-full flex items-center justify-center gap-3 border border-gray-200 rounded-2xl py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60"
+            >
+                <GoogleIcon />
+                {googleLoading ? 'Redirection...' : "S'inscrire avec Google"}
+            </button>
+            <p className="text-xs text-gray-400 text-center -mt-2">
+                Aucun email de confirmation à surveiller — Google s'en charge.
+            </p>
+
+            <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-gray-100" />
+                <span className="text-xs text-gray-400">ou avec ton email</span>
+                <div className="flex-1 h-px bg-gray-100" />
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <Input
+                    label="Nom complet"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Jean Dupont"
                     required
                 />
-                <label htmlFor="accept-privacy" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
-                    J'ai lu et j'accepte la{' '}
-                    <Link to="/privacy" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
-                        politique de confidentialité
-                    </Link>{' '}
-                    et les{' '}
-                    <Link to="/terms" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
-                        conditions d'utilisation
-                    </Link>{' '}
-                    de Vanessa. Je comprends que mon email sera vérifié avant l'activation du compte.
-                </label>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
-                    ❌ {error}
+                <Input
+                    label="Adresse email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ton@email.com"
+                    required
+                />
+                <div>
+                    <Input
+                        label="Numéro de téléphone (optionnel)"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+229 XX XX XX XX"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                        Pas obligatoire, mais utile pour sécuriser ton compte.
+                    </p>
                 </div>
-            )}
+                <Input
+                    label="Mot de passe"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Minimum 8 caractères"
+                    required
+                    minLength={8}
+                />
 
-            <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                className="w-full"
-                isLoading={loading}
-                disabled={!acceptedPrivacy || loading}
-            >
-                Créer mon compte
-            </Button>
+                <div className="flex items-start gap-3 bg-gray-50 rounded-2xl p-4">
+                    <input
+                        type="checkbox"
+                        id="accept-privacy"
+                        checked={acceptedPrivacy}
+                        onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-[#FF4757] cursor-pointer shrink-0"
+                        required
+                    />
+                    <label htmlFor="accept-privacy" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
+                        J'ai lu et j'accepte la{' '}
+                        <Link to="/privacy" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
+                            politique de confidentialité
+                        </Link>{' '}
+                        et les{' '}
+                        <Link to="/terms" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
+                            conditions d'utilisation
+                        </Link>{' '}
+                        de Vanessa. Je comprends que mon email sera vérifié avant l'activation du compte.
+                    </label>
+                </div>
 
-            {!acceptedPrivacy && (
-                <p className="text-xs text-gray-400 text-center">
-                    Accepte la politique de confidentialité pour continuer
-                </p>
-            )}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
+                        ❌ {error}
+                    </div>
+                )}
 
-            <div className="text-center text-sm">
-                Déjà un compte ?{' '}
-                <Link to="/login" className="text-[#FF4757] font-semibold hover:underline">
-                    Se connecter
-                </Link>
-            </div>
-        </form>
+                <Button
+                    type="submit"
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    isLoading={loading}
+                    disabled={!acceptedPrivacy || loading}
+                >
+                    Créer mon compte
+                </Button>
+
+                {!acceptedPrivacy && (
+                    <p className="text-xs text-gray-400 text-center">
+                        Accepte la politique de confidentialité pour continuer
+                    </p>
+                )}
+
+                <div className="text-center text-sm">
+                    Déjà un compte ?{' '}
+                    <Link to="/login" className="text-[#FF4757] font-semibold hover:underline">
+                        Se connecter
+                    </Link>
+                </div>
+            </form>
+        </div>
     );
 };

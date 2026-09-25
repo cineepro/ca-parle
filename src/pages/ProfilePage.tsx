@@ -1,5 +1,4 @@
 // src/pages/ProfilePage.tsx — Vanessa
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useReputation } from '@/features/reputation/hooks/useReputation';
@@ -7,13 +6,10 @@ import { ReputationCard } from '@/features/reputation/components/ReputationCard'
 import { BadgeGrid } from '@/features/reputation/components/BadgeGrid';
 import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBanner';
 import { InviteButton } from '@/features/stories/components/InviteButton';
-import { VanessaMemoryPanel } from '@/features/vanessa/components/VanessaMemoryPanel';
-import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 
 export default function ProfilePage() {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const { stats, catalog, earnedKeys, loading } = useReputation(user?.$id);
-    const [showSuggestExpression, setShowSuggestExpression] = useState(false);
 
     if (loading || !stats) {
         return (
@@ -39,52 +35,7 @@ export default function ProfilePage() {
 
                 <ReputationCard stats={stats} name={user?.name} />
                 <BadgeGrid catalog={catalog} earnedKeys={earnedKeys} />
-
-                <VanessaMemoryPanel />
-
-                <div className="bg-white rounded-3xl divide-y divide-gray-50 overflow-hidden">
-                    <Link to="/tendances" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        Tendances
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <Link to="/espace-partenaire" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        Espace partenaire
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <button
-                        onClick={() => setShowSuggestExpression(true)}
-                        className="w-full flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50 text-left"
-                    >
-                        Proposer une expression à Vanessa
-                        <span className="text-gray-300">›</span>
-                    </button>
-                    <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        🔎 Mes références suivies
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <Link to="/documentation" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        📖 Comment ça marche
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <Link to="/privacy" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        🔒 Politique de confidentialité
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <Link to="/terms" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
-                        📄 Conditions d'utilisation
-                        <span className="text-gray-300">›</span>
-                    </Link>
-                    <button
-                        onClick={logout}
-                        className="w-full flex items-center justify-between px-5 py-4 text-sm text-red-500 hover:bg-red-50 text-left"
-                    >
-                        🚪 Déconnexion
-                        <span className="text-red-200">›</span>
-                    </button>
-                </div>
             </div>
-
-            {showSuggestExpression && <SuggestExpressionModal onClose={() => setShowSuggestExpression(false)} />}
         </div>
     );
 }

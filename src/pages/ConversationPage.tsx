@@ -6,7 +6,6 @@ import { MessageBubble } from '@/features/messaging/components/MessageBubble';
 import { MessageComposer } from '@/features/messaging/components/MessageComposer';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Avatar } from '@/components/ui/avatar';
-import { ConnectorChips } from '@/features/vanessa/components/ConnectorChips';
 import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
 
 export default function ConversationPage() {
@@ -120,7 +119,7 @@ export default function ConversationPage() {
 
     return (
         <div className="max-w-2xl mx-auto flex flex-col relative" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
-            <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
+            <div className="bg-white border-b border-gray-100 sticky top-14 md:top-0 z-10">
                 <div className="flex items-center gap-3 px-4 py-3">
                     <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
                     <Avatar name={otherName} userId={otherId} sizeClass="w-9 h-9" />
@@ -133,15 +132,6 @@ export default function ConversationPage() {
                         )}
                     </div>
                 </div>
-
-                {isVanessaConversation && connectors.length > 0 && (
-                    <ConnectorChips
-                        conversationId={id!}
-                        connectors={connectors}
-                        activeConnectorId={activeConnectorId}
-                        onChanged={setActiveConnectorId}
-                    />
-                )}
 
                 {/* Suggestion discrète, seulement en tout début de
                     conversation — la capacité de rédaction existe déjà

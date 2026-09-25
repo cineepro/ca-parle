@@ -27,7 +27,7 @@ export default function ModerationPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* En-tête fixe */}
-            <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
+            <div className="bg-white border-b border-gray-100 sticky top-14 md:top-0 z-10">
                 <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
                     <Link to="/accueil" className="text-gray-400 hover:text-gray-600">←</Link>
                     <h1 className="text-lg font-bold text-gray-800">Espace de modération</h1>

@@ -12,6 +12,7 @@ import VanessaHomePage from '@/pages/VanessaHomePage';
 import CreateStoryPage from '@/pages/CreateStoryPage';
 import StoryDetailPage from '@/pages/StoryDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
+import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
@@ -85,6 +86,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <ProfilePage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/memoire"
+                    element={
+                        <ProtectedRoute>
+                            <MemoryPage />
                         </ProtectedRoute>
                     }
                 />

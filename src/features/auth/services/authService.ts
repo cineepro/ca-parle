@@ -33,8 +33,31 @@ export const authService = {
                 name: (dbProfile as any).name || authUser.name,
             } as UserProfile;
         } catch {
-            // Le document DB n'existe pas encore (edge case) → objet Auth seul
-            return authUser;
+            // Le document DB n'existe pas encore. Cas normal côté mot de
+            // passe (edge case rare) — mais SYSTÉMATIQUE pour un compte
+            // Google, qui ne passe jamais par /email-confirmed (seul
+            // endroit qui créait le profil jusqu'ici). On le crée ici à
+            // la volée, une seule fois, pour ne jamais laisser un compte
+            // authentifié sans profil applicatif.
+            try {
+                await dbService.createUserProfile({
+                    userId: authUser.$id,
+                    name: authUser.name || '',
+                    email: authUser.email,
+                    createdAt: new Date().toISOString(),
+                });
+                const dbProfile = await dbService.getUserProfile(authUser.$id);
+                return {
+                    ...authUser,
+                    ...dbProfile,
+                    $id: authUser.$id,
+                    email: authUser.email,
+                    name: (dbProfile as any).name || authUser.name,
+                } as UserProfile;
+            } catch (err) {
+                console.error('[authService] Création du profil de secours échouée :', err);
+                return authUser;
+            }
         }
     },
 

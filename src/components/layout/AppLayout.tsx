@@ -1,8 +1,7 @@
 // src/components/layout/AppLayout.tsx — Vanessa
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TopNav } from './TopNav';
-import { BottomNav } from './BottomNav';
+import { Sidebar } from './Sidebar';
 import { CookieConsentBanner } from '@/features/onboarding/components/CookieConsentBanner';
 import { CommunityRulesModal } from '@/features/onboarding/components/CommunityRulesModal';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -35,11 +34,11 @@ export const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <TopNav />
-            {/* pb-24 sur mobile pour laisser la place à BottomNav (fixed) ;
-                pas de padding supplémentaire sur desktop où elle est cachée. */}
-            <main className="pb-24 md:pb-6">{children}</main>
-            <BottomNav />
+            <Sidebar />
+            {/* md:ml-72 pour laisser la place au panneau fixe sur desktop —
+                sur mobile, le panneau est replié hors-écran, pas besoin de
+                marge. */}
+            <main className="md:ml-72">{children}</main>
             <CommunityRulesModal />
             <CookieConsentBanner />
         </div>
