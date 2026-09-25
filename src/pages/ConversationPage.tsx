@@ -22,11 +22,11 @@ export default function ConversationPage() {
     const lastMessageIdRef = useRef<string | null>(null);
     const prevScrollHeightRef = useRef<number>(0);
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-
     // Connecteurs de partenaires — chargés une seule fois, réutilisés à la
     // fois pour les pastilles du composeur et le badge d'en-tête.
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [activeConnectorId, setActiveConnectorId] = useState('');
+    const [writingPrefill, setWritingPrefill] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         if (!isVanessaConversation) return;
@@ -142,6 +142,21 @@ export default function ConversationPage() {
                         onChanged={setActiveConnectorId}
                     />
                 )}
+
+                {/* Suggestion discrète, seulement en tout début de
+                    conversation — la capacité de rédaction existe déjà
+                    (sa personnalité s'applique à toute demande), le seul
+                    vrai manque était que personne n'y pensait. */}
+                {isVanessaConversation && messages.length <= 2 && (
+                    <div className="px-4 pb-2">
+                        <button
+                            onClick={() => setWritingPrefill(`Vanessa, aide-moi à rédiger un post pour les réseaux sur : `)}
+                            className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1.5"
+                        >
+                            ✍️ Demande-lui de rédiger quelque chose
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div
@@ -214,6 +229,7 @@ export default function ConversationPage() {
                     onSendVoice={sendVoiceMessage}
                     onSendImage={sendImageMessage}
                     sending={sending}
+                    prefill={writingPrefill}
                 />
             </div>
         </div>

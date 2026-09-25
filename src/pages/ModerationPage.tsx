@@ -7,8 +7,9 @@ import { NewsletterComposer } from '@/features/newsletter/components/NewsletterC
 import { VanessaKnowledgeManager } from '@/features/vanessa/components/VanessaKnowledgeManager';
 import { VanessaConnectorManager } from '@/features/vanessa/components/VanessaConnectorManager';
 import { CaSertModerationQueue } from '@/features/caSert/components/CaSertModerationQueue';
+import { VanessaFeedbackReview } from '@/features/vanessa/components/VanessaFeedbackReview';
 
-type Tab = 'signalements' | 'ca-sert' | 'newsletter' | 'connecteurs' | 'connaissances';
+type Tab = 'signalements' | 'ca-sert' | 'newsletter' | 'connecteurs' | 'connaissances' | 'avis';
 
 export default function ModerationPage() {
     const { items, loading, refresh } = useModerationQueue();
@@ -17,6 +18,7 @@ export default function ModerationPage() {
     const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = [
         { id: 'signalements', icon: '🛡️', label: 'Signalements', badge: items.length },
         { id: 'ca-sert', icon: '🧰', label: 'Ça sert' },
+        { id: 'avis', icon: '👍👎', label: 'Avis sur Vanessa' },
         { id: 'newsletter', icon: '📧', label: 'Newsletter' },
         { id: 'connecteurs', icon: '🔗', label: 'Connecteurs' },
         { id: 'connaissances', icon: '🔮', label: 'Connaissances' },
@@ -74,6 +76,7 @@ export default function ModerationPage() {
                 )}
 
                 {tab === 'ca-sert' && <CaSertModerationQueue />}
+                {tab === 'avis' && <VanessaFeedbackReview />}
                 {tab === 'newsletter' && <NewsletterComposer />}
                 {tab === 'connecteurs' && <VanessaConnectorManager />}
                 {tab === 'connaissances' && <VanessaKnowledgeManager />}

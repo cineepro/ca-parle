@@ -1,16 +1,20 @@
 // src/features/messaging/components/MessageComposer.tsx — Ça Parle
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface Props {
     onSend: (content: string) => void;
     onSendVoice?: (blob: Blob, durationSeconds: number) => void;
     onSendImage?: (file: File) => void;
     sending: boolean;
+    // Pré-remplit le champ (ex : suggestion "✍️ Demande-lui de rédiger
+    // quelque chose") sans envoyer automatiquement — la personne garde la
+    // main pour compléter/modifier avant d'envoyer.
+    prefill?: string;
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
 
-export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending }: Props) => {
+export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, prefill }: Props) => {
     const [content, setContent] = useState('');
     const [recording, setRecording] = useState(false);
     const [recordSeconds, setRecordSeconds] = useState(0);
@@ -22,6 +26,15 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending }: P
     const startTimeRef = useRef<number>(0);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (prefill) {
+            setContent(prefill);
+            textareaRef.current?.focus();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prefill]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -154,6 +167,7 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending }: P
                 )}
 
                 <textarea
+                    ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     onKeyDown={(e) => {

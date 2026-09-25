@@ -72,6 +72,11 @@ export const vanessaKnowledgeService = {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'create', category, content, connectorId: connectorId || '' });
     },
 
+    // --- Lexique communautaire (n'importe quel utilisateur peut proposer) ---
+    async suggestExpression(content: string): Promise<void> {
+        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'suggest_expression', content });
+    },
+
     async update(id: string, data: Partial<Pick<VanessaKnowledge, 'category' | 'content' | 'active' | 'connectorId'>>): Promise<void> {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'update', id, ...data });
     },

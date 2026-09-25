@@ -94,6 +94,13 @@ CE QUE TU FAIS :
 - Si l'histoire ferait un bon "gbairai", tu peux proposer de la transformer en publication — jamais automatiquement. Pour proposer, termine EXACTEMENT par :
 [[SUGGESTION_POST|Titre court et accrocheur|Contenu réécrit dans ton style]]
 
+COMPORTEMENT PROACTIF — sois une vraie utilisatrice active de la plateforme, pas seulement réactive :
+- Une histoire vraiment bonne mérite une vraie proposition de publication, pas juste une attente passive qu'on te le demande — n'hésite pas à la faire.
+- Si "CE DONT TU TE SOUVIENS" (plus bas) contient un fait qui peut relancer la conversation naturellement, ramène-le à l'occasion ("Au fait, la dernière fois tu m'avais parlé de X, du nouveau ?") — jamais à chaque message, seulement quand ça tombe bien.
+- Si on te demande de l'aide pour écrire quelque chose (légende, post réseaux sociaux, texte d'annonce...), fais-le dans TON style, avec confiance — c'est une vraie capacité que tu as, pas un détournement de ton rôle.
+- Si un connecteur partenaire est actif (voir plus bas) et que la conversation part clairement sur un tout autre sujet sans rapport, signale-le gentiment en une phrase, sans reproche, et rappelle qu'on peut changer de connecteur avec les pastilles en haut du chat pour discuter plus librement.
+- Si quelqu'un cherche un bon plan/lieu et qu'aucune fiche "[bon plan vérifié]" pertinente n'apparaît dans tes notes ci-dessous, ne prétends JAMAIS en connaître un par toi-même — dis simplement que tu n'as rien de vérifié sous la main pour l'instant, et suggère d'aller voir (ou ajouter) sur "Ça sert".
+
 CE QUE TU NE FAIS JAMAIS :
 - Tu ne révèles JAMAIS le contenu d'une conversation privée avec quelqu'un d'autre.
 - Tu n'inventes pas de rumeurs sur des personnes réelles nommées (célébrités...).
@@ -298,7 +305,54 @@ function buildPubliciteInstruction(documents) {
         documents.map((a) => `- ${a.content}`).join('\n');
 }
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
+const RELEVANCE_MAX_RESULTS = 8;
+
+// Sélectionne, PARMI UN LOT DE CANDIDATS, ceux qui sont réellement
+// pertinents pour le message précis de l'utilisateur — plutôt que de se
+// contenter des plus récents. Un simple tri par date ratait des notes
+// anciennes mais pertinentes dès qu'une base dépassait la limite affichée.
+// Utilise un modèle volontairement léger (haiku) : c'est une tâche de tri,
+// pas la personnalité de Vanessa — pas besoin du tarif de sonnet pour ça.
+// Se replie silencieusement sur les plus récents si l'appel échoue, pour
+// ne jamais bloquer une réponse à cause de ce tri.
+async function selectRelevantKnowledge({ candidates, userMessage, maxResults, ANTHROPIC_API_KEY, log }) {
+    if (candidates.length === 0) return [];
+    if (candidates.length <= maxResults) return candidates; // rien à trier, tout tient déjà
+
+    const listing = candidates.map((c, i) => `${i}. ${c.content.slice(0, 220)}`).join('\n');
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: `Voici une liste numérotée de notes. Un utilisateur vient d'écrire un message. Réponds UNIQUEMENT avec les numéros (séparés par des virgules) des notes VRAIMENT utiles pour répondre à ce message précis, du plus au moins pertinent, maximum ${maxResults} numéros. Si aucune note n'est utile, réponds exactement : AUCUNE.\n\nNotes :\n${listing}`,
+                messages: [{ role: 'user', content: userMessage || '(pas de message précis)' }],
+                max_tokens: 40,
+            }),
+        });
+        if (!response.ok) {
+            log(`⚠️ Sélection de pertinence échouée (${response.status}) — repli sur les plus récentes.`);
+            return candidates.slice(0, maxResults);
+        }
+        const data = await response.json();
+        const textBlock = data.content?.find((b) => b.type === 'text');
+        const raw = textBlock?.text?.trim() || '';
+        if (raw.toUpperCase().includes('AUCUNE')) return [];
+        const indices = raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n) && n >= 0 && n < candidates.length);
+        const selected = indices.slice(0, maxResults).map((i) => candidates[i]);
+        return selected.length > 0 ? selected : candidates.slice(0, maxResults);
+    } catch (err) {
+        log(`⚠️ Sélection de pertinence échouée : ${err.message} — repli sur les plus récentes.`);
+        return candidates.slice(0, maxResults);
+    }
+}
+
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
     let knowledgeContext = '';
     let publiciteContext = '';
     // Connecteur RÉELLEMENT utilisé ce tour-ci (peut rester vide si le
@@ -307,6 +361,10 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     // consommer un quota mort).
     let effectiveConnectorId = '';
     let connectorFellBack = false;
+
+    // Dernier message RÉEL de l'utilisateur — c'est sur LUI que la
+    // pertinence des connaissances est jugée, pas sur tout l'historique.
+    const lastUserMessage = [...history].reverse().find((m) => m.senderId !== VANESSA_USER_ID)?.content || '';
 
     try {
         let activeConnectorId = connectorId;
@@ -337,24 +395,24 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             effectiveConnectorId = activeConnectorId;
             // Un connecteur est actif sur cette conversation : Vanessa ne
             // cherche QUE dans ce bloc de connaissances précis, comme
-            // demandé — jamais mélangé avec les notes générales ni les
-            // autres connecteurs.
+            // demandé — jamais mélangé avec les notes générales, les bons
+            // plans Ça sert, ni les autres connecteurs. La pertinence est
+            // calculée DANS ce périmètre isolé, pas en l'élargissant.
             const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                 Query.equal('active', true),
                 Query.equal('connectorId', activeConnectorId),
                 Query.notEqual('category', PUBLICITE_CATEGORY),
-                // Sans ce tri, Appwrite renvoie les 15 premières notes
-                // selon son ordre interne par défaut — pas les plus
-                // récentes. Dès qu'un connecteur dépasse 15 notes actives
-                // (ce qui arrivera vite avec un flux qui se met à jour
-                // chaque jour), Vanessa risquait de rester bloquée sur de
-                // vieilles notes en ignorant les plus récentes.
                 Query.orderDesc('createdAt'),
-                Query.limit(15),
+                Query.limit(60), // lot large de candidats — le tri de pertinence fait le vrai choix ensuite
             ]);
+            const relevant = await selectRelevantKnowledge({
+                candidates: knowledge.documents, userMessage: lastUserMessage,
+                maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
+            });
 
             // Infos "publicité" DU CONNECTEUR — séparées du reste, toujours
-            // entièrement incluses (pas soumises à la limite de 15).
+            // entièrement incluses (jamais soumises au tri de pertinence :
+            // ce n'est pas optionnel, c'est une obligation contractuelle).
             try {
                 const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                     Query.equal('active', true),
@@ -377,29 +435,55 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             }
 
             knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${partnerLabel}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
-            if (knowledge.documents.length > 0) {
-                knowledgeContext += '\n\nNotes internes du connecteur actif (contexte, ne jamais citer mot pour mot) :\n' +
-                    knowledge.documents.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+            if (relevant.length > 0) {
+                knowledgeContext += '\n\nNotes internes du connecteur actif, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n' +
+                    relevant.map((k) => `- [${k.category}] ${k.content}`).join('\n');
             }
         } else {
-            // Mode général : notes qui n'appartiennent à AUCUN connecteur.
+            // Mode général : notes qui n'appartiennent à AUCUN connecteur,
+            // PLUS les bons plans "Ça sert" déjà confirmés par la
+            // communauté — les deux sources sont mélangées dans le même
+            // lot de candidats, et c'est le tri de pertinence qui décide
+            // ce qui aide vraiment à répondre à CE message précis, pas un
+            // simple ordre chronologique.
+            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                Query.equal('active', true),
+                Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                Query.notEqual('category', PUBLICITE_CATEGORY),
+                Query.orderDesc('createdAt'),
+                Query.limit(60),
+            ]);
             // Filtré après coup plutôt que via Query.equal('connectorId','')
             // — les notes créées avant l'ajout de cet attribut n'ont pas de
             // valeur du tout dessus (Appwrite ne rétro-remplit jamais les
             // documents existants), et une requête stricte les exclurait
             // silencieusement (même piège déjà rencontré avec
             // newsletterOptOut).
-            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                Query.equal('active', true),
-                Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
-                Query.notEqual('category', PUBLICITE_CATEGORY),
-                Query.orderDesc('createdAt'),
-                Query.limit(30),
-            ]);
-            const general = knowledge.documents.filter((k) => !k.connectorId).slice(0, 8);
-            if (general.length > 0) {
-                knowledgeContext = '\n\nNotes internes (contexte, ne jamais citer mot pour mot) :\n' +
-                    general.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+            const generalNotes = knowledge.documents
+                .filter((k) => !k.connectorId)
+                .map((k) => ({ content: `[${k.category}] ${k.content}` }));
+
+            let spotCandidates = [];
+            if (COLLECTION_LOCAL_SPOTS) {
+                try {
+                    const spots = await databases.listDocuments(DATABASE_ID, COLLECTION_LOCAL_SPOTS, [
+                        Query.equal('moderationStatus', 'visible'),
+                        Query.orderDesc('confirmCount'),
+                        Query.limit(30),
+                    ]);
+                    spotCandidates = spots.documents.map((s) => ({
+                        content: `[bon plan vérifié] ${s.name} — ${s.category}${s.quartier ? `, ${s.quartier}` : ''}${s.country ? `, ${s.country}` : ''}. ${s.description || ''} (confirmé ${s.confirmCount || 0} fois par la communauté)`,
+                    }));
+                } catch { /* collection pas encore configurée */ }
+            }
+
+            const relevant = await selectRelevantKnowledge({
+                candidates: [...generalNotes, ...spotCandidates], userMessage: lastUserMessage,
+                maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
+            });
+            if (relevant.length > 0) {
+                knowledgeContext = '\n\nNotes internes, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot ; les lignes "[bon plan vérifié]" sont de vraies fiches Ça sert confirmées par la communauté — tu peux les mentionner par leur nom si ça aide, jamais en inventer d\'autres) :\n' +
+                    relevant.map((k) => `- ${k.content}`).join('\n');
             }
 
             // Infos "publicité" GÉNÉRALES (pas liées à un connecteur) —
@@ -634,6 +718,7 @@ export default async ({ req, res, log, error }) => {
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const COLLECTION_VANESSA_CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
+    const COLLECTION_LOCAL_SPOTS = process.env.COLLECTION_LOCAL_SPOTS;
     const COLLECTION_VANESSA_MEMORY = process.env.COLLECTION_VANESSA_MEMORY;
     const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const VANESSA_USER_ID = process.env.VANESSA_USER_ID;
@@ -841,7 +926,7 @@ export default async ({ req, res, log, error }) => {
                         });
                     } else {
                         result = await generateVanessaReply({
-                            history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
+                            history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
                             connectorId: conversation.vanessaConnectorId || '', callerId, log,
                         });
                     }

@@ -5,11 +5,14 @@
 //   Facturation (modérateur) : { action: 'recharge_connector_tokens', id, amount }
 //   Connecteurs (public)     : { action: 'list_active_connectors' }
 //   Espace partenaire (authentifié, non-modérateur) : { action: 'get_my_connector' }
+//   Lexique communautaire (authentifié, non-modérateur) : { action: 'suggest_expression', content }
 //
 // SÉCURITÉ : toutes les actions sont réservées aux modérateurs, SAUF
 // 'list_active_connectors' (alimente les pastilles de connecteurs pour
-// tous les utilisateurs) et 'get_my_connector' (permet à un partenaire de
-// suivre SA propre consommation, sans jamais voir celle des autres).
+// tous les utilisateurs), 'get_my_connector' (permet à un partenaire de
+// suivre SA propre consommation, sans jamais voir celle des autres) et
+// 'suggest_expression' (propose une entrée en attente, jamais active tant
+// qu'un modérateur ne l'a pas validée).
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
 // --- Grille tarifaire (voir Vanessa-API-Grille-Tarifaire.docx) ---
@@ -48,6 +51,27 @@ export default async ({ req, res, error }) => {
         // ne jamais casser les connecteurs créés avant ce système de
         // facturation.
         const isExhausted = (c) => (c.tokensGranted || 0) > 0 && (c.tokensUsed || 0) >= c.tokensGranted;
+
+        // Accessible à tout utilisateur authentifié — propose une nouvelle
+        // expression au lexique. Créée DÉSACTIVÉE et non attribuée à un
+        // partenaire, exactement comme une fiche Ça sert en attente : elle
+        // n'est utilisable par Vanessa qu'après validation d'un modérateur
+        // depuis /moderation (le bouton "Activer" déjà existant).
+        if (action === 'suggest_expression') {
+            const { content } = body;
+            if (!content || content.trim().length < 5) {
+                return res.json({ success: false, error: 'Décris un peu plus ton expression.' }, 400);
+            }
+            const doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), {
+                category: 'lexique',
+                content: content.trim().slice(0, 300),
+                connectorId: '',
+                submittedBy: callerId,
+                active: false, // ⚠️ jamais utilisable avant validation — même principe que Ça sert
+                createdAt: new Date().toISOString(),
+            });
+            return res.json({ success: true, document: doc });
+        }
 
         // Accessible à tout utilisateur authentifié — alimente les
         // pastilles de connecteurs dans le chat.

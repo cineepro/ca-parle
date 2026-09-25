@@ -1,4 +1,5 @@
 // src/pages/ProfilePage.tsx — Ça Parle
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useReputation } from '@/features/reputation/hooks/useReputation';
@@ -7,10 +8,12 @@ import { BadgeGrid } from '@/features/reputation/components/BadgeGrid';
 import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBanner';
 import { InviteButton } from '@/features/stories/components/InviteButton';
 import { VanessaMemoryPanel } from '@/features/vanessa/components/VanessaMemoryPanel';
+import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 
 export default function ProfilePage() {
     const { user, logout } = useAuth();
     const { stats, catalog, earnedKeys, loading } = useReputation(user?.$id);
+    const [showSuggestExpression, setShowSuggestExpression] = useState(false);
 
     if (loading || !stats) {
         return (
@@ -48,6 +51,13 @@ export default function ProfilePage() {
                         🤝 Espace partenaire
                         <span className="text-gray-300">›</span>
                     </Link>
+                    <button
+                        onClick={() => setShowSuggestExpression(true)}
+                        className="w-full flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50 text-left"
+                    >
+                        💡 Proposer une expression à Vanessa
+                        <span className="text-gray-300">›</span>
+                    </button>
                     <Link to="/mes-references" className="flex items-center justify-between px-5 py-4 text-sm text-gray-600 hover:bg-gray-50">
                         🔎 Mes références suivies
                         <span className="text-gray-300">›</span>
@@ -73,6 +83,8 @@ export default function ProfilePage() {
                     </button>
                 </div>
             </div>
+
+            {showSuggestExpression && <SuggestExpressionModal onClose={() => setShowSuggestExpression(false)} />}
         </div>
     );
 }
