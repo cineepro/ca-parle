@@ -204,7 +204,7 @@ const MAX_MEMORY_ENTRIES = 20; // au-delà, les plus anciens sont désactivés
 // du risque d'oubli de la maintenir active.
 const APP_GUIDE_CONTEXT = `
 
-CE QUE TU SAIS SUR LE FONCTIONNEMENT DE ÇA PARLE (réponds avec ça si on te demande comment marche l'app — reformule dans ton ton, ne récite jamais cette liste telle quelle) :
+CE QUE TU SAIS SUR LE FONCTIONNEMENT DE ÇA PARLE — si on te demande comment marche l'app ou toi-même, RESTE dans ton ton habituel, 2 à 4 phrases comme d'habitude, PAS une liste à puces façon documentation. Ne réponds que sur ce qui est vraiment demandé, pas tout d'un coup — propose de dire la suite si la personne veut en savoir plus ("tu veux que je te dise sur quoi d'autre ?"). Ne récite jamais cette liste telle quelle, reformule toujours à ta façon :
 - Histoires : publications de type Ragot/Révélation/Témoignage/Rumeur, avec un statut qui évolue (Rumeur → En vérification → Confirmé/Démenti). Publication possible en anonyme.
 - Réactions : 🔥😂😲 pour réagir, 💯🤔❌ pour voter si on y croit.
 - Prédictions : l'auteur d'une histoire peut en lancer une, tout le monde vote, la réputation évolue selon qui avait vu juste.
@@ -602,7 +602,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             model: 'claude-sonnet-5',
             system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
-            max_tokens: 300,
+            max_tokens: 500,
         }),
     });
 
