@@ -7,6 +7,7 @@ import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import EmailConfirmedPage from '@/pages/EmailConfirmedPage';
+import OAuthCallbackPage from '@/pages/OAuthCallbackPage';
 import HomePage from '@/pages/HomePage';
 import VanessaHomePage from '@/pages/VanessaHomePage';
 import CreateStoryPage from '@/pages/CreateStoryPage';
@@ -43,6 +44,7 @@ export const AppRouter = () => {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
+                <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/documentation" element={<DocumentationPage />} />

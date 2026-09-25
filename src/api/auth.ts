@@ -54,12 +54,24 @@ export const authService = {
         return await account.createEmailPasswordSession(email, password);
     },
 
+    // createOAuth2Session dépendait d'un cookie posé sur le domaine
+    // d'Appwrite (fra.cloud.appwrite.io), différent de kinemaplus.com —
+    // les navigateurs qui bloquent les cookies tiers (Firefox par défaut,
+    // Safari) empêchent alors la session de survivre à la redirection : le
+    // compte Google se crée bien côté Appwrite, mais sans session valide
+    // côté app. createOAuth2Token évite complètement ce problème : au
+    // retour, l'app reçoit un identifiant + secret dans l'URL et crée
+    // elle-même la session sur SON propre domaine (voir OAuthCallbackPage).
     async loginWithGoogle() {
-        return await account.createOAuth2Session(
+        return await account.createOAuth2Token(
             OAuthProvider.Google,
-            `${window.location.origin}/accueil`,
+            `${window.location.origin}/oauth-callback`,
             `${window.location.origin}/login`
         );
+    },
+
+    async completeOAuthSession(userId: string, secret: string) {
+        return await account.createSession(userId, secret);
     },
 
     async logout() {
