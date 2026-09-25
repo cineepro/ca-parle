@@ -46,6 +46,7 @@ export const Sidebar = () => {
     const { unreadCount } = useNotifications();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
+    const [activeConnectorId, setActiveConnectorId] = useState('');
     const [switchingConnector, setSwitchingConnector] = useState<string | null>(null);
     const [showSuggestExpression, setShowSuggestExpression] = useState(false);
 
@@ -53,19 +54,37 @@ export const Sidebar = () => {
         vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
     }, []);
 
+    // Sait quel connecteur est actif sur la conversation avec Vanessa, pour
+    // pouvoir le surligner ET pour que re-cliquer dessus le désactive au
+    // lieu de le réactiver sans effet visible (c'était le bug).
+    useEffect(() => {
+        if (!user?.$id || !VANESSA_USER_ID) return;
+        conversationService.findOrCreateDirect(user.$id, VANESSA_USER_ID)
+            .then((conversation) => setActiveConnectorId(conversation.vanessaConnectorId || ''))
+            .catch(() => {});
+    }, [user?.$id]);
+
     const close = () => setMobileOpen(false);
 
     // Un connecteur peut être choisi depuis N'IMPORTE QUELLE page (pas
     // seulement depuis la conversation avec Vanessa) — on rejoint (ou
-    // ouvre) sa conversation, on active le connecteur dessus, puis on y
-    // navigue. findOrCreateDirect ne recrée rien si la conversation existe
-    // déjà, donc cet appel reste sans risque même si on y est déjà.
+    // ouvre) sa conversation, on active/désactive le connecteur dessus,
+    // puis on y navigue. findOrCreateDirect ne recrée rien si la
+    // conversation existe déjà, donc cet appel reste sans risque même si
+    // on y est déjà.
+    //
+    // Vraie bascule : re-cliquer sur le connecteur déjà actif le désactive
+    // (retour au mode général) — avant, cliquer l'activait à nouveau à
+    // l'identique, sans aucun changement visible, d'où l'impression que
+    // "ça ne se désactive jamais" même en appuyant plusieurs fois.
     const handleSelectConnector = async (connectorId: string) => {
         if (!user?.$id || !VANESSA_USER_ID || switchingConnector) return;
+        const next = activeConnectorId === connectorId ? '' : connectorId;
         setSwitchingConnector(connectorId);
         try {
             const conversation = await conversationService.findOrCreateDirect(user.$id, VANESSA_USER_ID);
-            await conversationService.setVanessaConnector(conversation.$id, connectorId);
+            await conversationService.setVanessaConnector(conversation.$id, next);
+            setActiveConnectorId(next);
             navigate(`/messages/${conversation.$id}`);
             close();
         } finally {
@@ -157,24 +176,36 @@ export const Sidebar = () => {
                     {connectors.length > 0 && (
                         <>
                             <SectionLabel>Connecteurs</SectionLabel>
+                            <p className="px-3 pb-1.5 text-[11px] text-gray-400">Touche à nouveau pour désactiver</p>
                             <div className="space-y-0.5">
                                 {connectors.map((c) => {
                                     const count = monthlyQuestionCount(c);
+                                    const isActive = activeConnectorId === c.$id;
                                     return (
                                         <button
                                             key={c.$id}
                                             onClick={() => handleSelectConnector(c.$id)}
                                             disabled={switchingConnector === c.$id}
-                                            className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 text-left disabled:opacity-50"
+                                            className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-left disabled:opacity-50 transition-colors"
+                                            style={
+                                                isActive
+                                                    ? { backgroundColor: `${c.color}1A`, color: c.color, fontWeight: 600 }
+                                                    : { color: '#4b5563' }
+                                            }
                                         >
                                             <span
                                                 className="w-2 h-2 rounded-full shrink-0"
                                                 style={{ backgroundColor: c.color }}
                                             />
                                             <span className="flex-1 truncate">
-                                                {switchingConnector === c.$id ? 'Ouverture...' : c.name}
+                                                {switchingConnector === c.$id ? 'Un instant...' : c.name}
                                             </span>
-                                            {count > 0 && (
+                                            {isActive && !switchingConnector && (
+                                                <span className="text-[10px] font-bold shrink-0" style={{ color: c.color }}>
+                                                    ACTIF
+                                                </span>
+                                            )}
+                                            {count > 0 && !isActive && (
                                                 <span
                                                     className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-[#FF4757] text-white shrink-0"
                                                     title={`${count} question(s) en ${MONTH_LABELS[new Date().getMonth()]}`}
