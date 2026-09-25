@@ -10,6 +10,18 @@ main, en utilisant vraiment l'app. C'est l'objet de ce document.
 utilisateur normal). Note la date de ton dernier passage complet en bas de
 ce fichier.
 
+**Trois réflexes à garder en tête pendant tout le passage**, tirés de vrais
+soucis rencontrés en construisant l'app :
+- **Teste sur au moins 2 navigateurs différents + l'app Android**, surtout
+  pour Ça sert — un même code peut se comporter très différemment selon le
+  GPU/navigateur (vécu concrètement avec la carte).
+- **Essaie une action réservée aux modérateurs avec un compte normal**
+  (ex : recharger un connecteur) — doit être refusé proprement, pas planter
+  ni réussir.
+- **Regarde les écrans "vides"** avec un compte tout neuf (Ça sert sans
+  bon plan dans une zone, mémoire de Vanessa vide, profil sans badge) — un
+  vide moche ou cassé fait mauvaise impression dès la première visite.
+
 ---
 
 ## 1. Comptes et accès
