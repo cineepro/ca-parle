@@ -86,4 +86,12 @@ export const conversationService = {
         const result = await callFunction<{ conversation: Conversation }>(FUNCTIONS.SET_VANESSA_CONNECTOR, { conversationId, connectorId });
         return result.conversation;
     },
+
+    // Renomme une conversation avec Vanessa, pour la personnaliser — passe
+    // par la même Function que le changement de connecteur (déjà éprouvée,
+    // vérifie déjà que l'appelant fait bien partie de la conversation).
+    async renameConversation(conversationId: string, title: string): Promise<Conversation> {
+        const result = await callFunction<{ conversation: Conversation }>(FUNCTIONS.SET_VANESSA_CONNECTOR, { conversationId, title });
+        return result.conversation;
+    },
 };

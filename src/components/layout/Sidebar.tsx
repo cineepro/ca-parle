@@ -40,6 +40,45 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     return <p className="px-3 pt-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">{children}</p>;
 }
 
+// Section repliable — utilisée uniquement là où la liste peut devenir
+// longue (connecteurs, conversations) ; les autres sections restent de
+// simples SectionLabel, une liste courte et fixe n'a pas besoin de se
+// replier. L'état choisi est mémorisé (localStorage) pour ne pas avoir à
+// re-replier à chaque rechargement de page.
+function CollapsibleSection({
+    title, storageKey, count, children,
+}: { title: string; storageKey: string; count: number; children: React.ReactNode }) {
+    const [open, setOpen] = useState(() => {
+        try {
+            const stored = localStorage.getItem(`sidebar-section-${storageKey}`);
+            return stored !== null ? stored === 'open' : true;
+        } catch {
+            return true;
+        }
+    });
+
+    const toggle = () => {
+        setOpen((prev) => {
+            const next = !prev;
+            try { localStorage.setItem(`sidebar-section-${storageKey}`, next ? 'open' : 'closed'); } catch { /* ignore */ }
+            return next;
+        });
+    };
+
+    return (
+        <div>
+            <button
+                onClick={toggle}
+                className="w-full flex items-center justify-between px-3 pt-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600"
+            >
+                <span>{title} {count > 0 && `(${count})`}</span>
+                <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
+            </button>
+            {open && children}
+        </div>
+    );
+}
+
 // "à l'instant" / "il y a 5 min" / "hier" / "12 sept." — assez court pour
 // tenir sur une ligne de liste, sans avoir besoin d'une librairie dédiée.
 function relativeTime(iso?: string): string {
@@ -68,6 +107,8 @@ export const Sidebar = () => {
     const [showSuggestExpression, setShowSuggestExpression] = useState(false);
     const [vanessaConversations, setVanessaConversations] = useState<Conversation[]>([]);
     const [creatingConversation, setCreatingConversation] = useState(false);
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [renameValue, setRenameValue] = useState('');
 
     useEffect(() => {
         vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
@@ -102,6 +143,26 @@ export const Sidebar = () => {
     }, [location.pathname]);
 
     const close = () => setMobileOpen(false);
+
+    const startRename = (c: Conversation) => {
+        setRenamingId(c.$id);
+        setRenameValue(c.title || '');
+    };
+
+    // Enregistre à la fois sur Entrée (soumission du formulaire) et en
+    // quittant le champ (onBlur) — pour ne jamais perdre un renommage
+    // simplement parce qu'on a cliqué ailleurs sans appuyer sur Entrée.
+    const confirmRename = async () => {
+        if (!renamingId) return;
+        const id = renamingId;
+        const value = renameValue.trim();
+        setRenamingId(null);
+        if (!value) return;
+        try {
+            await conversationService.renameConversation(id, value);
+            setVanessaConversations((prev) => prev.map((c) => (c.$id === id ? { ...c, title: value } : c)));
+        } catch { /* pas grave, l'ancien titre reste affiché */ }
+    };
 
     // Ouvre un TOUT NOUVEAU fil de discussion avec Vanessa, distinct des
     // précédents — exactement le principe demandé : plusieurs conversations
@@ -226,8 +287,7 @@ export const Sidebar = () => {
                     </div>
 
                     {connectors.length > 0 && (
-                        <>
-                            <SectionLabel>Connecteurs</SectionLabel>
+                        <CollapsibleSection title="Connecteurs" storageKey="connecteurs" count={connectors.length}>
                             <p className="px-3 pb-1.5 text-[11px] text-gray-400">Touche à nouveau pour désactiver</p>
                             <div className="space-y-0.5">
                                 {connectors.map((c) => {
@@ -269,39 +329,77 @@ export const Sidebar = () => {
                                     );
                                 })}
                             </div>
-                        </>
+                        </CollapsibleSection>
                     )}
 
-                    <SectionLabel>Conversations avec Vanessa</SectionLabel>
-                    <div className="space-y-0.5">
-                        <button
-                            onClick={handleNewConversation}
-                            disabled={creatingConversation}
-                            className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#FF4757] hover:bg-[#FF4757]/5 disabled:opacity-50"
-                        >
-                            <span className="text-lg leading-none">+</span>
-                            {creatingConversation ? 'Ouverture...' : 'Nouvelle conversation'}
-                        </button>
-                        {vanessaConversations.map((c) => {
-                            const isCurrent = location.pathname === `/messages/${c.$id}`;
-                            return (
-                                <Link
-                                    key={c.$id}
-                                    to={`/messages/${c.$id}`}
-                                    onClick={close}
-                                    className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                                        isCurrent ? 'bg-[#FF4757]/10 text-[#FF4757] font-semibold' : 'text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <span className="truncate">{c.title || 'Nouvelle conversation'}</span>
-                                    <span className="text-[10px] text-gray-400 shrink-0">{relativeTime(c.lastMessageAt)}</span>
-                                </Link>
-                            );
-                        })}
-                        {vanessaConversations.length === 0 && (
-                            <p className="px-3 py-2 text-xs text-gray-400">Rien pour l'instant.</p>
-                        )}
-                    </div>
+                    <CollapsibleSection title="Conversations avec Vanessa" storageKey="conversations" count={vanessaConversations.length}>
+                        <div className="space-y-0.5">
+                            <button
+                                onClick={handleNewConversation}
+                                disabled={creatingConversation}
+                                className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#FF4757] hover:bg-[#FF4757]/5 disabled:opacity-50"
+                            >
+                                <span className="text-lg leading-none">+</span>
+                                {creatingConversation ? 'Ouverture...' : 'Nouvelle conversation'}
+                            </button>
+                            {vanessaConversations.map((c) => {
+                                const isCurrent = location.pathname === `/messages/${c.$id}`;
+                                const isRenaming = renamingId === c.$id;
+
+                                if (isRenaming) {
+                                    return (
+                                        <form
+                                            key={c.$id}
+                                            onSubmit={(e) => { e.preventDefault(); confirmRename(); }}
+                                            className="flex items-center gap-1 px-2 py-1"
+                                        >
+                                            <input
+                                                autoFocus
+                                                value={renameValue}
+                                                onChange={(e) => setRenameValue(e.target.value)}
+                                                onBlur={confirmRename}
+                                                onKeyDown={(e) => { if (e.key === 'Escape') setRenamingId(null); }}
+                                                maxLength={100}
+                                                className="flex-1 rounded-lg border border-[#FF4757]/40 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/30"
+                                            />
+                                        </form>
+                                    );
+                                }
+
+                                return (
+                                    <div
+                                        key={c.$id}
+                                        className={`group flex items-center gap-1 rounded-xl pr-1.5 transition-colors ${
+                                            isCurrent ? 'bg-[#FF4757]/10' : 'hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <Link
+                                            to={`/messages/${c.$id}`}
+                                            onClick={close}
+                                            className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-3 py-2.5 text-sm ${
+                                                isCurrent ? 'text-[#FF4757] font-semibold' : 'text-gray-600'
+                                            }`}
+                                        >
+                                            <span className="truncate">{c.title || 'Nouvelle conversation'}</span>
+                                            <span className="text-[10px] text-gray-400 shrink-0">{relativeTime(c.lastMessageAt)}</span>
+                                        </Link>
+                                        <button
+                                            onClick={() => startRename(c)}
+                                            aria-label="Renommer cette conversation"
+                                            className="shrink-0 p-1.5 text-gray-300 hover:text-gray-600"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            {vanessaConversations.length === 0 && (
+                                <p className="px-3 py-2 text-xs text-gray-400">Rien pour l'instant.</p>
+                            )}
+                        </div>
+                    </CollapsibleSection>
 
                     <SectionLabel>Vanessa & toi</SectionLabel>
                     <div className="space-y-0.5">

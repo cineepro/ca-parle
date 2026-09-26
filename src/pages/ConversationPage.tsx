@@ -7,6 +7,7 @@ import { MessageComposer } from '@/features/messaging/components/MessageComposer
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Avatar } from '@/components/ui/avatar';
 import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
+import { conversationService } from '@/features/messaging/services/conversationService';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -26,6 +27,26 @@ export default function ConversationPage() {
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [activeConnectorId, setActiveConnectorId] = useState('');
     const [writingPrefill, setWritingPrefill] = useState<string | undefined>(undefined);
+    const [renamingTitle, setRenamingTitle] = useState(false);
+    const [titleInput, setTitleInput] = useState('');
+    const [titleOverride, setTitleOverride] = useState<string | undefined>(undefined);
+
+    const displayTitle = titleOverride ?? conversation?.title;
+
+    const startRenameTitle = () => {
+        setTitleInput(displayTitle || '');
+        setRenamingTitle(true);
+    };
+
+    const confirmRenameTitle = async () => {
+        const value = titleInput.trim();
+        setRenamingTitle(false);
+        if (!value || !conversation) return;
+        try {
+            await conversationService.renameConversation(conversation.$id, value);
+            setTitleOverride(value);
+        } catch { /* le titre affiché reste simplement celui d'avant */ }
+    };
 
     useEffect(() => {
         if (!isVanessaConversation) return;
@@ -123,10 +144,31 @@ export default function ConversationPage() {
                 <div className="flex items-center gap-3 px-4 py-3">
                     <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
                     <Avatar name={otherName} userId={otherId} sizeClass="w-9 h-9" />
-                    <div>
-                        <p className="text-sm font-semibold text-gray-800">
-                            {isVanessaConversation && conversation?.title ? conversation.title : otherName}
-                        </p>
+                    <div className="flex-1 min-w-0">
+                        {isVanessaConversation && renamingTitle ? (
+                            <form onSubmit={(e) => { e.preventDefault(); confirmRenameTitle(); }}>
+                                <input
+                                    autoFocus
+                                    value={titleInput}
+                                    onChange={(e) => setTitleInput(e.target.value)}
+                                    onBlur={confirmRenameTitle}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setRenamingTitle(false); }}
+                                    maxLength={100}
+                                    className="text-sm font-semibold text-gray-800 border-b border-[#FF4757]/40 focus:outline-none"
+                                />
+                            </form>
+                        ) : (
+                            <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5 truncate">
+                                {isVanessaConversation && displayTitle ? displayTitle : otherName}
+                                {isVanessaConversation && (
+                                    <button onClick={startRenameTitle} aria-label="Renommer cette conversation" className="text-gray-300 hover:text-gray-500 shrink-0">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </p>
+                        )}
                         {activeConnector && (
                             <p className="text-[11px] font-medium" style={{ color: activeConnector.color }}>
                                 {activeConnector.icon} {activeConnector.description || activeConnector.name}
