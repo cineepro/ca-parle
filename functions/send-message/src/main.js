@@ -307,6 +307,36 @@ function buildPubliciteInstruction(documents) {
 
 const RELEVANCE_MAX_RESULTS = 8;
 
+// Génère un titre court pour une conversation avec Vanessa qui n'en a pas
+// encore — dès le premier message, comme Claude/ChatGPT le font pour
+// qu'une conversation soit identifiable immédiatement dans la liste,
+// plutôt que d'attendre et de devoir deviner après coup de quoi elle
+// parlait. Volontairement sur haiku : c'est un résumé, pas une réponse de
+// Vanessa, pas besoin du modèle complet pour ça.
+async function generateConversationTitle(firstUserMessage, ANTHROPIC_API_KEY) {
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': ANTHROPIC_API_KEY,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: 'Résume ce message en un titre très court (3 à 6 mots), en français, sans guillemets ni point final. Réponds uniquement avec le titre, rien d\'autre.',
+                messages: [{ role: 'user', content: (firstUserMessage || '').slice(0, 500) || 'Nouvelle conversation' }],
+                max_tokens: 20,
+            }),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        const textBlock = data.content?.find((b) => b.type === 'text');
+        return textBlock?.text?.trim().replace(/^["'«]|["'»]$/g, '').slice(0, 60) || null;
+    } catch {
+        return null;
+    }
+}
 // Sélectionne, PARMI UN LOT DE CANDIDATS, ceux qui sont réellement
 // pertinents pour le message précis de l'utilisateur — plutôt que de se
 // contenter des plus récents. Un simple tri par date ratait des notes
@@ -757,6 +787,18 @@ export default async ({ req, res, log, error }) => {
         if (!conversation.participantIds.includes(callerId)) {
             log(`❌ ${callerId} ne fait pas partie de participantIds.`);
             return res.json({ success: false, error: "Tu ne fais pas partie de cette conversation." }, 403);
+        }
+
+        // Première fois qu'on écrit dans cette conversation avec Vanessa :
+        // on lui donne un titre, une seule fois — jamais régénéré ensuite,
+        // même si la conversation part ensuite dans une autre direction.
+        if (!conversation.title && conversation.participantIds.includes(VANESSA_USER_ID) && content) {
+            generateConversationTitle(content, ANTHROPIC_API_KEY).then((title) => {
+                if (title) {
+                    databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, { title })
+                        .catch((err) => log(`⚠️ Échec de l'enregistrement du titre : ${err.message}`));
+                }
+            }).catch(() => {});
         }
 
         const permissions = [

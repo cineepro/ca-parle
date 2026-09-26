@@ -124,7 +124,9 @@ export default function ConversationPage() {
                     <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
                     <Avatar name={otherName} userId={otherId} sizeClass="w-9 h-9" />
                     <div>
-                        <p className="text-sm font-semibold text-gray-800">{otherName}</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                            {isVanessaConversation && conversation?.title ? conversation.title : otherName}
+                        </p>
                         {activeConnector && (
                             <p className="text-[11px] font-medium" style={{ color: activeConnector.color }}>
                                 {activeConnector.icon} {activeConnector.description || activeConnector.name}

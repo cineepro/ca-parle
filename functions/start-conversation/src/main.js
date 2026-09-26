@@ -32,7 +32,7 @@ export default async ({ req, res, error }) => {
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { otherUserId } = body;
+        const { otherUserId, forceNew } = body;
 
         if (!otherUserId) {
             return res.json({ success: false, error: 'otherUserId requis.' }, 400);
@@ -43,12 +43,24 @@ export default async ({ req, res, error }) => {
 
         const directKey = buildDirectKey(callerId, otherUserId);
 
-        const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_CONVERSATIONS, [
-            Query.equal('directKey', directKey),
-            Query.limit(1),
-        ]);
-        if (existing.documents.length > 0) {
-            return res.json({ success: true, conversation: existing.documents[0] });
+        // forceNew : réservé à Vanessa (voir conversationService.createNewVanessaConversation)
+        // — permet d'avoir PLUSIEURS conversations avec elle, une par
+        // sujet, plutôt qu'une seule imposée. directKey n'identifie donc
+        // plus "LA" conversation entre ces deux personnes de façon unique
+        // pour Vanessa (il peut y en avoir plusieurs), seulement "UNE"
+        // parmi elles — la plus récente étant celle reprise par défaut
+        // (voir tri ci-dessous). Pour les messages entre deux vraies
+        // personnes, forceNew n'est jamais utilisé côté client, donc le
+        // comportement "une seule conversation par paire" reste inchangé.
+        if (!forceNew) {
+            const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_CONVERSATIONS, [
+                Query.equal('directKey', directKey),
+                Query.orderDesc('lastMessageAt'),
+                Query.limit(1),
+            ]);
+            if (existing.documents.length > 0) {
+                return res.json({ success: true, conversation: existing.documents[0] });
+            }
         }
 
         const permissions = [callerId, otherUserId].flatMap((id) => [
@@ -64,6 +76,7 @@ export default async ({ req, res, error }) => {
                 participantIds: [callerId, otherUserId],
                 isGroup: false,
                 directKey,
+                title: '',
                 lastMessage: '',
                 lastMessageAt: new Date().toISOString(),
                 lastMessageSenderId: '',

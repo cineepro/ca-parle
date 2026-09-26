@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
-import { conversationService } from '@/features/messaging/services/conversationService';
+import { conversationService, type Conversation } from '@/features/messaging/services/conversationService';
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '@/features/vanessa/utils/questionCount';
 import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 import { VANESSA_USER_ID } from '@/api/constants';
@@ -40,19 +40,45 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     return <p className="px-3 pt-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">{children}</p>;
 }
 
+// "à l'instant" / "il y a 5 min" / "hier" / "12 sept." — assez court pour
+// tenir sur une ligne de liste, sans avoir besoin d'une librairie dédiée.
+function relativeTime(iso?: string): string {
+    if (!iso) return '';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "à l'instant";
+    if (minutes < 60) return `il y a ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `il y a ${hours} h`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return 'hier';
+    if (days < 7) return `il y a ${days} j`;
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
 export const Sidebar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { unreadCount } = useNotifications();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [activeConnectorId, setActiveConnectorId] = useState('');
     const [switchingConnector, setSwitchingConnector] = useState<string | null>(null);
     const [showSuggestExpression, setShowSuggestExpression] = useState(false);
+    const [vanessaConversations, setVanessaConversations] = useState<Conversation[]>([]);
+    const [creatingConversation, setCreatingConversation] = useState(false);
 
     useEffect(() => {
         vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
     }, []);
+
+    const loadVanessaConversations = () => {
+        if (!user?.$id || !VANESSA_USER_ID) return;
+        conversationService.listVanessaConversations(user.$id, VANESSA_USER_ID)
+            .then(setVanessaConversations)
+            .catch(() => {});
+    };
 
     // Sait quel connecteur est actif sur la conversation avec Vanessa, pour
     // pouvoir le surligner ET pour que re-cliquer dessus le désactive au
@@ -62,9 +88,35 @@ export const Sidebar = () => {
         conversationService.findOrCreateDirect(user.$id, VANESSA_USER_ID)
             .then((conversation) => setActiveConnectorId(conversation.vanessaConnectorId || ''))
             .catch(() => {});
+        loadVanessaConversations();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.$id]);
 
+    // Recharge la liste à chaque changement de page — c'est ce qui fait
+    // apparaître une conversation qui vient tout juste d'être créée, ou
+    // remonter en tête celle qui vient de recevoir un nouveau message,
+    // sans avoir à recharger toute la barre.
+    useEffect(() => {
+        loadVanessaConversations();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname]);
+
     const close = () => setMobileOpen(false);
+
+    // Ouvre un TOUT NOUVEAU fil de discussion avec Vanessa, distinct des
+    // précédents — exactement le principe demandé : plusieurs conversations
+    // possibles, une par sujet, comme sur les grandes IA conversationnelles.
+    const handleNewConversation = async () => {
+        if (!user?.$id || !VANESSA_USER_ID || creatingConversation) return;
+        setCreatingConversation(true);
+        try {
+            const conversation = await conversationService.createNewVanessaConversation(VANESSA_USER_ID);
+            navigate(`/messages/${conversation.$id}`);
+            close();
+        } finally {
+            setCreatingConversation(false);
+        }
+    };
 
     // Un connecteur peut être choisi depuis N'IMPORTE QUELLE page (pas
     // seulement depuis la conversation avec Vanessa) — on rejoint (ou
@@ -219,6 +271,37 @@ export const Sidebar = () => {
                             </div>
                         </>
                     )}
+
+                    <SectionLabel>Conversations avec Vanessa</SectionLabel>
+                    <div className="space-y-0.5">
+                        <button
+                            onClick={handleNewConversation}
+                            disabled={creatingConversation}
+                            className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#FF4757] hover:bg-[#FF4757]/5 disabled:opacity-50"
+                        >
+                            <span className="text-lg leading-none">+</span>
+                            {creatingConversation ? 'Ouverture...' : 'Nouvelle conversation'}
+                        </button>
+                        {vanessaConversations.map((c) => {
+                            const isCurrent = location.pathname === `/messages/${c.$id}`;
+                            return (
+                                <Link
+                                    key={c.$id}
+                                    to={`/messages/${c.$id}`}
+                                    onClick={close}
+                                    className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                                        isCurrent ? 'bg-[#FF4757]/10 text-[#FF4757] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <span className="truncate">{c.title || 'Nouvelle conversation'}</span>
+                                    <span className="text-[10px] text-gray-400 shrink-0">{relativeTime(c.lastMessageAt)}</span>
+                                </Link>
+                            );
+                        })}
+                        {vanessaConversations.length === 0 && (
+                            <p className="px-3 py-2 text-xs text-gray-400">Rien pour l'instant.</p>
+                        )}
+                    </div>
 
                     <SectionLabel>Vanessa & toi</SectionLabel>
                     <div className="space-y-0.5">
