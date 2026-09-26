@@ -45,16 +45,18 @@ export default async ({ req, res, error }) => {
 
         // forceNew : réservé à Vanessa (voir conversationService.createNewVanessaConversation)
         // — permet d'avoir PLUSIEURS conversations avec elle, une par
-        // sujet, plutôt qu'une seule imposée. directKey n'identifie donc
-        // plus "LA" conversation entre ces deux personnes de façon unique
-        // pour Vanessa (il peut y en avoir plusieurs), seulement "UNE"
-        // parmi elles — la plus récente étant celle reprise par défaut
-        // (voir tri ci-dessous). Pour les messages entre deux vraies
+        // sujet, plutôt qu'une seule imposée. La recherche ne se fait donc
+        // PLUS via directKey (qui reste soumis à une contrainte d'unicité
+        // au niveau de la base — une seule valeur possible, jamais deux
+        // documents identiques) : on cherche directement les conversations
+        // dont participantIds contient LES DEUX personnes, peu importe la
+        // valeur de directKey. Pour les messages entre deux vraies
         // personnes, forceNew n'est jamais utilisé côté client, donc le
         // comportement "une seule conversation par paire" reste inchangé.
         if (!forceNew) {
             const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_CONVERSATIONS, [
-                Query.equal('directKey', directKey),
+                Query.contains('participantIds', callerId),
+                Query.contains('participantIds', otherUserId),
                 Query.orderDesc('lastMessageAt'),
                 Query.limit(1),
             ]);
@@ -75,7 +77,14 @@ export default async ({ req, res, error }) => {
             {
                 participantIds: [callerId, otherUserId],
                 isGroup: false,
-                directKey,
+                // Sans forceNew (premier échange entre ces deux personnes,
+                // humain ou Vanessa) : la vraie valeur, identique à avant —
+                // aucun changement pour les conversations déjà existantes.
+                // Avec forceNew (une Nième conversation avec Vanessa) : un
+                // suffixe unique est ajouté, pour respecter la contrainte
+                // d'unicité de la base — la recherche ci-dessus ne s'appuie
+                // de toute façon plus sur cette valeur exacte.
+                directKey: forceNew ? `${directKey}__${ID.unique()}` : directKey,
                 title: '',
                 lastMessage: '',
                 lastMessageAt: new Date().toISOString(),
