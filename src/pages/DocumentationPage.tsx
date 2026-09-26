@@ -132,16 +132,6 @@ const GROUPS: Group[] = [
             },
         ],
     },
-    {
-        heading: 'Bientôt disponible',
-        sections: [
-            {
-                title: 'Vanessa pour votre entreprise (à venir)',
-                content:
-                    "Un agent capable de rédiger et d'envoyer des emails, des messages WhatsApp, ou de répondre à des commentaires sur les réseaux sociaux, dans le ton de Vanessa — pour le compte de votre propre entreprise, sur vos propres comptes. Encore en réflexion, pas encore disponible : on préfère d'abord bien faire ce qui existe déjà avant de s'étendre.",
-            },
-        ],
-    },
 ];
 
 export default function DocumentationPage() {

@@ -13,6 +13,7 @@ interface NavItem {
     to: string;
     label: string;
     badge?: number;
+    badgeText?: string;
 }
 
 function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
@@ -30,6 +31,11 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
             {!!item.badge && (
                 <span className="bg-[#FF4757] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {item.badge > 9 ? '9+' : item.badge}
+                </span>
+            )}
+            {item.badgeText && (
+                <span className="bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full px-2 py-0.5 shrink-0">
+                    {item.badgeText}
                 </span>
             )}
         </Link>
@@ -209,6 +215,7 @@ export const Sidebar = () => {
         { to: '/accueil', label: 'Vanessa' },
         { to: '/ca-parle', label: 'Ça Parle' },
         { to: '/ca-sert', label: 'Ça sert' },
+        { to: '/pour-entreprises', label: 'Pour les entreprises', badgeText: 'Bientôt' },
         { to: '/messages', label: 'Messages' },
         { to: '/recherche', label: 'Rechercher' },
         { to: '/notifications', label: 'Notifications', badge: unreadCount },

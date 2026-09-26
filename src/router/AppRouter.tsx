@@ -19,6 +19,7 @@ import ModerationPage from '@/pages/ModerationPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import CaSertPage from '@/pages/CaSertPage';
+import BusinessAgentPage from '@/pages/BusinessAgentPage';
 import MyCaSertContributionsPage from '@/pages/MyCaSertContributionsPage';
 import PartnerSpacePage from '@/pages/PartnerSpacePage';
 import MessagesPage from '@/pages/MessagesPage';
@@ -136,6 +137,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <CaSertPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/pour-entreprises"
+                    element={
+                        <ProtectedRoute>
+                            <BusinessAgentPage />
                         </ProtectedRoute>
                     }
                 />
