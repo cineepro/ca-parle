@@ -198,14 +198,14 @@ export default function ConversationPage() {
             {showScrollToBottom && (
                 <button
                     onClick={scrollToBottom}
-                    className="absolute right-4 bottom-24 md:bottom-20 z-20 w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#FF4757] transition-colors"
+                    className="absolute right-4 bottom-20 z-20 w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#FF4757] transition-colors"
                     aria-label="Descendre en bas"
                 >
                     ↓
                 </button>
             )}
 
-            <div className="sticky bottom-20 md:bottom-0">
+            <div className="sticky bottom-0">
                 {sendError && (
                     <p className="text-xs text-red-500 text-center bg-red-50 py-1.5 px-3">{sendError}</p>
                 )}

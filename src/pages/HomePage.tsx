@@ -32,7 +32,7 @@ export default function HomePage() {
 
             <Link
                 to="/publier"
-                className="fixed bottom-24 md:bottom-8 right-4 md:right-8 flex items-center gap-2 bg-[#FF4757] text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg hover:bg-[#e63e4d] transition-colors z-30"
+                className="fixed bottom-4 md:bottom-8 right-4 md:right-8 flex items-center gap-2 bg-[#FF4757] text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg hover:bg-[#e63e4d] transition-colors z-30"
             >
                 Publier une histoire
             </Link>
