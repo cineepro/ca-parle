@@ -382,7 +382,7 @@ async function selectRelevantKnowledge({ candidates, userMessage, maxResults, AN
     }
 }
 
-async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
+async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, emissionTopic, emissionPosture, callerId, log }) {
     let knowledgeContext = '';
     let publiciteContext = '';
     // Connecteur RÉELLEMENT utilisé ce tour-ci (peut rester vide si le
@@ -396,6 +396,21 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     // pertinence des connaissances est jugée, pas sur tout l'historique.
     const lastUserMessage = [...history].reverse().find((m) => m.senderId !== VANESSA_USER_ID)?.content || '';
 
+    // MODE ÉMISSION — une conversation marquée comme telle (voir
+    // manage-emissions) COURT-CIRCUITE toute la recherche de connaissances
+    // habituelle : volontairement, sur demande explicite, Vanessa n'est PAS
+    // restreinte à des notes validées pour cet exercice précis — l'objectif
+    // est une vraie discussion vivante (débat, discussion émotionnelle...),
+    // pas une récitation de faits. Son ton, ses expressions et sa
+    // personnalité restent en revanche entièrement intacts — seule la
+    // façon de MENER la conversation change.
+    if (emissionTopic) {
+        log(`🎙️ Mode émission actif — sujet : "${emissionTopic}", posture : "${emissionPosture || 'libre'}"`);
+        knowledgeContext = `\n\nMODE ÉMISSION EN COURS — sujet : ${emissionTopic}. Posture demandée : ${emissionPosture || 'libre, à ton jugement'}.
+Dans ce cadre précis, tu n'es PAS limitée à tes notes de connaissances habituelles — sois libre, réagis vraiment à ce qui se dit, rebondis, reviens sur un point plus tard dans l'échange, lance toi-même des sujets, défends un point de vue si la posture l'exige. Ce n'est JAMAIS une question-réponse, c'est une vraie discussion, comme deux personnes qui se parlent vraiment.
+Garde ABSOLUMENT ton ton, tes expressions et ta personnalité habituels — rien ne change de qui tu es, seulement ta façon de mener l'échange.
+Même dans cette posture : si tu perçois un vrai signe de détresse authentique chez la personne (pas un sujet difficile raconté avec du recul, une vraie détresse en train de se produire), tu sors IMMÉDIATEMENT de la posture demandée et tu appliques tes règles de sécurité habituelles, sans aucune exception.`;
+    } else {
     try {
         let activeConnectorId = connectorId;
 
@@ -532,6 +547,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
             } catch { /* collection pas encore configurée */ }
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
+    }
 
     // Ressources d'urgence — catégorie dédiée, TOUJOURS entièrement
     // incluse (jamais soumise à la limite de 8 ni au hasard de l'ordre des
@@ -969,7 +985,10 @@ export default async ({ req, res, log, error }) => {
                     } else {
                         result = await generateVanessaReply({
                             history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID,
-                            connectorId: conversation.vanessaConnectorId || '', callerId, log,
+                            connectorId: conversation.vanessaConnectorId || '',
+                            emissionTopic: conversation.emissionTopic || '',
+                            emissionPosture: conversation.emissionPosture || '',
+                            callerId, log,
                         });
                     }
                     const reply = result.text;

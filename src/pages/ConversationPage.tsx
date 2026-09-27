@@ -1,6 +1,6 @@
 // src/pages/ConversationPage.tsx — Vanessa
 import { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
 import { MessageBubble } from '@/features/messaging/components/MessageBubble';
 import { MessageComposer } from '@/features/messaging/components/MessageComposer';
@@ -30,6 +30,8 @@ export default function ConversationPage() {
     const [renamingTitle, setRenamingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState('');
     const [titleOverride, setTitleOverride] = useState<string | undefined>(undefined);
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const navigate = useNavigate();
 
     const displayTitle = titleOverride ?? conversation?.title;
 
@@ -46,6 +48,18 @@ export default function ConversationPage() {
             await conversationService.renameConversation(conversation.$id, value);
             setTitleOverride(value);
         } catch { /* le titre affiché reste simplement celui d'avant */ }
+    };
+
+    // Comme dans la barre latérale : ne supprime jamais réellement, juste
+    // masqué de la vue de la personne — on quitte ensuite vers l'accueil
+    // puisque cette conversation n'est plus destinée à être revue ici.
+    const handleDeleteConversation = async () => {
+        if (!conversation) return;
+        setConfirmingDelete(false);
+        try {
+            await conversationService.hideConversation(conversation.$id);
+            navigate('/accueil');
+        } catch { /* rien de cassé si ça échoue, on reste simplement sur la page */ }
     };
 
     useEffect(() => {
@@ -175,6 +189,25 @@ export default function ConversationPage() {
                             </p>
                         )}
                     </div>
+                    {isVanessaConversation && (
+                        confirmingDelete ? (
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs text-red-500">Supprimer ?</span>
+                                <button onClick={handleDeleteConversation} className="text-xs font-bold text-red-600">Oui</button>
+                                <button onClick={() => setConfirmingDelete(false)} className="text-xs text-gray-400">Annuler</button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmingDelete(true)}
+                                aria-label="Supprimer cette conversation"
+                                className="shrink-0 p-1.5 text-gray-300 hover:text-red-500"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </button>
+                        )
+                    )}
                 </div>
 
                 {/* Suggestion discrète, seulement en tout début de

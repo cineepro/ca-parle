@@ -16,6 +16,8 @@ import ProfilePage from '@/pages/ProfilePage';
 import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
+import EmissionsPage from '@/pages/EmissionsPage';
+import EmissionRecordingPage from '@/pages/EmissionRecordingPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
 import CaSertPage from '@/pages/CaSertPage';
@@ -113,6 +115,22 @@ export const AppRouter = () => {
                     element={
                         <ModeratorRoute>
                             <ModerationPage />
+                        </ModeratorRoute>
+                    }
+                />
+                <Route
+                    path="/emissions"
+                    element={
+                        <ModeratorRoute>
+                            <EmissionsPage />
+                        </ModeratorRoute>
+                    }
+                />
+                <Route
+                    path="/emissions/:id/enregistrement"
+                    element={
+                        <ModeratorRoute>
+                            <EmissionRecordingPage />
                         </ModeratorRoute>
                     }
                 />

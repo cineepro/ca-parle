@@ -115,6 +115,7 @@ export const Sidebar = () => {
     const [creatingConversation, setCreatingConversation] = useState(false);
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
+    const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
     useEffect(() => {
         vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
@@ -168,6 +169,17 @@ export const Sidebar = () => {
             await conversationService.renameConversation(id, value);
             setVanessaConversations((prev) => prev.map((c) => (c.$id === id ? { ...c, title: value } : c)));
         } catch { /* pas grave, l'ancien titre reste affiché */ }
+    };
+
+    // "Supprimer" ici ne l'efface jamais réellement (voir set-vanessa-connector,
+    // action hide) — juste masqué de la liste de la personne qui l'a
+    // demandé. On retire simplement l'entrée de la liste affichée.
+    const handleDelete = async (conversationId: string) => {
+        setConfirmingDeleteId(null);
+        try {
+            await conversationService.hideConversation(conversationId);
+            setVanessaConversations((prev) => prev.filter((c) => c.$id !== conversationId));
+        } catch { /* la conversation reste visible, rien de cassé */ }
     };
 
     // Ouvre un TOUT NOUVEAU fil de discussion avec Vanessa, distinct des
@@ -373,6 +385,16 @@ export const Sidebar = () => {
                                     );
                                 }
 
+                                if (confirmingDeleteId === c.$id) {
+                                    return (
+                                        <div key={c.$id} className="flex items-center gap-1.5 px-3 py-2 bg-red-50 rounded-xl">
+                                            <span className="flex-1 text-xs text-red-600">Supprimer cette conversation ?</span>
+                                            <button onClick={() => handleDelete(c.$id)} className="text-xs font-bold text-red-600">Oui</button>
+                                            <button onClick={() => setConfirmingDeleteId(null)} className="text-xs text-gray-400">Annuler</button>
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                     <div
                                         key={c.$id}
@@ -397,6 +419,15 @@ export const Sidebar = () => {
                                         >
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                 <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmingDeleteId(c.$id)}
+                                            aria-label="Supprimer cette conversation"
+                                            className="shrink-0 p-1.5 text-gray-300 hover:text-red-500"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
                                         </button>
                                     </div>
@@ -433,6 +464,7 @@ export const Sidebar = () => {
                             <SectionLabel>Équipe</SectionLabel>
                             <div className="space-y-0.5">
                                 <NavLink item={{ to: '/moderation', label: 'Modération' }} onNavigate={close} />
+                                <NavLink item={{ to: '/emissions', label: 'Émissions' }} onNavigate={close} />
                             </div>
                         </>
                     )}

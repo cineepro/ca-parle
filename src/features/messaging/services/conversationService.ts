@@ -17,6 +17,16 @@ export interface Conversation extends Models.Document {
     lastMessageAt?: string;
     lastMessageSenderId?: string;
     vanessaConnectorId?: string;
+    // Présents uniquement sur une conversation créée comme "émission" (voir
+    // manage-emissions) — c'est ce que send-message lit pour basculer en
+    // mode libre, sans restriction à la base de connaissances habituelle.
+    emissionTopic?: string;
+    emissionPosture?: string;
+    // Suppression "douce" : contient l'identifiant de chaque participant
+    // qui a choisi de masquer cette conversation de sa propre liste — les
+    // messages, eux, restent intacts en base pour l'autre participant
+    // (Vanessa) et ne sont jamais réellement effacés.
+    hiddenFor?: string[];
     createdAt: string;
 }
 
@@ -53,7 +63,8 @@ export const conversationService = {
     // Toutes les conversations de cet utilisateur AVEC VANESSA
     // spécifiquement (il peut désormais y en avoir plusieurs) — réutilise
     // simplement listForUser, qui ramène déjà tout, trié par activité
-    // récente ; filtré ici pour ne garder que celles où Vanessa participe.
+    // récente et sans les conversations masquées ; filtré ici pour ne
+    // garder que celles où Vanessa participe.
     async listVanessaConversations(userId: string, vanessaUserId: string): Promise<Conversation[]> {
         const all = await this.listForUser(userId);
         return all.filter((c) => c.participantIds.includes(vanessaUserId));
@@ -63,13 +74,18 @@ export const conversationService = {
     // est la requête correcte pour "ce tableau contient cette valeur" sur
     // un attribut array — Query.equal ne fonctionne PAS sur les attributs
     // array et renvoie une erreur 400 côté Appwrite).
+    //
+    // Retire aussi les conversations que CET utilisateur a lui-même
+    // masquées (hiddenFor) — un filtrage après coup, pas une requête,
+    // puisqu'Appwrite ne propose pas nativement de "tableau qui NE
+    // contient PAS cette valeur".
     async listForUser(userId: string): Promise<Conversation[]> {
         const result = await databases.listDocuments<Conversation>(DATABASE_ID, COLLECTIONS.CONVERSATIONS, [
             Query.contains('participantIds', userId),
             Query.orderDesc('lastMessageAt'),
             Query.limit(50),
         ]);
-        return result.documents;
+        return result.documents.filter((c) => !(c.hiddenFor || []).includes(userId));
     },
 
     async getById(conversationId: string): Promise<Conversation> {
@@ -93,5 +109,11 @@ export const conversationService = {
     async renameConversation(conversationId: string, title: string): Promise<Conversation> {
         const result = await callFunction<{ conversation: Conversation }>(FUNCTIONS.SET_VANESSA_CONNECTOR, { conversationId, title });
         return result.conversation;
+    },
+
+    // "Supprime" une conversation — en réalité, la masque uniquement pour
+    // la personne qui l'a demandé. Rien n'est jamais effacé côté serveur.
+    async hideConversation(conversationId: string): Promise<void> {
+        await callFunction(FUNCTIONS.SET_VANESSA_CONNECTOR, { conversationId, hide: true });
     },
 };
