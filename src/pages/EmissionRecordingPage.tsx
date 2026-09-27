@@ -210,8 +210,6 @@ export default function EmissionRecordingPage() {
         if (streamRef.current) beginTurn();
     };
 
-    if (loading) return <p className="text-sm text-gray-400 text-center py-20">Chargement...</p>;
-
     // Dès qu'une nouvelle réponse VOCALE de Vanessa arrive, on la joue
     // automatiquement — pendant qu'elle "parle", on n'écoute pas (pour ne
     // jamais capter sa propre voix comme si c'était l'invité). Une fois
@@ -240,6 +238,14 @@ export default function EmissionRecordingPage() {
     // Coupe tout proprement si la personne quitte la page en cours
     // d'émission — jamais de micro qui reste ouvert en arrière-plan.
     useEffect(() => stopEmission, [stopEmission]);
+
+    // Placé volontairement APRÈS tous les hooks ci-dessus (useState,
+    // useRef, useCallback, useEffect) — jamais avant. Un retour anticipé
+    // placé plus haut ferait sauter certains hooks tant que `loading` est
+    // vrai, puis les ferait apparaître d'un coup une fois le chargement
+    // terminé : React l'interdit strictement (nombre de hooks qui doit
+    // rester identique à chaque rendu), d'où l'erreur #310 rencontrée.
+    if (loading) return <p className="text-sm text-gray-400 text-center py-20">Chargement...</p>;
 
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-8">
