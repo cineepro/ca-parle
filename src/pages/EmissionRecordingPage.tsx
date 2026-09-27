@@ -1,5 +1,5 @@
 // src/pages/EmissionRecordingPage.tsx — Vanessa
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
 import { getVoiceMessageUrl } from '@/features/messaging/services/messageService';
@@ -11,13 +11,14 @@ import { VANESSA_USER_ID } from '@/api/constants';
 // un vrai réglage fin ne se fait qu'en conditions réelles de tournage, pas
 // en théorie. Ajuste-les après un nouvel essai si besoin.
 const SILENCE_THRESHOLD = 12; // 0-255 — au-dessus : "quelqu'un parle"
-const SILENCE_DURATION_MS = 1800; // pause jugée comme "fin du tour de parole" (assoupli : 1,3s coupait de vraies respirations de réflexion)
+const SILENCE_DURATION_MS = 1800; // pause jugée comme "fin du tour de parole"
 const MIN_SPEECH_MS = 400; // en dessous : probablement un bruit, pas une vraie phrase
 const MAX_TURN_MS = 45_000; // filet de sécurité si personne ne fait jamais de pause
-// Si la réponse de Vanessa n'arrive vraiment pas (échec silencieux côté
-// serveur, quota, etc.), on ne reste pas bloqué en "Réfléchit..." pour
-// toujours — on relance l'écoute après ce délai.
-const REPLY_TIMEOUT_MS = 25_000;
+const REPLY_TIMEOUT_MS = 30_000; // au-delà, on considère que la réponse ne viendra pas
+
+// Préfixe unique dans la console F12 — facile à filtrer (tape "ÉMISSION"
+// dans la barre de filtre de la console pour ne voir que ces lignes-là).
+const LOG = (...args: unknown[]) => console.log('[ÉMISSION]', ...args);
 
 type Phase = 'off' | 'paused' | 'listening' | 'recording' | 'processing' | 'speaking';
 
@@ -61,6 +62,25 @@ export default function EmissionRecordingPage() {
     const phaseRef = useRef<Phase>('off');
     phaseRef.current = phase;
 
+    // --- Le vrai correctif ---
+    // beginTurn / endTurn / checkVolume s'appellent en boucle les unes les
+    // autres (beginTurn programme checkVolume et endTurn ; endTurn peut
+    // rappeler beginTurn ; checkVolume appelle endTurn). Les figer via
+    // useCallback avec des tableaux de dépendances incomplets (nécessaire
+    // pour casser ce cycle) revenait à capturer, une fois pour toutes,
+    // `sendVoiceMessage` tel qu'il existait au TOUT PREMIER rendu — c'est-
+    // à-dire souvent AVANT même que la conversation soit chargée. Résultat :
+    // un appel silencieux, sans erreur ni requête réseau, sur une
+    // conversation figée à `null`.
+    //
+    // La correction : ces trois fonctions vivent maintenant dans des refs,
+    // réassignées à CHAQUE rendu avec les toutes dernières valeurs — le
+    // setInterval/setTimeout appelle toujours la version la plus fraîche,
+    // jamais une version figée dans le temps.
+    const beginTurnRef = useRef<() => void>(() => {});
+    const endTurnRef = useRef<() => Promise<void>>(async () => {});
+    const checkVolumeRef = useRef<() => void>(() => {});
+
     const clearVad = () => {
         if (vadIntervalRef.current) clearInterval(vadIntervalRef.current);
         if (turnTimeoutRef.current) clearTimeout(turnTimeoutRef.current);
@@ -72,11 +92,9 @@ export default function EmissionRecordingPage() {
         replyTimeoutRef.current = null;
     };
 
-    // Démarre un nouveau tour de parole : un enregistreur frais, une
-    // détection de silence fraîche — appelé au démarrage de l'émission, à
-    // la reprise après pause, ET après chaque réponse de Vanessa.
-    const beginTurn = useCallback(() => {
+    beginTurnRef.current = () => {
         if (!streamRef.current) return;
+        LOG('Nouveau tour — écoute démarrée.');
         const recorder = new MediaRecorder(streamRef.current);
         chunksRef.current = [];
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -85,56 +103,45 @@ export default function EmissionRecordingPage() {
         speechStartRef.current = null;
         silenceStartRef.current = null;
         setPhase('listening');
-        vadIntervalRef.current = setInterval(checkVolume, 100);
-        turnTimeoutRef.current = setTimeout(endTurn, MAX_TURN_MS);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        vadIntervalRef.current = setInterval(() => checkVolumeRef.current(), 100);
+        turnTimeoutRef.current = setTimeout(() => endTurnRef.current(), MAX_TURN_MS);
+    };
 
-    // Termine le tour de parole en cours : arrête l'enregistrement de CE
-    // tour précis, envoie le vocal capturé par le pipeline déjà existant.
-    //
-    // IMPORTANT : l'envoi (sendVoiceMessage) confirme seulement que TON
-    // message est bien enregistré — la vraie réponse de Vanessa arrive
-    // séparément, un peu après, via la conversation elle-même. On reste
-    // donc bien en "Réfléchit..." après cet envoi, et c'est l'effet plus
-    // bas (qui surveille l'arrivée d'un nouveau message vocal d'elle) qui
-    // fait vraiment avancer vers "Vanessa parle" — jamais cette fonction.
-    const endTurn = useCallback(async () => {
+    endTurnRef.current = async () => {
         clearVad();
         const recorder = recorderRef.current;
         if (!recorder || recorder.state === 'inactive') return;
+        LOG('Fin du tour détectée (silence) — arrêt de l\u2019enregistrement.');
         setPhase('processing');
         const stopped = new Promise<void>((resolve) => { recorder.onstop = () => resolve(); });
         recorder.stop();
         await stopped;
 
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        LOG(`Blob capturé : ${blob.size} octets.`);
         const durationSeconds = Math.max(1, Math.round(((speechStartRef.current ? Date.now() - speechStartRef.current : 1000)) / 1000));
 
         if (blob.size === 0) {
-            // Rien capturé de valable — inutile d'attendre une réponse
-            // qui ne viendra jamais, on relance directement l'écoute.
-            if (streamRef.current) beginTurn();
+            LOG('Rien capturé de valable — relance directe de l\u2019écoute.');
+            if (streamRef.current) beginTurnRef.current();
             return;
         }
 
+        LOG('Envoi du vocal à Vanessa...');
         await sendVoiceMessage(blob, durationSeconds);
-        // À partir d'ici, on reste en "processing" — voir le commentaire
-        // au-dessus. Un filet de sécurité si sa réponse ne vient vraiment
-        // jamais (panne, quota...), pour ne jamais rester bloqué — mais on
-        // le SIGNALE cette fois, plutôt que de revenir en bleu sans rien
-        // dire comme avant.
+        LOG('Envoi confirmé — en attente de sa réponse (voir l\u2019effet qui surveille `messages`).');
+
         clearReplyTimeout();
         replyTimeoutRef.current = setTimeout(() => {
             if (phaseRef.current === 'processing' && streamRef.current) {
+                LOG(`⚠️ Aucune réponse reçue après ${REPLY_TIMEOUT_MS / 1000}s — relance de l\u2019écoute.`);
                 setReplyTimedOut(true);
-                beginTurn();
+                beginTurnRef.current();
             }
         }, REPLY_TIMEOUT_MS);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sendVoiceMessage, beginTurn]);
+    };
 
-    const checkVolume = useCallback(() => {
+    checkVolumeRef.current = () => {
         const analyser = analyserRef.current;
         if (!analyser) return;
         const data = new Uint8Array(analyser.fftSize);
@@ -147,6 +154,7 @@ export default function EmissionRecordingPage() {
         if (level > SILENCE_THRESHOLD) {
             if (!speechStartRef.current) {
                 speechStartRef.current = now;
+                LOG(`Voix détectée (niveau ${level.toFixed(1)}) — enregistrement.`);
                 setPhase('recording');
             }
             silenceStartRef.current = null;
@@ -155,14 +163,15 @@ export default function EmissionRecordingPage() {
             const silenceDuration = now - silenceStartRef.current;
             const speechDuration = now - speechStartRef.current;
             if (silenceDuration > SILENCE_DURATION_MS && speechDuration > MIN_SPEECH_MS) {
-                endTurn();
+                endTurnRef.current();
             }
         }
-    }, [endTurn]);
+    };
 
     const startEmission = async () => {
         setMicError(null);
         try {
+            LOG('Démarrage — demande d\u2019accès au micro...');
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
             const ctx = new AudioContext();
@@ -172,15 +181,16 @@ export default function EmissionRecordingPage() {
             analyser.fftSize = 2048;
             source.connect(analyser);
             analyserRef.current = analyser;
-            beginTurn();
-        } catch {
+            LOG('Micro prêt.');
+            beginTurnRef.current();
+        } catch (err) {
+            LOG('❌ Échec d\u2019accès au micro :', err);
             setMicError("Impossible d'accéder au micro — vérifie l'autorisation dans ton navigateur.");
         }
     };
 
-    // Coupe TOUT, y compris le micro lui-même (nouvelle autorisation
-    // nécessaire pour repartir). À utiliser en fin d'enregistrement.
-    const stopEmission = useCallback(() => {
+    const stopEmission = () => {
+        LOG('Arrêt complet de l\u2019émission.');
         setPhase('off');
         clearVad();
         clearReplyTimeout();
@@ -194,14 +204,10 @@ export default function EmissionRecordingPage() {
         streamRef.current = null;
         audioContextRef.current = null;
         analyserRef.current = null;
-    }, []);
+    };
 
-    // Coupe seulement l'ÉCOUTE (rien n'est envoyé, le tour en cours est
-    // abandonné) — le micro reste ouvert, la reprise est instantanée, sans
-    // nouvelle demande d'autorisation. Pensé exactement pour ton cas : un
-    // souci technique en pleine conversation, sans que Vanessa "entende"
-    // qu'on continue de lui parler pendant que tu le règles.
     const pauseListening = () => {
+        LOG('Pause demandée.');
         clearVad();
         clearReplyTimeout();
         if (recorderRef.current && recorderRef.current.state !== 'inactive') {
@@ -213,7 +219,8 @@ export default function EmissionRecordingPage() {
     };
 
     const resumeListening = () => {
-        if (streamRef.current) beginTurn();
+        LOG('Reprise après pause.');
+        if (streamRef.current) beginTurnRef.current();
     };
 
     // Dès qu'une nouvelle réponse VOCALE de Vanessa arrive, on la joue
@@ -228,6 +235,7 @@ export default function EmissionRecordingPage() {
         );
         if (lastVanessaAudio && lastVanessaAudio.$id !== lastPlayedMessageId.current) {
             lastPlayedMessageId.current = lastVanessaAudio.$id;
+            LOG('Réponse vocale de Vanessa détectée — lecture.');
             clearVad();
             clearReplyTimeout();
             setReplyTimedOut(false);
@@ -235,23 +243,24 @@ export default function EmissionRecordingPage() {
             const audio = new Audio(getVoiceMessageUrl(lastVanessaAudio.audioFileId!));
             audioPlayerRef.current = audio;
             audio.onended = () => {
-                if (streamRef.current) beginTurn();
+                LOG('Lecture terminée — reprise de l\u2019écoute.');
+                if (streamRef.current) beginTurnRef.current();
             };
-            audio.play().catch(() => { if (streamRef.current) beginTurn(); });
+            audio.play().catch((err) => {
+                LOG('❌ Échec de lecture audio :', err);
+                if (streamRef.current) beginTurnRef.current();
+            });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [messages]);
+    }, [messages, phase]);
 
     // Coupe tout proprement si la personne quitte la page en cours
     // d'émission — jamais de micro qui reste ouvert en arrière-plan.
-    useEffect(() => stopEmission, [stopEmission]);
+    useEffect(() => {
+        return () => stopEmission();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // Placé volontairement APRÈS tous les hooks ci-dessus (useState,
-    // useRef, useCallback, useEffect) — jamais avant. Un retour anticipé
-    // placé plus haut ferait sauter certains hooks tant que `loading` est
-    // vrai, puis les ferait apparaître d'un coup une fois le chargement
-    // terminé : React l'interdit strictement (nombre de hooks qui doit
-    // rester identique à chaque rendu), d'où l'erreur #310 rencontrée.
     if (loading) return <p className="text-sm text-gray-400 text-center py-20">Chargement...</p>;
 
     return (
@@ -323,8 +332,8 @@ export default function EmissionRecordingPage() {
                     {sendError && <p className="text-xs text-red-500 text-center font-semibold">⚠️ {sendError}</p>}
                     {replyTimedOut && !sendError && (
                         <p className="text-xs text-amber-600 text-center font-semibold">
-                            ⚠️ Sa réponse n'est jamais arrivée (25s) — vérifie les journaux de la Function
-                            "send-message" côté Appwrite pour voir la vraie erreur.
+                            ⚠️ Sa réponse n'est jamais arrivée ({REPLY_TIMEOUT_MS / 1000}s) — ouvre la console F12
+                            (préfixe "[ÉMISSION]") pour voir exactement à quelle étape ça bloque.
                         </p>
                     )}
                     {phase === 'paused' && (
