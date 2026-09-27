@@ -40,10 +40,11 @@ const PHASE_COLOR: Record<Phase, string> = {
 
 export default function EmissionRecordingPage() {
     const { id } = useParams<{ id: string }>();
-    const { conversation, messages, sendVoiceMessage, loading } = useConversationThread(id!);
+    const { conversation, messages, sendVoiceMessage, loading, sendError } = useConversationThread(id!);
 
     const [phase, setPhase] = useState<Phase>('off');
     const [micError, setMicError] = useState<string | null>(null);
+    const [replyTimedOut, setReplyTimedOut] = useState(false);
 
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -120,10 +121,15 @@ export default function EmissionRecordingPage() {
         await sendVoiceMessage(blob, durationSeconds);
         // À partir d'ici, on reste en "processing" — voir le commentaire
         // au-dessus. Un filet de sécurité si sa réponse ne vient vraiment
-        // jamais (panne, quota...), pour ne jamais rester bloqué.
+        // jamais (panne, quota...), pour ne jamais rester bloqué — mais on
+        // le SIGNALE cette fois, plutôt que de revenir en bleu sans rien
+        // dire comme avant.
         clearReplyTimeout();
         replyTimeoutRef.current = setTimeout(() => {
-            if (phaseRef.current === 'processing' && streamRef.current) beginTurn();
+            if (phaseRef.current === 'processing' && streamRef.current) {
+                setReplyTimedOut(true);
+                beginTurn();
+            }
         }, REPLY_TIMEOUT_MS);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sendVoiceMessage, beginTurn]);
@@ -224,6 +230,7 @@ export default function EmissionRecordingPage() {
             lastPlayedMessageId.current = lastVanessaAudio.$id;
             clearVad();
             clearReplyTimeout();
+            setReplyTimedOut(false);
             setPhase('speaking');
             const audio = new Audio(getVoiceMessageUrl(lastVanessaAudio.audioFileId!));
             audioPlayerRef.current = audio;
@@ -313,6 +320,13 @@ export default function EmissionRecordingPage() {
                         </div>
                     )}
                     {micError && <p className="text-xs text-red-500 text-center">{micError}</p>}
+                    {sendError && <p className="text-xs text-red-500 text-center font-semibold">⚠️ {sendError}</p>}
+                    {replyTimedOut && !sendError && (
+                        <p className="text-xs text-amber-600 text-center font-semibold">
+                            ⚠️ Sa réponse n'est jamais arrivée (25s) — vérifie les journaux de la Function
+                            "send-message" côté Appwrite pour voir la vraie erreur.
+                        </p>
+                    )}
                     {phase === 'paused' && (
                         <p className="text-xs text-gray-400 text-center">
                             En pause — Vanessa n'écoute plus du tout. Rien n'a été envoyé du tour en cours.
