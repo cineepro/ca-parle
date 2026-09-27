@@ -151,6 +151,23 @@ async function transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_
     }
 }
 
+// Corrections phonétiques — le moteur de synthèse lit certains mots
+// tels qu'écrits d'une façon qui ne correspond pas à la vraie prononciation
+// attendue (ex : "gbai" lu comme un sigle, lettre par lettre). Ça
+// n'affecte QUE ce qui est dit à voix haute — jamais le texte affiché ni
+// stocké en base. Ajoute une entrée ici à chaque nouveau mot signalé.
+const PRONUNCIATION_FIXES = [
+    [/\bgbai\b/gi, 'gbaïe'],
+];
+
+function applyPronunciationFixes(text) {
+    let result = text;
+    for (const [pattern, replacement] of PRONUNCIATION_FIXES) {
+        result = result.replace(pattern, replacement);
+    }
+    return result;
+}
+
 async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, text, permissions, log }) {
     try {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
@@ -160,8 +177,16 @@ async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLA
                 'xi-api-key': ELEVENLABS_API_KEY,
             },
             body: JSON.stringify({
-                text,
+                text: applyPronunciationFixes(text),
                 model_id: 'eleven_multilingual_v2',
+                // "speed" est disponible sur TOUS les forfaits ElevenLabs,
+                // toutes voix confondues (0.7 à 1.2, 1.0 = défaut) — la
+                // voix par défaut se sentait lente, corrigé ici plutôt
+                // qu'en changeant de forfait, qui n'aurait rien changé à
+                // ce réglage précis.
+                voice_settings: {
+                    speed: 1.12,
+                },
             }),
         });
 
