@@ -147,6 +147,7 @@ async function transcribeAudio({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_
         return data.text?.trim() || '[Message vocal]';
     } catch (err) {
         log(`⚠️ Transcription échouée : ${err.message}`);
+        await emitEvent('transcription_failed', 'warning', err.message);
         return '[Message vocal]';
     }
 }
@@ -168,8 +169,31 @@ function applyPronunciationFixes(text) {
     return result;
 }
 
+// Réglages de la voix, modifiables SANS redéployer le code (variables
+// d'environnement de la Function) — pour comparer des essais rapidement :
+//   ELEVENLABS_MODEL_ID  : eleven_multilingual_v2 (défaut), eleven_flash_v2_5, eleven_v3
+//   ELEVENLABS_SPEED     : 0.7 à 1.2 (défaut 1.12). Ignoré avec eleven_v3.
+//   ELEVENLABS_STABILITY : 0 à 1 (non envoyé si absent). Plus bas = plus vivant.
+// Rappel : le choix de la VOIX (ELEVENLABS_VOICE_ID) pèse plus lourd sur
+// le rendu que tous ces réglages réunis.
+function buildVoiceConfig() {
+    const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
+    const voiceSettings = {};
+
+    const speed = parseFloat(process.env.ELEVENLABS_SPEED ?? '1.12');
+    if (!Number.isNaN(speed) && !modelId.includes('v3')) {
+        voiceSettings.speed = Math.min(1.2, Math.max(0.7, speed));
+    }
+    const stability = parseFloat(process.env.ELEVENLABS_STABILITY);
+    if (!Number.isNaN(stability)) {
+        voiceSettings.stability = Math.min(1, Math.max(0, stability));
+    }
+    return { modelId, voiceSettings };
+}
+
 async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, text, permissions, log }) {
     try {
+        const { modelId, voiceSettings } = buildVoiceConfig();
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
             method: 'POST',
             headers: {
@@ -178,15 +202,8 @@ async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLA
             },
             body: JSON.stringify({
                 text: applyPronunciationFixes(text),
-                model_id: 'eleven_multilingual_v2',
-                // "speed" est disponible sur TOUS les forfaits ElevenLabs,
-                // toutes voix confondues (0.7 à 1.2, 1.0 = défaut) — la
-                // voix par défaut se sentait lente, corrigé ici plutôt
-                // qu'en changeant de forfait, qui n'aurait rien changé à
-                // ce réglage précis.
-                voice_settings: {
-                    speed: 1.12,
-                },
+                model_id: modelId,
+                ...(Object.keys(voiceSettings).length > 0 ? { voice_settings: voiceSettings } : {}),
             }),
         });
 
@@ -203,6 +220,7 @@ async function synthesizeVanessaVoice({ storage, BUCKET_VOICE_MESSAGES, ELEVENLA
         return uploaded.$id;
     } catch (err) {
         log(`⚠️ Synthèse vocale de Vanessa échouée (non bloquant) : ${err.message}`);
+        await emitEvent('tts_failed', 'warning', err.message);
         return null;
     }
 }
@@ -328,6 +346,20 @@ async function extractMemoryIfNeeded({ conversation, databases, DATABASE_ID, COL
 function buildPubliciteInstruction(documents) {
     return '\n\nINFORMATION À MENTIONNER OBLIGATOIREMENT, À LA TOUTE FIN de ta réponse, sur sa propre ligne, en commençant EXACTEMENT par "PUB : " (reformule le reste dans ton ton, mais ne retire jamais ce préfixe et ne l\'omets JAMAIS) :\n' +
         documents.map((a) => `- ${a.content}`).join('\n');
+}
+
+// Journal d'événements de la plateforme (lu par la Console, voir
+// platform-overview). Beaucoup d'échecs de cette Function sont
+// volontairement "non bloquants" : Vanessa n'a pas pu répondre, mais
+// l'exécution se termine quand même en succès (200) — Appwrite la montre
+// donc comme réussie. Sans ce journal, ces pannes-là seraient invisibles.
+// Jamais de contenu de message ici : uniquement type, gravité, erreur technique.
+let eventSink = null;
+async function emitEvent(type, severity, message, meta = {}) {
+    if (!eventSink) return;
+    try {
+        await eventSink(type, severity, message, meta);
+    } catch { /* le journal ne doit JAMAIS faire échouer un envoi */ }
 }
 
 const RELEVANCE_MAX_RESULTS = 8;
@@ -785,6 +817,14 @@ export default async ({ req, res, log, error }) => {
     const messaging = new Messaging(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const COLLECTION_CONVERSATIONS = process.env.COLLECTION_CONVERSATIONS;
+    const COLLECTION_APP_EVENTS = process.env.COLLECTION_APP_EVENTS;
+    eventSink = COLLECTION_APP_EVENTS ? (type, severity, message, meta) =>
+        databases.createDocument(DATABASE_ID, COLLECTION_APP_EVENTS, ID.unique(), {
+            type, severity, source: 'send-message',
+            message: String(message).slice(0, 300),
+            meta: JSON.stringify(meta).slice(0, 900),
+            createdAt: new Date().toISOString(),
+        }) : null;
     const COLLECTION_MESSAGES = process.env.COLLECTION_MESSAGES;
     const COLLECTION_NOTIFICATIONS = process.env.COLLECTION_NOTIFICATIONS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
@@ -1109,6 +1149,9 @@ export default async ({ req, res, log, error }) => {
                 }
             } catch (vanessaErr) {
                 log(`⚠️ Réponse Vanessa échouée (non bloquant) : ${vanessaErr.message}`);
+                await emitEvent('vanessa_reply_failed', 'critical', vanessaErr.message, {
+                    voice: !!isVoice, connector: !!conversation.vanessaConnectorId, emission: !!conversation.emissionTopic,
+                });
                 // Non bloquant — le message humain reste envoyé normalement.
             }
         } else {
@@ -1119,6 +1162,7 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: true, message });
     } catch (err) {
         log(`❌ ERREUR NON GÉRÉE : ${err.message}`);
+        await emitEvent('send_message_unhandled', 'critical', err.message);
         error(err.message);
         return res.json({ success: false, error: err.message }, 500);
     }
