@@ -46,9 +46,27 @@ export interface PlatformEvent {
     createdAt: string;
 }
 
+export interface PlatformAlert {
+    id: string;
+    key: string;
+    title: string;
+    details: string;
+    severity: Severity;
+    status: 'open' | 'acknowledged' | 'resolved';
+    occurrences: number;
+    firstSeenAt: string;
+    lastSeenAt: string;
+    resolvedAt: string | null;
+    acknowledgedBy: string | null;
+}
+
 export const platformService = {
     overview: () => callFunction<Overview>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'overview' }),
     system: () => callFunction<{ generatedAt: string; functions: FunctionHealth[] }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'system' }),
+    alerts: () => callFunction<{ alerts: PlatformAlert[] }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'list' }),
+    alertSummary: () => callFunction<{ open: number; critical: number }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'summary' }),
+    acknowledgeAlert: (alertId: string) => callFunction(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'acknowledge', alertId }),
+    runCheck: () => callFunction<{ findings: number; created: number; resolved: number }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'run' }),
     events: (severity?: Severity) =>
         callFunction<{ events: PlatformEvent[]; notConfigured?: boolean }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'events', severity }),
 };

@@ -1,6 +1,7 @@
 // src/features/console/components/ConsoleOverview.tsx — Vanessa
 import { useState, useEffect, useCallback } from 'react';
 import { platformService, timeAgo, type Overview } from '../services/platformService';
+import { useAlertSummary } from '../hooks/useAlertSummary';
 
 interface Props {
     onNavigate: (section: string) => void;
@@ -31,6 +32,7 @@ function Queue({ label, value, onClick }: { label: string; value: number | null 
 }
 
 export const ConsoleOverview = ({ onNavigate }: Props) => {
+    const alertSummary = useAlertSummary(true);
     const [data, setData] = useState<Overview | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -64,6 +66,20 @@ export const ConsoleOverview = ({ onNavigate }: Props) => {
                     {loading ? 'Actualisation...' : 'Actualiser'}
                 </button>
             </div>
+
+            {alertSummary.open > 0 && (
+                <button
+                    onClick={() => onNavigate('alerts')}
+                    className={`w-full text-left rounded-2xl border p-4 flex items-center justify-between ${
+                        alertSummary.critical > 0 ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'
+                    }`}
+                >
+                    <span className={`text-sm font-semibold ${alertSummary.critical > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                        {alertSummary.open} alerte(s) ouverte(s){alertSummary.critical > 0 ? `, dont ${alertSummary.critical} critique(s)` : ''}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-500">Voir</span>
+                </button>
+            )}
 
             <section>
                 <h2 className="text-sm font-bold text-gray-800 mb-2">À traiter</h2>

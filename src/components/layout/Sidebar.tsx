@@ -8,6 +8,7 @@ import { conversationService, type Conversation } from '@/features/messaging/ser
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '@/features/vanessa/utils/questionCount';
 import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 import { VANESSA_USER_ID } from '@/api/constants';
+import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 interface NavItem {
     to: string;
@@ -18,7 +19,7 @@ interface NavItem {
 
 function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
     const location = useLocation();
-    const isActive = location.pathname === item.to;
+    const isActive = location.pathname === item.to.split('?')[0];
     return (
         <Link
             to={item.to}
@@ -106,6 +107,7 @@ export const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { unreadCount } = useNotifications();
+    const alertSummary = useAlertSummary(!!user?.isModerator);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [activeConnectorId, setActiveConnectorId] = useState('');
@@ -463,7 +465,10 @@ export const Sidebar = () => {
                         <>
                             <SectionLabel>Équipe</SectionLabel>
                             <div className="space-y-0.5">
-                                <NavLink item={{ to: '/moderation', label: 'Modération' }} onNavigate={close} />
+                                <NavLink
+                                    item={{ to: alertSummary.open > 0 ? '/moderation?section=alerts' : '/moderation', label: 'Console', badge: alertSummary.open }}
+                                    onNavigate={close}
+                                />
                                 <NavLink item={{ to: '/emissions', label: 'Émissions' }} onNavigate={close} />
                             </div>
                         </>

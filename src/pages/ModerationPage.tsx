@@ -14,9 +14,11 @@ import { VanessaFeedbackReview } from '@/features/vanessa/components/VanessaFeed
 import { ConsoleOverview } from '@/features/console/components/ConsoleOverview';
 import { ConsoleJournal } from '@/features/console/components/ConsoleJournal';
 import { ConsoleSystem } from '@/features/console/components/ConsoleSystem';
+import { ConsoleAlerts } from '@/features/console/components/ConsoleAlerts';
+import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 type Section =
-    | 'overview' | 'journal' | 'system'
+    | 'overview' | 'alerts' | 'journal' | 'system'
     | 'signalements' | 'ca-sert' | 'avis' | 'connaissances' | 'connecteurs'
     | 'newsletter';
 
@@ -25,6 +27,7 @@ interface NavGroup { title: string; entries: NavEntry[] }
 
 const SECTION_TITLES: Record<Section, string> = {
     overview: "Vue d'ensemble",
+    alerts: 'Alertes',
     journal: 'Journal des incidents',
     system: 'Système',
     signalements: 'Signalements',
@@ -37,6 +40,7 @@ const SECTION_TITLES: Record<Section, string> = {
 
 export default function ModerationPage() {
     const { items, loading, refresh } = useModerationQueue();
+    const alertSummary = useAlertSummary(true);
     const [params, setParams] = useSearchParams();
     const requested = params.get('section') as Section | null;
     const section: Section = requested && requested in SECTION_TITLES ? requested : 'overview';
@@ -45,6 +49,7 @@ export default function ModerationPage() {
     const groups: NavGroup[] = [
         { title: 'Supervision', entries: [
             { id: 'overview', label: "Vue d'ensemble" },
+            { id: 'alerts', label: 'Alertes', badge: alertSummary.open },
             { id: 'journal', label: 'Journal' },
             { id: 'system', label: 'Système' },
         ] },
@@ -104,6 +109,7 @@ export default function ModerationPage() {
                         <h2 className="text-base font-bold text-gray-800 mb-4">{SECTION_TITLES[section]}</h2>
 
                         {section === 'overview' && <ConsoleOverview onNavigate={go} />}
+                        {section === 'alerts' && <ConsoleAlerts />}
                         {section === 'journal' && <ConsoleJournal />}
                         {section === 'system' && <ConsoleSystem />}
 
