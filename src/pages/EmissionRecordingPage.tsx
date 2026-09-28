@@ -240,16 +240,51 @@ export default function EmissionRecordingPage() {
             clearReplyTimeout();
             setReplyTimedOut(false);
             setPhase('speaking');
-            const audio = new Audio(getVoiceMessageUrl(lastVanessaAudio.audioFileId!));
+            // On attend que le navigateur ait assez chargé l'audio AVANT de
+            // le jouer, au lieu de le lire en streaming dès le premier
+            // octet : au moindre ralentissement du réseau, une lecture en
+            // streaming saute ou se coupe. Filet de sécurité : si le
+            // navigateur n'annonce jamais "assez chargé", on joue quand
+            // même après quelques secondes plutôt que de rester muet.
+            const audio = new Audio();
+            audio.preload = 'auto';
             audioPlayerRef.current = audio;
+            let started = false;
+            let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+            const startPlayback = () => {
+                if (started) return;
+                started = true;
+                if (fallbackTimer) clearTimeout(fallbackTimer);
+                // La personne a mis en pause ou arrêté pendant le chargement.
+                if (phaseRef.current === 'off' || phaseRef.current === 'paused') return;
+                LOG('Lecture démarrée.');
+                audio.play().catch((err) => {
+                    LOG('❌ Échec de lecture audio :', err);
+                    if (streamRef.current) beginTurnRef.current();
+                });
+            };
+            audio.oncanplaythrough = startPlayback;
+            fallbackTimer = setTimeout(() => {
+                LOG('⚠️ Chargement lent — lecture lancée quand même.');
+                startPlayback();
+            }, 4000);
+            // Ces deux logs répondent à "est-ce ma connexion ?" : s'ils
+            // apparaissent pendant que Vanessa parle, c'est le réseau ;
+            // s'ils n'apparaissent jamais alors que le son coupe, la
+            // coupure est dans le fichier audio lui-même (voix, vitesse).
+            audio.onwaiting = () => LOG('⚠️ Lecture en attente de données (réseau).');
+            audio.onstalled = () => LOG('⚠️ Le téléchargement de l\u2019audio est bloqué (réseau).');
+            audio.onerror = () => {
+                LOG('❌ Erreur de chargement audio.');
+                if (streamRef.current) beginTurnRef.current();
+            };
             audio.onended = () => {
                 LOG('Lecture terminée — reprise de l\u2019écoute.');
                 if (streamRef.current) beginTurnRef.current();
             };
-            audio.play().catch((err) => {
-                LOG('❌ Échec de lecture audio :', err);
-                if (streamRef.current) beginTurnRef.current();
-            });
+            LOG('Chargement de la réponse audio...');
+            audio.src = getVoiceMessageUrl(lastVanessaAudio.audioFileId!);
+            audio.load();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [messages, phase]);
@@ -261,102 +296,133 @@ export default function EmissionRecordingPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // La discussion défile toute seule vers le dernier message — quand on
+    // suit l'écrit en même temps qu'on parle, on ne veut jamais avoir à
+    // chercher la dernière phrase. Placé AVANT le retour anticipé ci-dessous
+    // (règle des hooks : jamais après un `return` conditionnel).
+    const transcriptRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const el = transcriptRef.current;
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }, [messages.length, loading]);
+
     if (loading) return <p className="text-sm text-gray-400 text-center py-20">Chargement...</p>;
 
     return (
-        <div className="min-h-screen bg-gray-50 px-4 py-8">
-            <div className="max-w-lg mx-auto space-y-5">
+        <div className="min-h-screen bg-gray-50 px-4 py-6">
+            <div className="max-w-6xl mx-auto space-y-4">
                 <div className="flex items-center gap-3">
                     <Link to="/emissions" className="text-gray-400 hover:text-gray-600">←</Link>
                     <h1 className="text-lg font-bold text-gray-800">{conversation?.title?.replace('🎙️ ', '') || 'Émission'}</h1>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-1">
-                    <p className="text-xs font-semibold text-gray-400">Sujet</p>
-                    <p className="text-sm text-gray-700">{conversation?.emissionTopic}</p>
-                    {conversation?.emissionPosture && (
-                        <>
-                            <p className="text-xs font-semibold text-gray-400 pt-2">Posture</p>
-                            <p className="text-sm text-gray-700">{conversation.emissionPosture}</p>
-                        </>
-                    )}
-                </div>
-
-                {/* Le vrai indicateur demandé : montre clairement l'état
-                    précis de l'émission — sans jamais avoir besoin d'un
-                    bouton "envoyer" au fil de la discussion. */}
-                <div className="bg-white rounded-3xl border border-gray-100 p-8 flex flex-col items-center gap-4">
-                    <div className="relative">
-                        <div className={`w-24 h-24 rounded-full ${PHASE_COLOR[phase]} flex items-center justify-center transition-colors`}>
-                            {(phase === 'recording' || phase === 'listening') && (
-                                <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ backgroundColor: 'currentColor' }} />
+                {/* Deux colonnes sur grand écran : le micro et ses boutons à
+                    gauche, la discussion écrite à droite. Chaque colonne
+                    défile de son côté — la discussion peut être très longue
+                    sans jamais faire bouger le micro. Sur petit écran, tout
+                    s'empile (micro d'abord, discussion dessous). */}
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:h-[calc(100vh-7rem)]">
+                    <div className="space-y-4 lg:overflow-y-auto">
+                        <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-1">
+                            <p className="text-xs font-semibold text-gray-400">Sujet</p>
+                            <p className="text-sm text-gray-700">{conversation?.emissionTopic}</p>
+                            {conversation?.emissionPosture && (
+                                <>
+                                    <p className="text-xs font-semibold text-gray-400 pt-2">Posture</p>
+                                    <p className="text-sm text-gray-700">{conversation.emissionPosture}</p>
+                                </>
                             )}
-                            <span className="text-white text-2xl relative">🎙️</span>
                         </div>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-700">{PHASE_LABEL[phase]}</p>
 
-                    {phase === 'off' ? (
-                        <button
-                            onClick={startEmission}
-                            className="w-full rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
-                        >
-                            Démarrer l'émission
-                        </button>
-                    ) : (
-                        <div className="w-full flex gap-2">
-                            {phase === 'paused' ? (
+                        <div className="bg-white rounded-3xl border border-gray-100 p-6 flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <div className={`w-24 h-24 rounded-full ${PHASE_COLOR[phase]} flex items-center justify-center transition-colors`}>
+                                    {(phase === 'recording' || phase === 'listening') && (
+                                        <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ backgroundColor: 'currentColor' }} />
+                                    )}
+                                    <span className="text-white text-2xl relative">🎙️</span>
+                                </div>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-700">{PHASE_LABEL[phase]}</p>
+
+                            {phase === 'off' ? (
                                 <button
-                                    onClick={resumeListening}
-                                    className="flex-1 rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
+                                    onClick={startEmission}
+                                    className="w-full rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
                                 >
-                                    Reprendre
+                                    Démarrer l'émission
                                 </button>
                             ) : (
-                                <button
-                                    onClick={pauseListening}
-                                    className="flex-1 rounded-full py-3.5 font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                                >
-                                    Pause
-                                </button>
+                                <div className="w-full flex gap-2">
+                                    {phase === 'paused' ? (
+                                        <button
+                                            onClick={resumeListening}
+                                            className="flex-1 rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
+                                        >
+                                            Reprendre
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={pauseListening}
+                                            className="flex-1 rounded-full py-3.5 font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                                        >
+                                            Pause
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={stopEmission}
+                                        className="flex-1 rounded-full py-3.5 font-bold text-sm bg-gray-800 hover:bg-gray-900 text-white transition-colors"
+                                    >
+                                        Arrêter
+                                    </button>
+                                </div>
                             )}
-                            <button
-                                onClick={stopEmission}
-                                className="flex-1 rounded-full py-3.5 font-bold text-sm bg-gray-800 hover:bg-gray-900 text-white transition-colors"
-                            >
-                                Arrêter
-                            </button>
+                            {micError && <p className="text-xs text-red-500 text-center">{micError}</p>}
+                            {sendError && <p className="text-xs text-red-500 text-center font-semibold">⚠️ {sendError}</p>}
+                            {replyTimedOut && !sendError && (
+                                <p className="text-xs text-amber-600 text-center font-semibold">
+                                    ⚠️ Sa réponse n'est jamais arrivée ({REPLY_TIMEOUT_MS / 1000}s) — ouvre la console F12
+                                    (préfixe "[ÉMISSION]") pour voir exactement à quelle étape ça bloque.
+                                </p>
+                            )}
+                            {phase === 'paused' && (
+                                <p className="text-xs text-gray-400 text-center">
+                                    En pause — Vanessa n'écoute plus du tout. Rien n'a été envoyé du tour en cours.
+                                </p>
+                            )}
+                            {phase !== 'off' && phase !== 'paused' && (
+                                <p className="text-xs text-gray-400 text-center">
+                                    Parlez normalement — Vanessa attend une pause pour répondre, aucun bouton à presser.
+                                </p>
+                            )}
                         </div>
-                    )}
-                    {micError && <p className="text-xs text-red-500 text-center">{micError}</p>}
-                    {sendError && <p className="text-xs text-red-500 text-center font-semibold">⚠️ {sendError}</p>}
-                    {replyTimedOut && !sendError && (
-                        <p className="text-xs text-amber-600 text-center font-semibold">
-                            ⚠️ Sa réponse n'est jamais arrivée ({REPLY_TIMEOUT_MS / 1000}s) — ouvre la console F12
-                            (préfixe "[ÉMISSION]") pour voir exactement à quelle étape ça bloque.
-                        </p>
-                    )}
-                    {phase === 'paused' && (
-                        <p className="text-xs text-gray-400 text-center">
-                            En pause — Vanessa n'écoute plus du tout. Rien n'a été envoyé du tour en cours.
-                        </p>
-                    )}
-                    {phase !== 'off' && phase !== 'paused' && (
-                        <p className="text-xs text-gray-400 text-center">
-                            Parlez normalement — Vanessa attend une pause pour répondre, aucun bouton à presser.
-                        </p>
-                    )}
-                </div>
+                    </div>
 
-                {/* Transcription en direct, pour l'animateur — pas pour le
-                    public, aucune émission n'est diffusée en direct. */}
-                <div className="space-y-2">
-                    {messages.map((m) => (
-                        <div key={m.$id} className={`text-xs p-3 rounded-xl ${m.senderId === VANESSA_USER_ID ? 'bg-[#FFF0F1] text-gray-700' : 'bg-white border border-gray-100 text-gray-600'}`}>
-                            <span className="font-semibold">{m.senderId === VANESSA_USER_ID ? 'Vanessa' : 'Invité'} — </span>
-                            {m.content}
+                    {/* Discussion écrite, pour l'animateur et l'invité — pas
+                        pour le public, aucune émission n'est diffusée en
+                        direct. */}
+                    <div className="bg-white rounded-3xl border border-gray-100 flex flex-col h-[55vh] lg:h-full min-h-0">
+                        <div className="px-5 py-3 border-b border-gray-100">
+                            <p className="text-xs font-semibold text-gray-400">Discussion</p>
                         </div>
-                    ))}
+                        <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                            {messages.length === 0 ? (
+                                <p className="text-sm text-gray-300 text-center py-10">La discussion s'affichera ici.</p>
+                            ) : (
+                                messages.map((m) => (
+                                    <div
+                                        key={m.$id}
+                                        className={`text-sm leading-relaxed p-3 rounded-xl ${
+                                            m.senderId === VANESSA_USER_ID ? 'bg-[#FFF0F1] text-gray-800' : 'bg-gray-50 text-gray-700'
+                                        }`}
+                                    >
+                                        <span className="font-semibold">{m.senderId === VANESSA_USER_ID ? 'Vanessa' : 'Invité'} — </span>
+                                        {m.content}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
