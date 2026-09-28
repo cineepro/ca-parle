@@ -8,6 +8,9 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Avatar } from '@/components/ui/avatar';
 import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
 import { conversationService } from '@/features/messaging/services/conversationService';
+import { useVoiceConversation } from '@/features/messaging/hooks/useVoiceConversation';
+import { VoiceCallBar } from '@/features/messaging/components/VoiceCallBar';
+import { VANESSA_USER_ID } from '@/api/constants';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -119,6 +122,13 @@ export default function ConversationPage() {
     const scrollToBottom = () => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
+
+    // Mode appel : discussion vocale continue avec Vanessa (voir le hook).
+    // Placé AVANT les retours anticipés ci-dessous, comme tous les hooks.
+    // L'appel se coupe dès qu'on change de conversation ou qu'on quitte la page.
+    const call = useVoiceConversation({ messages, sendVoiceMessage, vanessaUserId: VANESSA_USER_ID });
+    const stopCall = call.stop;
+    useEffect(() => () => stopCall(), [id, stopCall]);
 
     if (loading) {
         return (
@@ -291,13 +301,28 @@ export default function ConversationPage() {
                         🔮 Vanessa est une intelligence artificielle. Elle peut se tromper.
                     </p>
                 )}
-                <MessageComposer
-                    onSend={sendMessage}
-                    onSendVoice={sendVoiceMessage}
-                    onSendImage={sendImageMessage}
-                    sending={sending}
-                    prefill={writingPrefill}
-                />
+                {call.active ? (
+                    <VoiceCallBar
+                        phase={call.phase}
+                        notice={call.notice}
+                        micError={call.micError}
+                        sendError={sendError}
+                        userLine={[...messages].reverse().find((m) => m.senderId !== VANESSA_USER_ID && !m.$id.startsWith('temp-') && m.content && m.content !== '[Message vocal]')?.content}
+                        vanessaLine={[...messages].reverse().find((m) => m.senderId === VANESSA_USER_ID)?.content}
+                        onPause={call.pause}
+                        onResume={call.resume}
+                        onEnd={call.stop}
+                    />
+                ) : (
+                    <MessageComposer
+                        onSend={sendMessage}
+                        onSendVoice={sendVoiceMessage}
+                        onSendImage={sendImageMessage}
+                        sending={sending}
+                        prefill={writingPrefill}
+                        onStartCall={isVanessaConversation ? call.start : undefined}
+                    />
+                )}
             </div>
         </div>
     );

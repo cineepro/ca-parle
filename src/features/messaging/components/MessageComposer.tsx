@@ -10,11 +10,15 @@ interface Props {
     // quelque chose") sans envoyer automatiquement — la personne garde la
     // main pour compléter/modifier avant d'envoyer.
     prefill?: string;
+    // Démarre une discussion vocale continue (mode appel). Fourni uniquement
+    // pour les conversations avec Vanessa ; le micro des notes vocales reste
+    // disponible à côté, inchangé.
+    onStartCall?: () => void;
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
 
-export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, prefill }: Props) => {
+export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, prefill, onStartCall }: Props) => {
     const [content, setContent] = useState('');
     const [recording, setRecording] = useState(false);
     const [recordSeconds, setRecordSeconds] = useState(0);
@@ -181,6 +185,21 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, pre
                     maxLength={2000}
                     className="flex-1 resize-none rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 max-h-32"
                 />
+
+                {onStartCall && !content.trim() && (
+                    <button
+                        type="button"
+                        onClick={onStartCall}
+                        disabled={sending}
+                        title="Discuter en direct avec Vanessa"
+                        aria-label="Discuter en direct avec Vanessa"
+                        className="shrink-0 w-10 h-10 rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center disabled:opacity-40 hover:bg-[#FF4757]/20 transition-colors"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                            <path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2" />
+                        </svg>
+                    </button>
+                )}
 
                 {content.trim() ? (
                     <button
