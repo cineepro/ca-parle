@@ -4,11 +4,13 @@
 //
 // Bascule : si l'appelant a déjà confirmé cette fiche, sa confirmation est
 // retirée ; sinon elle est ajoutée. L'unicité (un seul avis par personne et
-// par fiche) est garantie par l'ID du document lui-même (`${spotId}_${userId}`),
-// pas par une requête de vérification séparée — Appwrite refuse nativement
-// un ID déjà existant, donc pas de double confirmation possible même en cas
-// de double clic rapide.
-import { Client, Databases, ID } from 'node-appwrite';
+// par fiche) est vérifiée par une requête (spotId + userId), pas par un ID
+// de document composite — un ID Appwrite classique fait déjà ~20 caractères,
+// deux mis bout à bout dépassent systématiquement la limite de 36 caractères
+// qu'Appwrite impose aux identifiants de document (c'était la vraie cause de
+// l'échec : pas un cas rare, un cas garanti dès qu'un utilisateur avait un
+// identifiant de longueur normale).
+import { Client, Databases, ID, Query } from 'node-appwrite';
 
 export default async ({ req, res, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
@@ -34,20 +36,23 @@ export default async ({ req, res, error }) => {
         }
 
         const spot = await databases.getDocument(DATABASE_ID, COLLECTION_LOCAL_SPOTS, spotId);
-        const confirmationId = `${spotId}_${callerId}`;
+
+        const existing = await databases.listDocuments(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, [
+            Query.equal('spotId', spotId),
+            Query.equal('userId', callerId),
+            Query.limit(1),
+        ]);
 
         let confirmed;
-        try {
-            // Existe déjà → l'appelant retire sa confirmation.
-            await databases.getDocument(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, confirmationId);
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, confirmationId);
+        if (existing.documents.length > 0) {
+            // Déjà confirmé → l'appelant retire sa confirmation.
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, existing.documents[0].$id);
             await databases.updateDocument(DATABASE_ID, COLLECTION_LOCAL_SPOTS, spotId, {
                 confirmCount: Math.max(0, (spot.confirmCount || 0) - 1),
             });
             confirmed = false;
-        } catch {
-            // N'existe pas encore → on l'ajoute.
-            await databases.createDocument(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, confirmationId, {
+        } else {
+            await databases.createDocument(DATABASE_ID, COLLECTION_SPOT_CONFIRMATIONS, ID.unique(), {
                 spotId, userId: callerId, createdAt: new Date().toISOString(),
             });
             await databases.updateDocument(DATABASE_ID, COLLECTION_LOCAL_SPOTS, spotId, {

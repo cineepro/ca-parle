@@ -70,29 +70,55 @@ export default async ({ req, res, error }) => {
             Permission.update(Role.user(id)),
         ]);
 
-        const conversation = await databases.createDocument(
-            DATABASE_ID,
-            COLLECTION_CONVERSATIONS,
-            ID.unique(),
-            {
-                participantIds: [callerId, otherUserId],
-                isGroup: false,
-                // Sans forceNew (premier échange entre ces deux personnes,
-                // humain ou Vanessa) : la vraie valeur, identique à avant —
-                // aucun changement pour les conversations déjà existantes.
-                // Avec forceNew (une Nième conversation avec Vanessa) : un
-                // suffixe unique est ajouté, pour respecter la contrainte
-                // d'unicité de la base — la recherche ci-dessus ne s'appuie
-                // de toute façon plus sur cette valeur exacte.
-                directKey: forceNew ? `${directKey}__${ID.unique()}` : directKey,
-                title: '',
-                lastMessage: '',
-                lastMessageAt: new Date().toISOString(),
-                lastMessageSenderId: '',
-                createdAt: new Date().toISOString(),
-            },
-            permissions
-        );
+        let conversation;
+        try {
+            conversation = await databases.createDocument(
+                DATABASE_ID,
+                COLLECTION_CONVERSATIONS,
+                ID.unique(),
+                {
+                    participantIds: [callerId, otherUserId],
+                    isGroup: false,
+                    // Sans forceNew (premier échange entre ces deux personnes,
+                    // humain ou Vanessa) : la vraie valeur, identique à avant —
+                    // aucun changement pour les conversations déjà existantes.
+                    // Avec forceNew (une Nième conversation avec Vanessa) : un
+                    // suffixe unique est ajouté, pour respecter la contrainte
+                    // d'unicité de la base — la recherche ci-dessus ne s'appuie
+                    // de toute façon plus sur cette valeur exacte.
+                    directKey: forceNew ? `${directKey}__${ID.unique()}` : directKey,
+                    title: '',
+                    lastMessage: '',
+                    lastMessageAt: new Date().toISOString(),
+                    lastMessageSenderId: '',
+                    createdAt: new Date().toISOString(),
+                },
+                permissions
+            );
+        } catch (createErr) {
+            // Deux appels quasi simultanés (ex : plusieurs parties de l'écran
+            // qui demandent chacune "la" conversation avec Vanessa au
+            // chargement de la page) peuvent tous les deux constater "rien
+            // trouvé" avant qu'aucun n'ait eu le temps d'écrire — le second à
+            // écrire se fait alors refuser par la contrainte d'unicité sur
+            // directKey. Plutôt que d'échouer, on récupère simplement la
+            // conversation que l'autre appel vient de créer. Ne s'applique
+            // jamais à forceNew, dont le directKey est justement rendu unique
+            // exprès — une vraie erreur là ne doit jamais être masquée.
+            const isUniqueConflict = /unique/i.test(createErr.message || '');
+            if (!forceNew && isUniqueConflict) {
+                const retry = await databases.listDocuments(DATABASE_ID, COLLECTION_CONVERSATIONS, [
+                    Query.contains('participantIds', callerId),
+                    Query.contains('participantIds', otherUserId),
+                    Query.orderDesc('lastMessageAt'),
+                    Query.limit(1),
+                ]);
+                if (retry.documents.length > 0) {
+                    return res.json({ success: true, conversation: retry.documents[0] });
+                }
+            }
+            throw createErr;
+        }
 
         return res.json({ success: true, conversation });
     } catch (err) {
