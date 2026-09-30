@@ -17,7 +17,7 @@
 // Attribution : les fiches importées d'OpenStreetMap doivent porter la
 // mention de leur origine (ODbL) — c'est fait automatiquement dans la
 // description créée à l'étape "accept".
-import { Client, Databases, ID, Query } from 'node-appwrite';
+import { Client, Databases, ID, Query, Permission, Role } from 'node-appwrite';
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const MAX_RADIUS_M = 3000;
@@ -193,7 +193,13 @@ export default async ({ req, res, log, error }) => {
                 latitude: final.latitude,
                 longitude: final.longitude,
                 createdAt: new Date().toISOString(),
-            });
+            }, [Permission.read(Role.any()), Permission.update(Role.user(callerId))]);
+            // La collection local_spots a la sécurité par ligne (RLS)
+            // activée : sans ces permissions explicites, un document reste
+            // invisible pour tout le monde en dehors de la console Appwrite
+            // (qui, elle, contourne les permissions) — même avec
+            // moderationStatus déjà à "visible". C'était la vraie cause des
+            // fiches "présentes en base mais invisibles sur le site".
 
             await databases.updateDocument(DATABASE_ID, COLLECTION_IMPORT_CANDIDATES, candidateId, { status: 'accepte' });
             log(`Fiche Ça sert créée : ${spot.$id}.`);
