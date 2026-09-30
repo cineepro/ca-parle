@@ -102,6 +102,7 @@ export default function ModerationPage() {
                                 </div>
                             ))}
                             <Link to="/emissions" className={`${itemClass(false)} lg:w-full`}>Émissions</Link>
+                            <Link to="/import-osm" className={`${itemClass(false)} lg:w-full`}>Import OSM</Link>
                         </div>
                     </nav>
 

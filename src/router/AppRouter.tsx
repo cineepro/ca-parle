@@ -17,6 +17,7 @@ import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
 import EmissionsPage from '@/pages/EmissionsPage';
+import ImportOsmPage from '@/pages/ImportOsmPage';
 import EmissionRecordingPage from '@/pages/EmissionRecordingPage';
 import NotificationsPage from '@/pages/NotificationsPage';
 import TrendingPage from '@/pages/TrendingPage';
@@ -123,6 +124,14 @@ export const AppRouter = () => {
                     element={
                         <ModeratorRoute>
                             <EmissionsPage />
+                        </ModeratorRoute>
+                    }
+                />
+                <Route
+                    path="/import-osm"
+                    element={
+                        <ModeratorRoute>
+                            <ImportOsmPage />
                         </ModeratorRoute>
                     }
                 />
