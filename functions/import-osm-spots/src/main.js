@@ -42,7 +42,6 @@ function buildOverpassQuery(lat, lng, radius, category) {
     }).join('\n');
     return `[out:json][timeout:25];\n(\n${clauses}\n);\nout center tags ${MAX_RESULTS};`;
 }
-
 function mapOsmElement(el, category) {
     const tags = el.tags || {};
     const lat = el.lat ?? el.center?.lat;
@@ -62,7 +61,7 @@ function mapOsmElement(el, category) {
     };
 }
 
-export default async ({ req, res, error }) => {
+export default async ({ req, res, log, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
     if (!callerId) return res.json({ success: false, error: 'Authentification requise.' }, 401);
 
@@ -82,6 +81,7 @@ export default async ({ req, res, error }) => {
         if (!callerUser.isModerator) return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
 
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
+        log(`Action reçue : ${body.action}`);
 
         if (body.action === 'search') {
             const { lat, lng, category } = body;
@@ -89,12 +89,46 @@ export default async ({ req, res, error }) => {
             if (!lat || !lng || !category) return res.json({ success: false, error: 'lat, lng et category requis.' }, 400);
 
             const query = buildOverpassQuery(lat, lng, radius, category);
-            const response = await fetch(OVERPASS_URL, { method: 'POST', body: `data=${encodeURIComponent(query)}` });
-            if (!response.ok) {
-                return res.json({ success: false, error: `OpenStreetMap a répondu ${response.status} — réessaie dans une minute (serveur partagé).` }, 502);
+            log(`Requête Overpass (${category}, rayon ${radius} m, centre ${lat},${lng}) :\n${query}`);
+
+            // IMPORTANT : Overpass attend un corps de formulaire classique
+            // ("data=..."). Sans l'en-tête Content-Type explicite, certains
+            // runtimes n'envoient rien de précis, et Overpass peut alors mal
+            // interpréter — voire rejeter — la requête. C'était la cause la
+            // plus probable de l'échec silencieux rencontré.
+            let response;
+            try {
+                response = await fetch(OVERPASS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `data=${encodeURIComponent(query)}`,
+                });
+            } catch (fetchErr) {
+                error(`Échec réseau vers Overpass : ${fetchErr.message}`);
+                return res.json({ success: false, error: "Impossible de joindre OpenStreetMap (réseau) — réessaie dans une minute." });
             }
+
+            log(`Overpass a répondu : statut ${response.status}`);
+            if (!response.ok) {
+                // Overpass explique presque toujours la cause dans le corps
+                // de sa réponse (limite atteinte, erreur de syntaxe...) — on
+                // le journalise en entier pour ne plus jamais rester sans
+                // piste. Le code de retour ici reste volontairement 200 :
+                // Appwrite marque "failed" (et masque notre message) toute
+                // exécution qui renvoie un code HTTP différent de 200-299 —
+                // exactement ce qui a caché l'erreur la dernière fois.
+                const errorBody = await response.text().catch(() => '');
+                error(`Overpass a échoué (${response.status}) : ${errorBody.slice(0, 500)}`);
+                const hint = response.status === 429
+                    ? 'Trop de recherches en peu de temps — patiente une minute avant de réessayer.'
+                    : 'Réessaie dans une minute (serveur partagé, parfois occupé).';
+                return res.json({ success: false, error: `OpenStreetMap a répondu ${response.status}. ${hint}` });
+            }
+
             const data = await response.json();
+            log(`Overpass a renvoyé ${data.elements?.length || 0} élément(s) brut(s).`);
             const mapped = (data.elements || []).map((el) => mapOsmElement(el, category)).filter(Boolean);
+            log(`${mapped.length} élément(s) exploitable(s) après filtrage (nom + coordonnées présents).`);
 
             // On ignore ce qui a déjà été proposé (même point OSM) pour ne
             // jamais faire relire deux fois le même candidat.
@@ -113,6 +147,7 @@ export default async ({ req, res, error }) => {
                 existingRefs.add(c.sourceRef);
                 created++;
             }
+            log(`${created} nouveau(x) candidat(s) enregistré(s) (${mapped.length - created} déjà connu(s)).`);
             return res.json({ success: true, found: mapped.length, created });
         }
 
@@ -121,6 +156,7 @@ export default async ({ req, res, error }) => {
             const r = await databases.listDocuments(DATABASE_ID, COLLECTION_IMPORT_CANDIDATES, [
                 Query.equal('status', status), Query.orderDesc('createdAt'), Query.limit(100),
             ]);
+            log(`Liste "${status}" : ${r.documents.length} candidat(s).`);
             return res.json({ success: true, candidates: r.documents });
         }
 
@@ -129,6 +165,7 @@ export default async ({ req, res, error }) => {
             if (!candidateId) return res.json({ success: false, error: 'candidateId requis.' }, 400);
             const c = await databases.getDocument(DATABASE_ID, COLLECTION_IMPORT_CANDIDATES, candidateId);
             const final = { ...c, ...(overrides || {}) };
+            log(`Acceptation du candidat ${candidateId} ("${final.name}").`);
 
             const baseDescription = final.description || '';
             const attribution = 'Source : OpenStreetMap, contributeurs (licence ODbL).';
@@ -151,12 +188,14 @@ export default async ({ req, res, error }) => {
             });
 
             await databases.updateDocument(DATABASE_ID, COLLECTION_IMPORT_CANDIDATES, candidateId, { status: 'accepte' });
+            log(`Fiche Ça sert créée : ${spot.$id}.`);
             return res.json({ success: true, spot });
         }
 
         if (body.action === 'ignore') {
             if (!body.candidateId) return res.json({ success: false, error: 'candidateId requis.' }, 400);
             await databases.updateDocument(DATABASE_ID, COLLECTION_IMPORT_CANDIDATES, body.candidateId, { status: 'ignore' });
+            log(`Candidat ${body.candidateId} ignoré.`);
             return res.json({ success: true });
         }
 
