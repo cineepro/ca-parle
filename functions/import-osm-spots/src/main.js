@@ -96,11 +96,19 @@ export default async ({ req, res, log, error }) => {
             // runtimes n'envoient rien de précis, et Overpass peut alors mal
             // interpréter — voire rejeter — la requête. C'était la cause la
             // plus probable de l'échec silencieux rencontré.
+            // Overpass exige désormais que chaque appelant s'identifie
+            // clairement via un en-tête User-Agent — sans lui, son serveur
+            // (Apache) répond 406 Not Acceptable, exactement l'erreur
+            // rencontrée. Confirmé par la documentation d'usage d'Overpass.
             let response;
             try {
                 response = await fetch(OVERPASS_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'VanessaCaSert/1.0 (kinemaplus.com; import moderateur)',
+                        'Accept': 'application/json',
+                    },
                     body: `data=${encodeURIComponent(query)}`,
                 });
             } catch (fetchErr) {
