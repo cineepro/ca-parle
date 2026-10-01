@@ -202,7 +202,13 @@ async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLE
     const base = connector.sourceUrl;
     const links = new Set();
     $(connector.listingSelector).each((_, el) => {
-        const href = $(el).attr('href');
+        // Tolérant à deux cas fréquents : le sélecteur pointe directement
+        // sur un <a> (href présent sur l'élément lui-même), OU — le cas le
+        // plus courant en pratique via "Inspecter" — sur la carte visuelle
+        // qui ENTOURE le lien (une <div>, sans href propre). On cherche
+        // alors le premier <a> à l'intérieur.
+        const $el = $(el);
+        const href = $el.attr('href') || $el.find('a').first().attr('href');
         if (!href) return;
         try {
             links.add(new URL(href, base).toString());
