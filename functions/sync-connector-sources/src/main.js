@@ -14,7 +14,6 @@ import { Client, Databases, Query, ID } from 'node-appwrite';
 import { createHash } from 'crypto';
 import Parser from 'rss-parser';
 import { convert as htmlToText } from 'html-to-text';
-import * as cheerio from 'cheerio';
 
 const FETCH_USER_AGENT = 'VanessaConnecteurs/1.0 (kinemaplus.com)';
 
@@ -195,6 +194,19 @@ async function syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE,
 // durée — conforme à la prudence "teste chaque site avant de le brancher"
 // déjà recommandée.
 async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp) {
+    // Chargement dynamique plutôt qu'un import en tête de fichier : si ce
+    // module n'est pas réellement installé dans le déploiement (dépendance
+    // ajoutée à package.json mais pas reprise par Appwrite au build), un
+    // import statique fait planter TOUT le fichier au chargement — avant
+    // même la première ligne de la fonction exportée, donc sans AUCUN log
+    // possible. Ici, l'échec reste localisé et se voit clairement.
+    let cheerio;
+    try {
+        cheerio = await import('cheerio');
+    } catch (err) {
+        throw new Error(`Module "cheerio" introuvable au déploiement (${err.message}) — vérifie que le dernier package.json a bien été redéployé avec le code.`);
+    }
+
     const listResponse = await fetch(connector.sourceUrl, { headers: { 'User-Agent': FETCH_USER_AGENT } });
     if (!listResponse.ok) throw new Error(`Échec du téléchargement de la page de liste (${listResponse.status})`);
 
@@ -266,6 +278,8 @@ async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLE
 }
 
 export default async ({ req, res, log, error }) => {
+    log('🚀 Function démarrée.');
+
     const client = new Client()
         .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)
         .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
@@ -298,6 +312,7 @@ export default async ({ req, res, log, error }) => {
             }
 
             log(`Connecteur : ${connector.name} — ${connector.sourceUrl}`);
+            log(`  Stratégie : ${connector.listingSelector ? `page de liste (sélecteur "${connector.listingSelector}")` : 'RSS, puis repli page classique si besoin'}.`);
             let outcome;
 
             try {
