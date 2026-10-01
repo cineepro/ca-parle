@@ -10,7 +10,7 @@ function fcfaToTokens(fcfa: number): number {
     return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
 }
 
-const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '', sourceUrl: '' };
+const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '', sourceUrl: '', listingSelector: '' };
 
 function formatDate(iso?: string) {
     if (!iso) return null;
@@ -72,6 +72,7 @@ export const VanessaConnectorManager = () => {
                 color: form.color,
                 description: form.description.trim(),
                 sourceUrl: form.sourceUrl.trim(), // laissable vide — ajoutable après coup à tout moment
+                listingSelector: form.listingSelector.trim(),
                 active: true,
             });
             setForm(EMPTY_FORM);
@@ -198,6 +199,12 @@ export const VanessaConnectorManager = () => {
                     onChange={(e) => setForm({ ...form, sourceUrl: e.target.value })}
                     placeholder="Lien à surveiller (optionnel — ajoutable plus tard)"
                     className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                />
+                <input
+                    value={form.listingSelector}
+                    onChange={(e) => setForm({ ...form, listingSelector: e.target.value })}
+                    placeholder="Sélecteur CSS si page de liste sans RSS (ex: div.actu-item) — sinon laisser vide"
+                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                 />
                 <Button size="sm" onClick={handleAdd} isLoading={saving} disabled={!form.name.trim()} className="col-span-2">
                     + Créer le connecteur
