@@ -35,6 +35,7 @@ export const VanessaConnectorManager = () => {
     // Édition du lien / du compte partenaire, connecteur par connecteur.
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editUrl, setEditUrl] = useState('');
+    const [editListingSelector, setEditListingSelector] = useState('');
     const [editPartner, setEditPartner] = useState('');
     const [savingEdit, setSavingEdit] = useState(false);
 
@@ -93,6 +94,7 @@ export const VanessaConnectorManager = () => {
     const startEdit = (c: VanessaConnector) => {
         setEditingId(c.$id);
         setEditUrl(c.sourceUrl || '');
+        setEditListingSelector(c.listingSelector || '');
         setEditPartner(c.partnerUserId || '');
     };
 
@@ -103,6 +105,7 @@ export const VanessaConnectorManager = () => {
             // existant, ce n'est pas ignoré comme "pas de changement".
             await vanessaKnowledgeService.updateConnector(id, {
                 sourceUrl: editUrl.trim(),
+                listingSelector: editListingSelector.trim(),
                 partnerUserId: editPartner.trim(),
             });
             setEditingId(null);
@@ -280,6 +283,11 @@ export const VanessaConnectorManager = () => {
                                             {c.lastSyncedAt && ` — dernière vérification : ${formatDate(c.lastSyncedAt)}`}
                                         </p>
                                     )}
+                                    {c.listingSelector && editingId !== c.$id && (
+                                        <p className="text-xs text-gray-400">
+                                            Page de liste — sélecteur : <span className="text-gray-600 font-mono">{c.listingSelector}</span>
+                                        </p>
+                                    )}
                                     {c.partnerUserId && editingId !== c.$id && (
                                         <p className="text-xs text-gray-400">
                                             Compte partenaire relié : <span className="text-gray-600 font-mono">{c.partnerUserId}</span>
@@ -293,6 +301,12 @@ export const VanessaConnectorManager = () => {
                                                 onChange={(e) => setEditUrl(e.target.value)}
                                                 placeholder="Lien à surveiller (laisser vide pour le retirer)"
                                                 className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                            />
+                                            <input
+                                                value={editListingSelector}
+                                                onChange={(e) => setEditListingSelector(e.target.value)}
+                                                placeholder="Sélecteur CSS si page de liste sans RSS (ex: a.actu-item) — sinon laisser vide"
+                                                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                                             />
                                             <input
                                                 value={editPartner}

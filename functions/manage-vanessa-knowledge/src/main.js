@@ -123,7 +123,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, partnerUserId, amountFcfa } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, listingSelector, partnerUserId, amountFcfa } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -178,6 +178,11 @@ export default async ({ req, res, error }) => {
                     color: color || '#FF4757',
                     description: description || '',
                     sourceUrl: sourceUrl || '', // laissable vide à la création, ajoutable/retirable ensuite via update_connector
+                    // Sélecteur CSS optionnel — uniquement utile si
+                    // sourceUrl pointe vers une page de LISTE d'articles
+                    // sans flux RSS (ex: gouv.bj/actualites). Vide = le
+                    // comportement habituel (RSS, sinon page unique) continue.
+                    listingSelector: listingSelector || '',
                     partnerUserId: partnerUserId || '',
                     tokensGranted: 0, // 0 = illimité tant qu'aucune vente n'est enregistrée
                     tokensUsed: 0,
@@ -199,6 +204,7 @@ export default async ({ req, res, error }) => {
                 // ce qui permet de RETIRER un lien déjà en place, pas
                 // seulement d'en ajouter un.
                 if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
+                if (listingSelector !== undefined) updateData.listingSelector = listingSelector;
                 if (partnerUserId !== undefined) updateData.partnerUserId = partnerUserId;
                 if (active !== undefined) updateData.active = active;
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, updateData);

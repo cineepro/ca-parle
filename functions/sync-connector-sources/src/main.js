@@ -14,6 +14,9 @@ import { Client, Databases, Query, ID } from 'node-appwrite';
 import { createHash } from 'crypto';
 import Parser from 'rss-parser';
 import { convert as htmlToText } from 'html-to-text';
+import * as cheerio from 'cheerio';
+
+const FETCH_USER_AGENT = 'VanessaConnecteurs/1.0 (kinemaplus.com)';
 
 const MAX_ITEMS_PER_SOURCE_PER_RUN = 5; // limite l'explosion de coût si une source publie beaucoup d'un coup
 const MAX_HASHES_KEPT = 300; // taille de l'historique de déduplication conservé par connecteur
@@ -110,7 +113,7 @@ async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COL
                 const controller = new AbortController();
                 const abortTimer = setTimeout(() => controller.abort(), 8_000);
                 try {
-                    const pageResponse = await fetch(item.link, { signal: controller.signal });
+                    const pageResponse = await fetch(item.link, { signal: controller.signal, headers: { 'User-Agent': FETCH_USER_AGENT } });
                     if (pageResponse.ok) text = htmlToText(await pageResponse.text(), { wordwrap: false });
                 } finally {
                     clearTimeout(abortTimer);
@@ -149,7 +152,7 @@ async function syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE,
     const abortTimer = setTimeout(() => controller.abort(), 8_000);
     let response;
     try {
-        response = await fetch(connector.sourceUrl, { signal: controller.signal });
+        response = await fetch(connector.sourceUrl, { signal: controller.signal, headers: { 'User-Agent': FETCH_USER_AGENT } });
     } finally {
         clearTimeout(abortTimer);
     }
@@ -173,6 +176,87 @@ async function syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE,
     }
 
     return { newEntries, newHashes: [contentHash] };
+}
+
+// --- Stratégie page de liste (gouv.bj, présidence, SGG... des sites sans
+// flux RSS, dont la page d'actualités liste plusieurs articles distincts) ---
+//
+// Contrairement à syncWebsite (toute la page = un seul résumé flou),
+// chaque article listé est repéré via un sélecteur CSS fourni par le
+// modérateur (connector.listingSelector), puis visité et résumé
+// INDIVIDUELLEMENT — exactement le même traitement item par item que pour
+// un flux RSS, simplement sans flux RSS pour fournir la liste de départ.
+//
+// Pourquoi un sélecteur manuel plutôt qu'une détection automatique : la
+// structure d'une page de liste varie trop d'un site à l'autre pour qu'une
+// règle unique fonctionne partout sans casser silencieusement. Un
+// sélecteur réglé une fois par le modérateur (clic droit → Inspecter sur
+// le site visé) est plus lent à mettre en place, mais fiable dans la
+// durée — conforme à la prudence "teste chaque site avant de le brancher"
+// déjà recommandée.
+async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp) {
+    const listResponse = await fetch(connector.sourceUrl, { headers: { 'User-Agent': FETCH_USER_AGENT } });
+    if (!listResponse.ok) throw new Error(`Échec du téléchargement de la page de liste (${listResponse.status})`);
+
+    const $ = cheerio.load(await listResponse.text());
+    const base = connector.sourceUrl;
+    const links = new Set();
+    $(connector.listingSelector).each((_, el) => {
+        const href = $(el).attr('href');
+        if (!href) return;
+        try {
+            links.add(new URL(href, base).toString());
+        } catch { /* lien malformé, ignoré */ }
+    });
+    log(`  ${links.size} lien(s) trouvé(s) avec le sélecteur "${connector.listingSelector}".`);
+
+    const alreadyProcessed = new Set(connector.processedItemHashes || []);
+    const newLinks = [...links]
+        .filter((link) => !alreadyProcessed.has(hashOf(link)))
+        .slice(0, MAX_ITEMS_PER_SOURCE_PER_RUN);
+
+    let newEntries = 0;
+    for (const link of newLinks) {
+        if (timeIsUp()) {
+            log(`  ⏱ Budget de temps atteint, articles restants reportés au prochain run.`);
+            break;
+        }
+        try {
+            log(`  Article : ${link}`);
+            const controller = new AbortController();
+            const abortTimer = setTimeout(() => controller.abort(), 8_000);
+            let pageResponse;
+            try {
+                pageResponse = await fetch(link, { signal: controller.signal, headers: { 'User-Agent': FETCH_USER_AGENT } });
+            } finally {
+                clearTimeout(abortTimer);
+            }
+            if (!pageResponse.ok) {
+                // Lien mort ou inaccessible : on le marque quand même comme
+                // traité pour ne pas le retenter indéfiniment à chaque run.
+                await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, hashOf(link));
+                continue;
+            }
+            const text = htmlToText(await pageResponse.text(), { wordwrap: false });
+            if (text.trim().length < 100) {
+                await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, hashOf(link));
+                continue;
+            }
+
+            const summary = await summarizeForKnowledge(text, connector.name, ANTHROPIC_API_KEY);
+            if (summary) {
+                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector.$id, summary);
+                newEntries++;
+            }
+            await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connector, hashOf(link));
+        } catch (err) {
+            log(`  Échec sur ${link} : ${err.message}`);
+            // Pas marqué comme traité : un souci réseau ponctuel mérite une
+            // nouvelle tentative au run suivant, pas un abandon définitif.
+        }
+    }
+
+    return { newEntries, handledIncrementally: true };
 }
 
 export default async ({ req, res, log, error }) => {
@@ -211,14 +295,20 @@ export default async ({ req, res, log, error }) => {
             let outcome;
 
             try {
-                // Détection automatique : on tente d'abord le RSS, on
-                // retombe sur une lecture de page classique si ce n'en
-                // est pas un.
-                try {
-                    outcome = await syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp);
-                } catch {
-                    log('  Pas un flux RSS valide, lecture en page classique...');
-                    outcome = await syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log);
+                // Priorité explicite : un sélecteur de liste configuré par
+                // le modérateur l'emporte toujours — c'est un choix
+                // délibéré pour CE site précis, pas une détection à deviner.
+                // Sans sélecteur : comportement inchangé (RSS, puis repli
+                // page classique si ce n'en est pas un).
+                if (connector.listingSelector) {
+                    outcome = await syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp);
+                } else {
+                    try {
+                        outcome = await syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, connector, ANTHROPIC_API_KEY, log, timeIsUp);
+                    } catch {
+                        log('  Pas un flux RSS valide, lecture en page classique...');
+                        outcome = await syncWebsite(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connector, ANTHROPIC_API_KEY, log);
+                    }
                 }
             } catch (err) {
                 error(`  Erreur sur ${connector.name} : ${err.message}`);

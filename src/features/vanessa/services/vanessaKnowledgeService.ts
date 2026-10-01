@@ -22,6 +22,10 @@ export interface VanessaConnector {
     color: string;
     description: string;
     sourceUrl?: string;
+    // Uniquement utile si sourceUrl pointe vers une page de LISTE
+    // d'articles sans flux RSS (ex : un site gouvernemental). Vide = le
+    // comportement habituel (RSS, sinon page unique résumée globalement).
+    listingSelector?: string;
     lastSyncedAt?: string;
     active: boolean;
     createdAt?: string;
