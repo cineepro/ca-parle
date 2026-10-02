@@ -137,9 +137,18 @@ export default async ({ req, res, error }) => {
         switch (action) {
             // --- Notes de connaissance ---
             case 'list': {
+                // Cette page a besoin de TOUT récupérer d'un coup (lexique,
+                // notes générales, notes de connecteurs en attente de
+                // relecture) — le tri par catégorie se fait ensuite côté
+                // client. Avec une limite trop juste (100 auparavant), les
+                // notes de connecteurs les plus récentes (tous les nouveaux
+                // sites branchés via sync-connector-sources) ont fini par
+                // remplir toute la fenêtre récupérée, ne laissant plus
+                // aucune place pour les notes générales une fois triées —
+                // alors qu'elles existaient toujours, intactes, en base.
                 const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
                     Query.orderDesc('createdAt'),
-                    Query.limit(100),
+                    Query.limit(500),
                 ]);
                 return res.json({ success: true, documents: result.documents });
             }

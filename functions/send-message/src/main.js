@@ -548,21 +548,36 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             // lot de candidats, et c'est le tri de pertinence qui décide
             // ce qui aide vraiment à répondre à CE message précis, pas un
             // simple ordre chronologique.
-            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                Query.equal('active', true),
-                Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
-                Query.notEqual('category', PUBLICITE_CATEGORY),
-                Query.orderDesc('createdAt'),
-                Query.limit(60),
-            ]);
-            // Filtré après coup plutôt que via Query.equal('connectorId','')
-            // — les notes créées avant l'ajout de cet attribut n'ont pas de
-            // valeur du tout dessus (Appwrite ne rétro-remplit jamais les
-            // documents existants), et une requête stricte les exclurait
-            // silencieusement (même piège déjà rencontré avec
+            // Filtré par connectorId AU NIVEAU DE LA REQUÊTE, pas après coup
+            // — avec le filtrage après coup, la limite(60) se remplissait
+            // avec les notes de connecteurs les plus récentes (tous les
+            // nouveaux sites branchés : gouv.bj, SGG, Cour
+            // constitutionnelle...), ne laissant plus aucune place pour les
+            // vraies notes générales une fois triées. Deux requêtes
+            // (connectorId vide, ET connectorId absent) pour couvrir aussi
+            // les notes créées avant l'ajout de cet attribut, qui n'ont
+            // aucune valeur dessus — une seule requête stricte les
+            // exclurait silencieusement (même piège déjà rencontré avec
             // newsletterOptOut).
-            const generalNotes = knowledge.documents
-                .filter((k) => !k.connectorId)
+            const [knowledgeEmpty, knowledgeNull] = await Promise.all([
+                databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                    Query.equal('active', true),
+                    Query.equal('connectorId', ''),
+                    Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                    Query.notEqual('category', PUBLICITE_CATEGORY),
+                    Query.orderDesc('createdAt'),
+                    Query.limit(100),
+                ]),
+                databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                    Query.equal('active', true),
+                    Query.isNull('connectorId'),
+                    Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                    Query.notEqual('category', PUBLICITE_CATEGORY),
+                    Query.orderDesc('createdAt'),
+                    Query.limit(100),
+                ]).catch(() => ({ documents: [] })), // certains plans Appwrite restreignent isNull — non bloquant
+            ]);
+            const generalNotes = [...knowledgeEmpty.documents, ...knowledgeNull.documents]
                 .map((k) => ({ content: `[${k.category}] ${k.content}` }));
 
             let spotCandidates = [];
