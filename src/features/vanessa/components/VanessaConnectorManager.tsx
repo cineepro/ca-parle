@@ -229,14 +229,28 @@ export const VanessaConnectorManager = () => {
         }
     };
 
+    // Même principe que pour les notes de connaissance : mise à jour
+    // directe de l'écran plutôt qu'un rechargement complet de la liste,
+    // qui donnait l'impression que toute la page se rechargeait pour un
+    // simple interrupteur. Annulé visuellement si le serveur échoue vraiment.
     const toggleActive = async (c: VanessaConnector) => {
-        await vanessaKnowledgeService.updateConnector(c.$id, { active: !c.active });
-        await load();
+        const next = !c.active;
+        setConnectors((prev) => prev.map((x) => (x.$id === c.$id ? { ...x, active: next } : x)));
+        try {
+            await vanessaKnowledgeService.updateConnector(c.$id, { active: next });
+        } catch {
+            setConnectors((prev) => prev.map((x) => (x.$id === c.$id ? { ...x, active: !next } : x)));
+        }
     };
 
     const remove = async (id: string) => {
-        await vanessaKnowledgeService.removeConnector(id);
-        await load();
+        const previous = connectors;
+        setConnectors((prev) => prev.filter((c) => c.$id !== id));
+        try {
+            await vanessaKnowledgeService.removeConnector(id);
+        } catch {
+            setConnectors(previous);
+        }
     };
 
     const startEdit = (c: VanessaConnector) => {

@@ -95,14 +95,29 @@ export const VanessaKnowledgeManager = () => {
         }
     };
 
+    // Mise à jour directe de l'écran, sans repasser par load() : avant,
+    // chaque bascule rechargeait TOUTE la liste (notes + connecteurs) et
+    // affichait "Chargement..." à la place, ce qui donnait l'impression
+    // que toute la page se rechargeait pour un simple interrupteur. En cas
+    // d'échec réel du serveur, le changement visuel est annulé.
     const toggleActive = async (item: VanessaKnowledge) => {
-        await vanessaKnowledgeService.update(item.$id, { active: !item.active });
-        await load();
+        const next = !item.active;
+        setItems((prev) => prev.map((i) => (i.$id === item.$id ? { ...i, active: next } : i)));
+        try {
+            await vanessaKnowledgeService.update(item.$id, { active: next });
+        } catch {
+            setItems((prev) => prev.map((i) => (i.$id === item.$id ? { ...i, active: !next } : i)));
+        }
     };
 
     const remove = async (id: string) => {
-        await vanessaKnowledgeService.remove(id);
-        await load();
+        const previous = items;
+        setItems((prev) => prev.filter((i) => i.$id !== id));
+        try {
+            await vanessaKnowledgeService.remove(id);
+        } catch {
+            setItems(previous);
+        }
     };
 
     const resources = items.filter((i) => i.category === URGENT_CATEGORY);
