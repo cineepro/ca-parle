@@ -21,12 +21,6 @@ export interface VanessaConnector {
     icon: string;
     color: string;
     description: string;
-    sourceUrl?: string;
-    // Uniquement utile si sourceUrl pointe vers une page de LISTE
-    // d'articles sans flux RSS (ex : un site gouvernemental). Vide = le
-    // comportement habituel (RSS, sinon page unique résumée globalement).
-    listingSelector?: string;
-    lastSyncedAt?: string;
     active: boolean;
     createdAt?: string;
     // Compteur mensuel de questions posées à ce connecteur (remis à zéro
@@ -46,6 +40,26 @@ export interface VanessaConnector {
     // partenaire pour CE connecteur précis (vide = aucun accès partenaire
     // configuré).
     partnerUserId?: string;
+}
+
+// Un site surveillé pour le compte d'un connecteur — un connecteur peut en
+// avoir plusieurs (ex : "Gouvernance" = gouv.bj + assemblee-nationale.bj +
+// presidence.bj), chacun suivi indépendamment (sa propre déduplication, sa
+// propre date de dernière vérification), mais toutes les notes produites
+// se retrouvent rattachées au même connecteur parent.
+export interface ConnectorSource {
+    $id: string;
+    connectorId: string;
+    url: string;
+    // Un nom court pour s'y retrouver dans la liste (ex : "Assemblée
+    // nationale") — purement indicatif, jamais affiché aux utilisateurs.
+    label?: string;
+    // Sélecteur CSS — uniquement si ce site est une page de LISTE sans
+    // flux RSS (ex : gouv.bj/actualites). Vide = RSS détecté automatiquement,
+    // sinon repli sur la page entière résumée globalement.
+    listingSelector?: string;
+    lastSyncedAt?: string;
+    createdAt?: string;
 }
 
 export interface MyConnectorUsage {
@@ -95,7 +109,7 @@ export const vanessaKnowledgeService = {
         return result.connectors;
     },
 
-    async createConnector(data: Omit<VanessaConnector, '$id' | 'createdAt' | 'lastSyncedAt'>): Promise<void> {
+    async createConnector(data: Omit<VanessaConnector, '$id' | 'createdAt'>): Promise<void> {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'create_connector', ...data });
     },
 
@@ -105,6 +119,24 @@ export const vanessaKnowledgeService = {
 
     async removeConnector(id: string): Promise<void> {
         await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'delete_connector', id });
+    },
+
+    // --- Sites surveillés par un connecteur ---
+    async listSources(connectorId: string): Promise<ConnectorSource[]> {
+        const result = await callFunction<{ sources: ConnectorSource[] }>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'list_sources', connectorId });
+        return result.sources;
+    },
+
+    async addSource(connectorId: string, url: string, listingSelector?: string, label?: string): Promise<void> {
+        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'add_source', connectorId, url, listingSelector: listingSelector || '', label: label || '' });
+    },
+
+    async updateSource(sourceId: string, data: { url?: string; listingSelector?: string; label?: string }): Promise<void> {
+        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'update_source', sourceId, ...data });
+    },
+
+    async removeSource(sourceId: string): Promise<void> {
+        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'remove_source', sourceId });
     },
 
     // --- Facturation ---

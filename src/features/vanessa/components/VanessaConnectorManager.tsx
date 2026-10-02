@@ -1,6 +1,6 @@
 // src/features/vanessa/components/VanessaConnectorManager.tsx — Vanessa
 import { useState, useEffect, useRef } from 'react';
-import { vanessaKnowledgeService, type VanessaConnector } from '../services/vanessaKnowledgeService';
+import { vanessaKnowledgeService, type VanessaConnector, type ConnectorSource } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '../utils/questionCount';
 
@@ -10,7 +10,8 @@ function fcfaToTokens(fcfa: number): number {
     return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
 }
 
-const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '', sourceUrl: '', listingSelector: '' };
+const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '' };
+const EMPTY_SOURCE_FORM = { url: '', label: '', listingSelector: '' };
 
 function formatDate(iso?: string) {
     if (!iso) return null;
@@ -23,6 +24,153 @@ function usagePercent(c: VanessaConnector): number | null {
     return Math.min(100, Math.round(((c.tokensUsed || 0) / c.tokensGranted) * 100));
 }
 
+// --- Panneau des sites surveillés par un connecteur (un connecteur peut
+// en avoir plusieurs — ex: "Gouvernance" = gouv.bj + assemblee-nationale.bj
+// + presidence.bj) — repliable, chargé seulement à l'ouverture. ---
+function ConnectorSourcesPanel({ connectorId }: { connectorId: string }) {
+    const [sources, setSources] = useState<ConnectorSource[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [newSource, setNewSource] = useState(EMPTY_SOURCE_FORM);
+    const [adding, setAdding] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editValues, setEditValues] = useState(EMPTY_SOURCE_FORM);
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            setSources(await vanessaKnowledgeService.listSources(connectorId));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { load(); }, [connectorId]);
+
+    const handleAddSource = async () => {
+        if (!newSource.url.trim()) return;
+        setAdding(true);
+        try {
+            await vanessaKnowledgeService.addSource(connectorId, newSource.url.trim(), newSource.listingSelector.trim(), newSource.label.trim());
+            setNewSource(EMPTY_SOURCE_FORM);
+            await load();
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const startEditSource = (s: ConnectorSource) => {
+        setEditingId(s.$id);
+        setEditValues({ url: s.url, label: s.label || '', listingSelector: s.listingSelector || '' });
+    };
+
+    const saveEditSource = async (sourceId: string) => {
+        setSavingEdit(true);
+        try {
+            await vanessaKnowledgeService.updateSource(sourceId, {
+                url: editValues.url.trim(), label: editValues.label.trim(), listingSelector: editValues.listingSelector.trim(),
+            });
+            setEditingId(null);
+            await load();
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const removeSource = async (sourceId: string) => {
+        await vanessaKnowledgeService.removeSource(sourceId);
+        await load();
+    };
+
+    return (
+        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-500">
+                Sites surveillés — toutes leurs notes se rattachent à ce même connecteur.
+            </p>
+
+            {loading ? (
+                <p className="text-xs text-gray-400">Chargement...</p>
+            ) : sources.length === 0 ? (
+                <p className="text-xs text-gray-400">Aucun site pour l'instant.</p>
+            ) : (
+                <div className="space-y-1.5">
+                    {sources.map((s) => (
+                        editingId === s.$id ? (
+                            <div key={s.$id} className="bg-white rounded-lg p-2 space-y-1.5 border border-gray-200">
+                                <input
+                                    value={editValues.label}
+                                    onChange={(e) => setEditValues((v) => ({ ...v, label: e.target.value }))}
+                                    placeholder="Nom du site (ex: Assemblée nationale)"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                />
+                                <input
+                                    value={editValues.url}
+                                    onChange={(e) => setEditValues((v) => ({ ...v, url: e.target.value }))}
+                                    placeholder="Lien à surveiller"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                />
+                                <input
+                                    value={editValues.listingSelector}
+                                    onChange={(e) => setEditValues((v) => ({ ...v, listingSelector: e.target.value }))}
+                                    placeholder="Sélecteur CSS si page de liste sans RSS — sinon laisser vide"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                />
+                                <div className="flex gap-1.5">
+                                    <Button size="sm" onClick={() => saveEditSource(s.$id)} isLoading={savingEdit}>Enregistrer</Button>
+                                    <Button size="sm" variant="secondary" onClick={() => setEditingId(null)}>Annuler</Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div key={s.$id} className="bg-white rounded-lg px-2.5 py-2 border border-gray-100">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-gray-700 truncate">{s.label || s.url}</p>
+                                        {s.label && <p className="text-[11px] text-gray-400 truncate">{s.url}</p>}
+                                        {s.listingSelector && (
+                                            <p className="text-[11px] text-gray-400 font-mono truncate">Sélecteur : {s.listingSelector}</p>
+                                        )}
+                                        <p className="text-[11px] text-gray-300">
+                                            {s.lastSyncedAt ? `Dernière vérification : ${formatDate(s.lastSyncedAt)}` : 'Jamais encore vérifié'}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button onClick={() => startEditSource(s)} className="text-[11px] font-semibold text-gray-400 hover:text-gray-600">Modifier</button>
+                                        <button onClick={() => removeSource(s.$id)} className="text-[11px] font-semibold text-red-400 hover:text-red-600">Retirer</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    ))}
+                </div>
+            )}
+
+            <div className="bg-white rounded-lg p-2 space-y-1.5 border border-dashed border-gray-200">
+                <input
+                    value={newSource.label}
+                    onChange={(e) => setNewSource((v) => ({ ...v, label: e.target.value }))}
+                    placeholder="Nom du site (optionnel, ex: Présidence)"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                />
+                <input
+                    value={newSource.url}
+                    onChange={(e) => setNewSource((v) => ({ ...v, url: e.target.value }))}
+                    placeholder="Lien à surveiller (site ou flux RSS)"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                />
+                <input
+                    value={newSource.listingSelector}
+                    onChange={(e) => setNewSource((v) => ({ ...v, listingSelector: e.target.value }))}
+                    placeholder="Sélecteur CSS si page de liste sans RSS (ex: a[href*=&quot;/article/&quot;]) — sinon laisser vide"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                />
+                <Button size="sm" onClick={handleAddSource} isLoading={adding} disabled={!newSource.url.trim()} className="w-full">
+                    + Ajouter ce site
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export const VanessaConnectorManager = () => {
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,12 +180,13 @@ export const VanessaConnectorManager = () => {
     const [uploadMessage, setUploadMessage] = useState<Record<string, string>>({});
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-    // Édition du lien / du compte partenaire, connecteur par connecteur.
+    // Édition du compte partenaire, connecteur par connecteur.
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editUrl, setEditUrl] = useState('');
-    const [editListingSelector, setEditListingSelector] = useState('');
     const [editPartner, setEditPartner] = useState('');
     const [savingEdit, setSavingEdit] = useState(false);
+
+    // Zone "Sites" dépliée, un connecteur à la fois.
+    const [sourcesOpenId, setSourcesOpenId] = useState<string | null>(null);
 
     // Recharge de tokens, connecteur par connecteur.
     const [rechargingId, setRechargingId] = useState<string | null>(null);
@@ -71,8 +220,6 @@ export const VanessaConnectorManager = () => {
                 icon: form.icon.trim() || '🔗',
                 color: form.color,
                 description: form.description.trim(),
-                sourceUrl: form.sourceUrl.trim(), // laissable vide — ajoutable après coup à tout moment
-                listingSelector: form.listingSelector.trim(),
                 active: true,
             });
             setForm(EMPTY_FORM);
@@ -94,21 +241,13 @@ export const VanessaConnectorManager = () => {
 
     const startEdit = (c: VanessaConnector) => {
         setEditingId(c.$id);
-        setEditUrl(c.sourceUrl || '');
-        setEditListingSelector(c.listingSelector || '');
         setEditPartner(c.partnerUserId || '');
     };
 
     const saveEdit = async (id: string) => {
         setSavingEdit(true);
         try {
-            // sourceUrl vide envoyé explicitement = retire le lien
-            // existant, ce n'est pas ignoré comme "pas de changement".
-            await vanessaKnowledgeService.updateConnector(id, {
-                sourceUrl: editUrl.trim(),
-                listingSelector: editListingSelector.trim(),
-                partnerUserId: editPartner.trim(),
-            });
+            await vanessaKnowledgeService.updateConnector(id, { partnerUserId: editPartner.trim() });
             setEditingId(null);
             await load();
         } finally {
@@ -154,10 +293,11 @@ export const VanessaConnectorManager = () => {
             <div>
                 <h2 className="text-base font-bold text-gray-800">Connecteurs de partenaires</h2>
                 <p className="text-xs text-gray-400 mt-1">
-                    Chaque connecteur apparaît comme une pastille sélectionnable dans le chat avec Vanessa. Le lien à
-                    surveiller (site ou flux RSS) est facultatif à la création — ajoutable, modifiable ou retirable à
-                    tout moment ensuite. Un connecteur désactivé disparaît des pastilles sans que rien ne soit perdu :
-                    ses connaissances restent intactes, prêtes à revenir dès qu'il est réactivé.
+                    Chaque connecteur apparaît comme une pastille sélectionnable dans le chat avec Vanessa. Un
+                    connecteur peut surveiller plusieurs sites à la fois (section "Sites" ci-dessous, une fois le
+                    connecteur créé) — toutes leurs notes se retrouvent rattachées à la même pastille. Un connecteur
+                    désactivé disparaît des pastilles sans que rien ne soit perdu : ses connaissances restent
+                    intactes, prêtes à revenir dès qu'il est réactivé.
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                     Le badge à côté du nom indique le nombre de questions posées à ce connecteur depuis le début du
@@ -170,7 +310,7 @@ export const VanessaConnectorManager = () => {
                 <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Nom (ex: Amour & Vie)"
+                    placeholder="Nom (ex: Gouvernance)"
                     maxLength={100}
                     className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                 />
@@ -194,21 +334,12 @@ export const VanessaConnectorManager = () => {
                     maxLength={200}
                     className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
                 />
-                <input
-                    value={form.sourceUrl}
-                    onChange={(e) => setForm({ ...form, sourceUrl: e.target.value })}
-                    placeholder="Lien à surveiller (optionnel — ajoutable plus tard)"
-                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
-                />
-                <input
-                    value={form.listingSelector}
-                    onChange={(e) => setForm({ ...form, listingSelector: e.target.value })}
-                    placeholder="Sélecteur CSS si page de liste sans RSS (ex: div.actu-item) — sinon laisser vide"
-                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
-                />
                 <Button size="sm" onClick={handleAdd} isLoading={saving} disabled={!form.name.trim()} className="col-span-2">
                     + Créer le connecteur
                 </Button>
+                <p className="col-span-2 text-[11px] text-gray-400">
+                    Les sites à surveiller s'ajoutent juste après, dans la fiche du connecteur créé (section "Sites").
+                </p>
             </div>
 
             {loading ? (
@@ -284,17 +415,6 @@ export const VanessaConnectorManager = () => {
                                 )}
 
                                 <div className="mt-2 pl-11 space-y-1.5">
-                                    {c.sourceUrl && editingId !== c.$id && (
-                                        <p className="text-xs text-gray-400">
-                                            Lien surveillé : <span className="text-gray-600">{c.sourceUrl}</span>
-                                            {c.lastSyncedAt && ` — dernière vérification : ${formatDate(c.lastSyncedAt)}`}
-                                        </p>
-                                    )}
-                                    {c.listingSelector && editingId !== c.$id && (
-                                        <p className="text-xs text-gray-400">
-                                            Page de liste — sélecteur : <span className="text-gray-600 font-mono">{c.listingSelector}</span>
-                                        </p>
-                                    )}
                                     {c.partnerUserId && editingId !== c.$id && (
                                         <p className="text-xs text-gray-400">
                                             Compte partenaire relié : <span className="text-gray-600 font-mono">{c.partnerUserId}</span>
@@ -303,18 +423,6 @@ export const VanessaConnectorManager = () => {
 
                                     {editingId === c.$id ? (
                                         <div className="space-y-1.5 bg-gray-50 rounded-xl p-2.5">
-                                            <input
-                                                value={editUrl}
-                                                onChange={(e) => setEditUrl(e.target.value)}
-                                                placeholder="Lien à surveiller (laisser vide pour le retirer)"
-                                                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
-                                            />
-                                            <input
-                                                value={editListingSelector}
-                                                onChange={(e) => setEditListingSelector(e.target.value)}
-                                                placeholder="Sélecteur CSS si page de liste sans RSS (ex: a.actu-item) — sinon laisser vide"
-                                                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
-                                            />
                                             <input
                                                 value={editPartner}
                                                 onChange={(e) => setEditPartner(e.target.value)}
@@ -363,10 +471,16 @@ export const VanessaConnectorManager = () => {
                                                 {uploadingFor === c.$id ? 'Lecture en cours...' : 'Ajouter un PDF'}
                                             </button>
                                             <button
+                                                onClick={() => setSourcesOpenId(sourcesOpenId === c.$id ? null : c.$id)}
+                                                className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1"
+                                            >
+                                                {sourcesOpenId === c.$id ? 'Masquer les sites' : 'Sites'}
+                                            </button>
+                                            <button
                                                 onClick={() => startEdit(c)}
                                                 className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1"
                                             >
-                                                Lien / Partenaire
+                                                Partenaire
                                             </button>
                                             <button
                                                 onClick={() => setRechargingId(c.$id)}
@@ -382,6 +496,7 @@ export const VanessaConnectorManager = () => {
                                     {rechargeConfirmation[c.$id] && (
                                         <p className="text-xs text-green-600">{rechargeConfirmation[c.$id]}</p>
                                     )}
+                                    {sourcesOpenId === c.$id && <ConnectorSourcesPanel connectorId={c.$id} />}
                                 </div>
                             </div>
                         );

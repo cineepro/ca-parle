@@ -1,11 +1,19 @@
 // functions/manage-vanessa-knowledge/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   Notes   : { action: 'list'|'create'|'update'|'delete', id?, category?, content?, active?, connectorId? }
-//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, sourceUrl?, partnerUserId?, active? }
+//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, partnerUserId?, active? }
+//   Sites d'un connecteur (modérateur) : { action: 'list_sources'|'add_source'|'update_source'|'remove_source', connectorId?, sourceId?, url?, listingSelector?, label? }
 //   Facturation (modérateur) : { action: 'recharge_connector_tokens', id, amount }
 //   Connecteurs (public)     : { action: 'list_active_connectors' }
 //   Espace partenaire (authentifié, non-modérateur) : { action: 'get_my_connector' }
 //   Lexique communautaire (authentifié, non-modérateur) : { action: 'suggest_expression', content }
+//
+// Un connecteur peut regrouper PLUSIEURS sites à surveiller (ex :
+// "Gouvernance" = gouv.bj + assemblee-nationale.bj + presidence.bj) —
+// chaque site vit comme un document séparé dans COLLECTION_CONNECTOR_SOURCES,
+// avec son propre suivi (processedItemHashes, lastSyncedAt), mais toutes
+// les notes qu'il produit sont rattachées au même connecteur parent. C'est
+// ce qui permet une seule pastille dans le chat pour plusieurs sources.
 //
 // SÉCURITÉ : toutes les actions sont réservées aux modérateurs, SAUF
 // 'list_active_connectors' (alimente les pastilles de connecteurs pour
@@ -40,6 +48,7 @@ export default async ({ req, res, error }) => {
     const COLLECTION_USERS = process.env.COLLECTION_USERS;
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const COLLECTION_VANESSA_CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
+    const COLLECTION_CONNECTOR_SOURCES = process.env.COLLECTION_CONNECTOR_SOURCES;
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
@@ -123,7 +132,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description, sourceUrl, listingSelector, partnerUserId, amountFcfa } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, partnerUserId, amountFcfa, sourceId, url, listingSelector, label } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -177,16 +186,9 @@ export default async ({ req, res, error }) => {
                     icon: icon || '🔗',
                     color: color || '#FF4757',
                     description: description || '',
-                    sourceUrl: sourceUrl || '', // laissable vide à la création, ajoutable/retirable ensuite via update_connector
-                    // Sélecteur CSS optionnel — uniquement utile si
-                    // sourceUrl pointe vers une page de LISTE d'articles
-                    // sans flux RSS (ex: gouv.bj/actualites). Vide = le
-                    // comportement habituel (RSS, sinon page unique) continue.
-                    listingSelector: listingSelector || '',
                     partnerUserId: partnerUserId || '',
                     tokensGranted: 0, // 0 = illimité tant qu'aucune vente n'est enregistrée
                     tokensUsed: 0,
-                    processedItemHashes: [],
                     active: active !== undefined ? active : true,
                     createdAt: new Date().toISOString(),
                 });
@@ -200,11 +202,6 @@ export default async ({ req, res, error }) => {
                 if (icon !== undefined) updateData.icon = icon;
                 if (color !== undefined) updateData.color = color;
                 if (description !== undefined) updateData.description = description;
-                // sourceUrl accepte explicitement une chaîne vide : c'est
-                // ce qui permet de RETIRER un lien déjà en place, pas
-                // seulement d'en ajouter un.
-                if (sourceUrl !== undefined) updateData.sourceUrl = sourceUrl;
-                if (listingSelector !== undefined) updateData.listingSelector = listingSelector;
                 if (partnerUserId !== undefined) updateData.partnerUserId = partnerUserId;
                 if (active !== undefined) updateData.active = active;
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, updateData);
@@ -213,6 +210,53 @@ export default async ({ req, res, error }) => {
             case 'delete_connector': {
                 if (!id) return res.json({ success: false, error: 'id requis.' }, 400);
                 await databases.deleteDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id);
+                // Les sites qui lui étaient rattachés n'ont plus aucun
+                // intérêt sans leur connecteur parent — nettoyage pour ne
+                // pas laisser de sites orphelins que sync-connector-sources
+                // continuerait à vérifier pour rien.
+                try {
+                    const orphaned = await databases.listDocuments(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, [
+                        Query.equal('connectorId', id), Query.limit(100),
+                    ]);
+                    await Promise.all(orphaned.documents.map((s) => databases.deleteDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, s.$id)));
+                } catch { /* non bloquant : le connecteur est supprimé de toute façon */ }
+                return res.json({ success: true });
+            }
+
+            // --- Sites surveillés par un connecteur (un connecteur peut en
+            // avoir plusieurs — voir l'en-tête du fichier) ---
+            case 'list_sources': {
+                if (!connectorId) return res.json({ success: false, error: 'connectorId requis.' }, 400);
+                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, [
+                    Query.equal('connectorId', connectorId), Query.orderDesc('createdAt'), Query.limit(50),
+                ]);
+                return res.json({ success: true, sources: result.documents });
+            }
+            case 'add_source': {
+                if (!connectorId || !url) return res.json({ success: false, error: 'connectorId et url requis.' }, 400);
+                const doc = await databases.createDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, ID.unique(), {
+                    connectorId,
+                    url,
+                    label: label || '',
+                    listingSelector: listingSelector || '',
+                    processedItemHashes: [],
+                    lastSyncedAt: '',
+                    createdAt: new Date().toISOString(),
+                });
+                return res.json({ success: true, source: doc });
+            }
+            case 'update_source': {
+                if (!sourceId) return res.json({ success: false, error: 'sourceId requis.' }, 400);
+                const updateData = {};
+                if (url !== undefined) updateData.url = url;
+                if (label !== undefined) updateData.label = label;
+                if (listingSelector !== undefined) updateData.listingSelector = listingSelector;
+                const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, sourceId, updateData);
+                return res.json({ success: true, source: doc });
+            }
+            case 'remove_source': {
+                if (!sourceId) return res.json({ success: false, error: 'sourceId requis.' }, 400);
+                await databases.deleteDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, sourceId);
                 return res.json({ success: true });
             }
 
