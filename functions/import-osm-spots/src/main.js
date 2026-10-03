@@ -100,37 +100,45 @@ export default async ({ req, res, log, error }) => {
             // clairement via un en-tête User-Agent — sans lui, son serveur
             // (Apache) répond 406 Not Acceptable, exactement l'erreur
             // rencontrée. Confirmé par la documentation d'usage d'Overpass.
-            let response;
-            try {
-                response = await fetch(OVERPASS_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'User-Agent': 'VanessaCaSert/1.0 (kinemaplus.com; import moderateur)',
-                        'Accept': 'application/json',
-                    },
-                    body: `data=${encodeURIComponent(query)}`,
-                });
-            } catch (fetchErr) {
-                error(`Échec réseau vers Overpass : ${fetchErr.message}`);
-                return res.json({ success: false, error: "Impossible de joindre OpenStreetMap (réseau) — réessaie dans une minute." });
+            //
+            // Le serveur public d'Overpass est partagé par toute la
+            // communauté, sans garantie de disponibilité — un 502/503/504
+            // (serveur surchargé, passager) ne veut rien dire de cassé chez
+            // nous. On retente une fois, sur un second serveur miroir
+            // public, avant d'abandonner.
+            const overpassHosts = [OVERPASS_URL, 'https://overpass.kumi.systems/api/interpreter'];
+            let response = null;
+            let lastErrorBody = '';
+            for (const host of overpassHosts) {
+                try {
+                    const attempt = await fetch(host, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'User-Agent': 'VanessaCaSert/1.0 (kinemaplus.com; import moderateur)',
+                            'Accept': 'application/json',
+                        },
+                        body: `data=${encodeURIComponent(query)}`,
+                    });
+                    log(`Overpass (${host}) a répondu : statut ${attempt.status}`);
+                    if (attempt.ok) {
+                        response = attempt;
+                        break;
+                    }
+                    lastErrorBody = await attempt.text().catch(() => '');
+                    error(`Overpass (${host}) a échoué (${attempt.status}) : ${lastErrorBody.slice(0, 300)}`);
+                } catch (fetchErr) {
+                    error(`Échec réseau vers Overpass (${host}) : ${fetchErr.message}`);
+                }
             }
 
-            log(`Overpass a répondu : statut ${response.status}`);
-            if (!response.ok) {
-                // Overpass explique presque toujours la cause dans le corps
-                // de sa réponse (limite atteinte, erreur de syntaxe...) — on
-                // le journalise en entier pour ne plus jamais rester sans
-                // piste. Le code de retour ici reste volontairement 200 :
-                // Appwrite marque "failed" (et masque notre message) toute
-                // exécution qui renvoie un code HTTP différent de 200-299 —
-                // exactement ce qui a caché l'erreur la dernière fois.
-                const errorBody = await response.text().catch(() => '');
-                error(`Overpass a échoué (${response.status}) : ${errorBody.slice(0, 500)}`);
-                const hint = response.status === 429
-                    ? 'Trop de recherches en peu de temps — patiente une minute avant de réessayer.'
-                    : 'Réessaie dans une minute (serveur partagé, parfois occupé).';
-                return res.json({ success: false, error: `OpenStreetMap a répondu ${response.status}. ${hint}` });
+            if (!response) {
+                // Les deux serveurs ont échoué — le code de retour reste
+                // volontairement 200 : Appwrite marque "failed" (et masque
+                // notre message) toute exécution qui renvoie un code HTTP
+                // différent de 200-299 — exactement ce qui a caché l'erreur
+                // la toute première fois.
+                return res.json({ success: false, error: "OpenStreetMap (et son miroir de secours) sont injoignables pour l'instant — réessaie dans quelques minutes, c'est un serveur public partagé, pas un souci de notre côté." });
             }
 
             const data = await response.json();
