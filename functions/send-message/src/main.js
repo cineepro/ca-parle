@@ -1155,10 +1155,23 @@ export default async ({ req, res, log, error }) => {
                         // texte exploitable) ni en mode connecteur (contexte
                         // professionnel, pas une conversation personnelle).
                         if (!isImage && !conversation.vanessaConnectorId) {
-                            await extractMemoryIfNeeded({
-                                conversation, databases, DATABASE_ID, COLLECTION_CONVERSATIONS, COLLECTION_MESSAGES,
-                                COLLECTION_VANESSA_MEMORY, ANTHROPIC_API_KEY, VANESSA_USER_ID, callerId, log,
-                            });
+                            // Protégé à part : la réponse de Vanessa est DÉJÀ
+                            // envoyée à ce stade. Sans cette protection, un
+                            // souci sur cette étape annexe remontait dans le
+                            // catch ci-dessous et était signalé à tort comme
+                            // "Vanessa n'a pas pu répondre" (critique), alors
+                            // que la personne avait bien reçu sa réponse.
+                            try {
+                                await extractMemoryIfNeeded({
+                                    conversation, databases, DATABASE_ID, COLLECTION_CONVERSATIONS, COLLECTION_MESSAGES,
+                                    COLLECTION_VANESSA_MEMORY, ANTHROPIC_API_KEY, VANESSA_USER_ID, callerId, log,
+                                });
+                            } catch (memoryStepErr) {
+                                log(`⚠️ Étape mémoire échouée après la réponse (non bloquant) : ${memoryStepErr.message}`);
+                                await emitEvent('memory_step_failed', 'warning', memoryStepErr.message, {
+                                    at: String(memoryStepErr.stack || '').split('\n').slice(1, 3).join(' | ').slice(0, 300),
+                                });
+                            }
                         }
                     }
                 }
@@ -1166,6 +1179,10 @@ export default async ({ req, res, log, error }) => {
                 log(`⚠️ Réponse Vanessa échouée (non bloquant) : ${vanessaErr.message}`);
                 await emitEvent('vanessa_reply_failed', 'critical', vanessaErr.message, {
                     voice: !!isVoice, connector: !!conversation.vanessaConnectorId, emission: !!conversation.emissionTopic,
+                    // Les deux premières lignes de la pile d'appels : elles
+                    // désignent la fonction et la ligne exactes qui ont échoué
+                    // — de quoi diagnostiquer sans deviner la prochaine fois.
+                    at: String(vanessaErr.stack || '').split('\n').slice(1, 3).join(' | ').slice(0, 300),
                 });
                 // Non bloquant — le message humain reste envoyé normalement.
             }

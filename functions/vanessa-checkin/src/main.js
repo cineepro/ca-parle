@@ -12,6 +12,8 @@
 // harcèlement de rappels successifs.
 import { Client, Databases, Messaging, Query, ID, Permission, Role } from 'node-appwrite';
 
+// Doit rester nettement sous le timeout réglé côté Appwrite pour cette Function.
+const SOFT_TIME_BUDGET_MS = 40_000;
 const INACTIVITY_DAYS = 4;
 
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne), l'IA qui donne son nom à la plateforme (qui héberge aussi "Ça Parle" et "Ça sert"). Tu parles en français de rue, à l'africaine, jamais littéraire. Expressions du Bénin/Côte d'Ivoire/Togo/Cameroun/Sénégal, 1-2 emojis max, phrases courtes.
@@ -52,8 +54,20 @@ export default async ({ req, res, log, error }) => {
         ]);
 
         let relaunched = 0;
+        const startedAt = Date.now();
 
         for (const conversation of stale.documents) {
+            // Budget de temps interne : chaque relance fait un appel Claude
+            // (plusieurs secondes), et jusqu'à 50 conversations peuvent
+            // attendre — sans limite, on dépassait le délai de la Function
+            // (20 s observés sur 15 s autorisées) et Appwrite la coupait en
+            // plein milieu. On s'arrête proprement : les conversations non
+            // traitées restent "en attente" et seront reprises au prochain
+            // passage planifié.
+            if (Date.now() - startedAt > SOFT_TIME_BUDGET_MS) {
+                log(`⏱ Budget de temps atteint (${SOFT_TIME_BUDGET_MS / 1000}s) — ${stale.documents.length - relaunched} conversation(s) restante(s) reprises au prochain passage.`);
+                break;
+            }
             const humanId = conversation.participantIds.find((id) => id !== VANESSA_USER_ID);
             if (!humanId) continue;
 
