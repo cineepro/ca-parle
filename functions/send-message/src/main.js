@@ -55,6 +55,72 @@ async function sendPush(messaging, userId, title, body, url, log) {
 
 const DAILY_IMAGE_LIMIT = 2;
 
+// Budget de sortie demandé à Claude pour une réponse de Vanessa.
+// Il couvre TOUT ce que le modèle produit, y compris sa réflexion interne
+// (le bloc "thinking" que claude-sonnet-5 peut renvoyer avant son texte).
+// Avec 500 (puis 300 pour les images), la réflexion pouvait en consommer
+// une grande partie et le texte visible était COUPÉ en plein mot — alors
+// que le champ `content` accepte 2000 caractères. Ce n'est qu'un plafond :
+// on ne paie que ce qui est réellement produit, et le persona garde ses
+// réponses courtes (2 à 4 phrases) tant qu'on ne lui demande pas un texte.
+const VANESSA_MAX_TOKENS = 1500;
+const VANESSA_IMAGE_MAX_TOKENS = 1000;
+// Taille de l'attribut `content` d'un message dans Appwrite.
+const MAX_MESSAGE_CHARS = 2000;
+
+// Mention ajoutée quand une réponse a dû être coupée, pour que la personne
+// sache qu'il y a une suite et comment l'obtenir. CONTINUATION_MARKER sert
+// à reconnaître, au tour suivant, un message de Vanessa resté incomplet —
+// qu'il porte cette mention ajoutée par le serveur ou celle que Vanessa a
+// écrite elle-même (voir LENGTH_RULE_CONTEXT).
+const CONTINUATION_MARKER = 'Dis-moi « continue »';
+const CONTINUATION_HINT = `(J'ai pas fini ! ${CONTINUATION_MARKER} et je te donne la suite.)`;
+
+// Toujours transmis à Vanessa : lui dit ce qu'un message peut contenir, pour
+// qu'elle découpe d'elle-même un long texte au lieu de se faire couper.
+const LENGTH_RULE_CONTEXT = `
+
+LONGUEUR D'UN MESSAGE : un seul message de toi ne peut pas dépasser environ 1800 caractères (à peu près 300 mots). Pour un texte long (histoire, lettre, article, discours...), écris-le en plusieurs parties : termine ta partie proprement, à la fin d'une phrase — ne coupe jamais en plein milieu — puis ajoute, seule sur la dernière ligne, exactement : (${CONTINUATION_MARKER} pour la suite.)`;
+
+// Si le message précédent de Vanessa était incomplet, on le lui rappelle —
+// sinon "continue" n'aurait aucun sens pour elle (rien ne lui dit où elle
+// s'était arrêtée, ni de ne pas recommencer depuis le début).
+function continuationContext(history, vanessaId) {
+    const previous = history[history.length - 2];
+    if (!previous || previous.senderId !== vanessaId || !String(previous.content || '').includes(CONTINUATION_MARKER)) return '';
+    return `
+
+TON DERNIER MESSAGE ÉTAIT INCOMPLET (il se terminait par une invitation à te dire « continue »). Si la personne te demande la suite (« continue », « oui », « vas-y », « la suite »...), reprends EXACTEMENT là où tu t'étais arrêtée : pas de salutation, pas de résumé, ne répète rien de ce que tu as déjà écrit. Si elle parle d'autre chose, oublie la suite.`;
+}
+
+// Garantit qu'une réponse ne finit JAMAIS au milieu d'un mot ni ne dépasse la
+// taille du champ `content` (dans ce cas la création du message échouerait
+// et la personne n'aurait aucune réponse). Si la réponse a été coupée par
+// la limite de tokens, ou est trop longue, on revient à la dernière phrase
+// complète, et on ajoute la mention pour demander la suite.
+function finishReply(text, stopReason) {
+    if (!text) return { text, truncated: false };
+    const tooLong = text.length > MAX_MESSAGE_CHARS - 10;
+    const cutByModel = stopReason === 'max_tokens';
+    if (!tooLong && !cutByModel) return { text, truncated: false };
+
+    // La mention doit elle aussi tenir dans les 2000 caractères.
+    const suffix = `\n\n${CONTINUATION_HINT}`;
+    const limit = Math.min(text.length, MAX_MESSAGE_CHARS - suffix.length - 10);
+    const head = text.slice(0, limit);
+    // Dernière fin de phrase (. ! ? …), éventuellement suivie d'un guillemet,
+    // d'une parenthèse ou d'un emoji, puis d'un espace / de la fin.
+    const matches = [...head.matchAll(/[.!?…]+["»”')\]*]*(?=\s|$)/g)];
+    const last = matches[matches.length - 1];
+    // On ne garde la coupe "à la phrase" que si elle conserve l'essentiel :
+    // sinon une longue réponse sans ponctuation se réduirait à un fragment.
+    if (last && last.index + last[0].length >= head.length * 0.4) {
+        return { text: head.slice(0, last.index + last[0].length).trim() + suffix, truncated: true };
+    }
+    const lastSpace = head.lastIndexOf(' ');
+    return { text: `${head.slice(0, lastSpace > 0 ? lastSpace : head.length).trim()}…${suffix}`, truncated: true };
+}
+
 // Pièces jointes (documents) entre deux personnes. Liste BLANCHE : jamais
 // d'exécutable, d'archive ni de page web (.exe, .apk, .zip, .html, .svg...).
 const ALLOWED_FILE_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf', 'odt', 'ods', 'odp'];
@@ -744,9 +810,9 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         },
         body: JSON.stringify({
             model: 'claude-sonnet-5',
-            system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
+            system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
-            max_tokens: 500,
+            max_tokens: VANESSA_MAX_TOKENS,
         }),
     });
 
@@ -762,8 +828,17 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
     // cherche explicitement le bloc de type "text", peu importe sa position.
     const textBlock = data.content?.find((b) => b.type === 'text');
     if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude : ${JSON.stringify(data.content)}`);
+    // Toujours journalisé : c'est ce qui permet de savoir, la prochaine fois
+    // qu'une réponse semble coupée, si c'est la limite de tokens ("max_tokens")
+    // ou autre chose.
+    log(`🔚 stop_reason=${data.stop_reason} output_tokens=${data.usage?.output_tokens} (budget ${VANESSA_MAX_TOKENS})`);
+    const finished = finishReply(textBlock?.text?.trim() || null, data.stop_reason);
+    if (finished.truncated) {
+        log('⚠️ Réponse ramenée à la dernière phrase complète (limite de tokens ou de taille atteinte).');
+        await emitEvent('reply_truncated', 'warning', `stop_reason=${data.stop_reason}`, { outputTokens: data.usage?.output_tokens || 0 });
+    }
     return {
-        text: textBlock?.text?.trim() || null,
+        text: finished.text,
         tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
         effectiveConnectorId,
         connectorFellBack,
@@ -796,7 +871,7 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
                     { type: 'text', text: requestText || 'Décris cette situation, façon gbairai.' },
                 ],
             }],
-            max_tokens: 300,
+            max_tokens: VANESSA_IMAGE_MAX_TOKENS,
         }),
     });
 
@@ -808,8 +883,13 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
     const data = await response.json();
     const textBlock = data.content?.find((b) => b.type === 'text');
     if (!textBlock) log(`⚠️ Aucun bloc "text" dans la réponse Claude Vision : ${JSON.stringify(data.content)}`);
+    log(`🔚 (image) stop_reason=${data.stop_reason} output_tokens=${data.usage?.output_tokens} (budget ${VANESSA_IMAGE_MAX_TOKENS})`);
+    const finishedImage = finishReply(textBlock?.text?.trim() || null, data.stop_reason);
+    if (finishedImage.truncated) {
+        await emitEvent('reply_truncated', 'warning', `image stop_reason=${data.stop_reason}`, { outputTokens: data.usage?.output_tokens || 0 });
+    }
     return {
-        text: textBlock?.text?.trim() || null,
+        text: finishedImage.text,
         tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
     };
 }

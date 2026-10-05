@@ -112,7 +112,9 @@ export default async ({ req, res, log, error }) => {
                 model: 'claude-sonnet-5',
                 system: VANESSA_SYSTEM_PROMPT,
                 messages: [{ role: 'user', content: userContext }],
-                max_tokens: 300,
+                // Couvre aussi la réflexion interne du modèle : 300 coupait le texte
+                // visible (voir send-message).
+                max_tokens: 1200,
             }),
         });
 

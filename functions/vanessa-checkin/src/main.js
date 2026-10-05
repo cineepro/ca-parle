@@ -83,7 +83,9 @@ export default async ({ req, res, log, error }) => {
                         model: 'claude-sonnet-5',
                         system: VANESSA_SYSTEM_PROMPT,
                         messages: [{ role: 'user', content: 'Relance-moi avec ta question gbaraï.' }],
-                        max_tokens: 150,
+                        // Couvre aussi la réflexion interne du modèle : 150 pouvait ne laisser
+                        // aucune place au texte visible (voir send-message).
+                        max_tokens: 800,
                     }),
                 });
                 if (!response.ok) {
