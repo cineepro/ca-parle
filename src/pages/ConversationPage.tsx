@@ -1,5 +1,5 @@
 // src/pages/ConversationPage.tsx — Vanessa
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
 import { MessageBubble } from '@/features/messaging/components/MessageBubble';
@@ -10,6 +10,9 @@ import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanes
 import { conversationService } from '@/features/messaging/services/conversationService';
 import { useVoiceConversation } from '@/features/messaging/hooks/useVoiceConversation';
 import { VoiceCallBar } from '@/features/messaging/components/VoiceCallBar';
+import { documentsEnabled, type Message } from '@/features/messaging/services/messageService';
+import { getMessageStatus } from '@/features/messaging/utils/receipts';
+import { getMessagePreview } from '@/features/messaging/utils/messagePreview';
 import { VANESSA_USER_ID } from '@/api/constants';
 
 export default function ConversationPage() {
@@ -17,8 +20,8 @@ export default function ConversationPage() {
     const { user } = useAuth();
     const {
         conversation, otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
-        sendImageMessage, isVanessaConversation,
-        loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
+        sendImageMessage, sendFileMessage, isVanessaConversation,
+        loadingOlder, hasMoreOlder, loadOlder, loadOlderUntil, vanessaTyping,
     } = useConversationThread(id!);
     const bottomRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -34,7 +37,71 @@ export default function ConversationPage() {
     const [titleInput, setTitleInput] = useState('');
     const [titleOverride, setTitleOverride] = useState<string | undefined>(undefined);
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    // Le message auquel la personne est en train de répondre (encadré dans le
+    // composeur, puis citation dans le message envoyé).
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [jumpNotice, setJumpNotice] = useState<string | null>(null);
     const navigate = useNavigate();
+
+    // Une réponse commencée ne doit pas suivre d'une conversation à l'autre.
+    useEffect(() => { setReplyingTo(null); }, [id]);
+
+    const senderLabel = (senderId: string): string => {
+        if (senderId === user?.$id) return 'Toi';
+        if (VANESSA_USER_ID && senderId === VANESSA_USER_ID) return 'Vanessa';
+        return otherName;
+    };
+
+    // Clic sur une citation : on va au message d'origine et on le met en
+    // évidence un instant, comme sur WhatsApp. S'il est plus ancien que ce
+    // qui est affiché, on remonte l'historique jusqu'à lui (dans la limite
+    // de ~300 messages).
+    const handleJumpTo = async (messageId: string) => {
+        const find = () => document.getElementById(`msg-${messageId}`);
+        let el = find();
+        if (!el) {
+            const found = await loadOlderUntil(messageId);
+            if (!found) {
+                setJumpNotice("Ce message est trop ancien pour être retrouvé ici.");
+                setTimeout(() => setJumpNotice(null), 3000);
+                return;
+            }
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            el = find();
+        }
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.transition = 'background-color 0.4s';
+        el.style.backgroundColor = 'rgba(255, 71, 87, 0.14)';
+        setTimeout(() => { el!.style.backgroundColor = ''; }, 1600);
+    };
+
+    const handleSend = (content: string) => {
+        sendMessage(content, replyingTo);
+        setReplyingTo(null);
+    };
+    const handleSendVoice = (blob: Blob, durationSeconds: number) => {
+        sendVoiceMessage(blob, durationSeconds, replyingTo);
+        setReplyingTo(null);
+    };
+    const handleSendAttachment = (file: File, caption: string, kind: 'image' | 'file') => {
+        if (kind === 'image') sendImageMessage(file, caption, replyingTo);
+        else sendFileMessage(file, caption, replyingTo);
+        setReplyingTo(null);
+    };
+
+    const dayLabel = (iso: string): string => {
+        const date = new Date(iso);
+        const now = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(now.getDate() - 1);
+        if (date.toDateString() === now.toDateString()) return "Aujourd'hui";
+        if (date.toDateString() === yesterday.toDateString()) return 'Hier';
+        return date.toLocaleDateString('fr-FR', {
+            weekday: 'long', day: 'numeric', month: 'long',
+            year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        });
+    };
 
     const displayTitle = titleOverride ?? conversation?.title;
 
@@ -158,6 +225,7 @@ export default function ConversationPage() {
         isVanessaConversation &&
         lastMessage &&
         lastMessage.type === 'image' &&
+        !lastMessage.content &&
         lastMessage.senderId === user?.$id &&
         !vanessaTyping
     );
@@ -258,9 +326,31 @@ export default function ConversationPage() {
                         Aucun message. Dis bonjour 👋
                     </p>
                 ) : (
-                    messages.map((message) => (
-                        <MessageBubble key={message.$id} message={message} isMine={message.senderId === user?.$id} />
-                    ))
+                    messages.map((message, index) => {
+                        const isMine = message.senderId === user?.$id;
+                        const showDay = index === 0 || new Date(message.$createdAt).toDateString() !== new Date(messages[index - 1].$createdAt).toDateString();
+                        // Pas de coches avec Vanessa : elle n'a pas d'appareil.
+                        const status = isMine && !isVanessaConversation ? getMessageStatus(message, conversation, otherId) : null;
+                        return (
+                            <Fragment key={message.$id}>
+                                {showDay && (
+                                    <div className="flex justify-center py-1.5">
+                                        <span className="text-[11px] text-gray-500 bg-gray-100 rounded-full px-3 py-1 capitalize">
+                                            {dayLabel(message.$createdAt)}
+                                        </span>
+                                    </div>
+                                )}
+                                <MessageBubble
+                                    message={message}
+                                    isMine={isMine}
+                                    status={status}
+                                    senderLabel={senderLabel}
+                                    onReply={setReplyingTo}
+                                    onJumpTo={handleJumpTo}
+                                />
+                            </Fragment>
+                        );
+                    })
                 )}
 
                 {showImageHint && (
@@ -296,6 +386,9 @@ export default function ConversationPage() {
                 {sendError && (
                     <p className="text-xs text-red-500 text-center bg-red-50 py-1.5 px-3">{sendError}</p>
                 )}
+                {jumpNotice && (
+                    <p className="text-xs text-gray-500 text-center bg-gray-50 py-1.5 px-3">{jumpNotice}</p>
+                )}
                 {isVanessaConversation && (
                     <p className="text-[11px] text-gray-400 text-center bg-gray-50 py-1 px-3 border-t border-gray-100">
                         🔮 Vanessa est une intelligence artificielle. Elle peut se tromper.
@@ -315,9 +408,13 @@ export default function ConversationPage() {
                     />
                 ) : (
                     <MessageComposer
-                        onSend={sendMessage}
-                        onSendVoice={sendVoiceMessage}
-                        onSendImage={sendImageMessage}
+                        onSend={handleSend}
+                        onSendVoice={handleSendVoice}
+                        onSendAttachment={handleSendAttachment}
+                        // Avec Vanessa : photos seulement (elle ne lit pas encore les documents).
+                        allowDocuments={!isVanessaConversation && documentsEnabled()}
+                        replyingTo={replyingTo ? { label: senderLabel(replyingTo.senderId), preview: getMessagePreview(replyingTo) } : null}
+                        onCancelReply={() => setReplyingTo(null)}
                         sending={sending}
                         prefill={writingPrefill}
                         onStartCall={isVanessaConversation ? call.start : undefined}

@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { messageService, type Message } from '../services/messageService';
 import { conversationService, type Conversation } from '../services/conversationService';
+import { receiptsService } from '../services/receiptsService';
+import { needsReadAck, markReadLocally } from '../utils/receipts';
+import { getMessagePreview } from '../utils/messagePreview';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { dbService } from '@/api/database';
 import { VANESSA_USER_ID } from '@/api/constants';
@@ -12,7 +15,13 @@ const PAGE_SIZE = 30;
 // ne pas laisser l'indicateur tourner indéfiniment.
 const VANESSA_TYPING_TIMEOUT_MS = 25_000;
 
-function buildOptimisticMessage(conversationId: string, senderId: string, content: string, tempId: string): Message {
+function buildOptimisticMessage(
+    conversationId: string,
+    senderId: string,
+    content: string,
+    tempId: string,
+    extra: Partial<Message> = {}
+): Message {
     const nowIso = new Date().toISOString();
     return {
         $id: tempId,
@@ -20,8 +29,15 @@ function buildOptimisticMessage(conversationId: string, senderId: string, conten
         $createdAt: nowIso, $updatedAt: nowIso,
         conversationId, senderId, content,
         type: 'text', readBy: [senderId], createdAt: nowIso,
+        ...extra,
     } as unknown as Message;
 }
+
+// Citation d'un message pour l'affichage immédiat d'une réponse.
+const replyJson = (target?: Message | null): Partial<Message> =>
+    target
+        ? { replyTo: JSON.stringify({ id: target.$id, senderId: target.senderId, type: target.type || 'text', preview: getMessagePreview(target) }) }
+        : {};
 
 export const useConversationThread = (conversationId: string) => {
     const { user } = useAuth();
@@ -47,6 +63,15 @@ export const useConversationThread = (conversationId: string) => {
     // initial n'ait fini de répondre (déjà observé avec les réponses de
     // Vanessa, le même risque existe pour l'écho de mon propre message).
     const pendingTempIds = useRef<string[]>([]);
+
+    // Toujours les dernières valeurs, pour les fonctions asynchrones et les
+    // écouteurs qui survivent à un rendu.
+    const messagesRef = useRef<Message[]>([]);
+    messagesRef.current = messages;
+    const hasMoreOlderRef = useRef(false);
+    hasMoreOlderRef.current = hasMoreOlder;
+    const conversationRef = useRef<Conversation | null>(null);
+    conversationRef.current = conversation;
 
     const isVanessaConversation = !!(
         VANESSA_USER_ID && conversation?.participantIds.includes(VANESSA_USER_ID)
@@ -124,6 +149,27 @@ export const useConversationThread = (conversationId: string) => {
         }
     }, [conversationId, messages, loadingOlder, hasMoreOlder]);
 
+    // Remonte l'historique jusqu'à retrouver un message précis (clic sur une
+    // citation dont l'original est plus ancien que ce qui est affiché).
+    // Plafonné : au-delà de ~300 messages, on abandonne plutôt que de lire
+    // toute la conversation. Retourne true si le message est maintenant là.
+    const loadOlderUntil = useCallback(async (targetId: string): Promise<boolean> => {
+        if (messagesRef.current.some((m) => m.$id === targetId)) return true;
+        let oldestId = messagesRef.current[0]?.$id;
+        let more = hasMoreOlderRef.current;
+        for (let page = 0; more && oldestId && page < 10; page++) {
+            const older = await messageService.getOlderMessages(conversationId, oldestId, PAGE_SIZE);
+            if (older.length === 0) break;
+            older.forEach((m) => seenIds.current.add(m.$id));
+            setMessages((prev) => [...older, ...prev]);
+            more = older.length === PAGE_SIZE;
+            setHasMoreOlder(more);
+            if (older.some((m) => m.$id === targetId)) return true;
+            oldestId = older[0].$id;
+        }
+        return false;
+    }, [conversationId]);
+
     // Abonnement temps réel : tant que le composant est monté, tout nouveau
     // message de cette conversation apparaît immédiatement, sans recharger.
     useEffect(() => {
@@ -154,38 +200,77 @@ export const useConversationThread = (conversationId: string) => {
         };
     }, [conversationId, user]);
 
-    const sendMessage = async (content: string) => {
-        if (!user || !conversation || !content.trim() || sending) return;
+    // Suit les mises à jour de CETTE conversation entre deux personnes : c'est
+    // ainsi que les coches passent de ✓ à ✓✓ sans recharger. Inutile (et donc
+    // non abonné) avec Vanessa : aucun accusé n'y existe.
+    const hasConversation = !!conversation;
+    useEffect(() => {
+        if (!hasConversation || isVanessaConversation) return;
+        return conversationService.subscribeToConversation(conversationId, (updated) => {
+            setConversation((prev) => (prev ? { ...prev, ...updated } : prev));
+        });
+    }, [conversationId, hasConversation, isVanessaConversation]);
+
+    // "Lu" : la conversation est ouverte ET visible. Les messages qui arrivent
+    // ensuite sont marqués lus par receiptsService (conversation active).
+    const myId = user?.$id;
+    useEffect(() => {
+        if (!hasConversation || !myId || isVanessaConversation) return;
+        receiptsService.setActiveConversation(conversationId);
+        const markIfNeeded = () => {
+            const current = conversationRef.current;
+            if (document.visibilityState !== 'visible') return;
+            markReadLocally(myId, conversationId); // le point "non lu" s'éteint tout de suite
+            if (current && needsReadAck(current, myId)) receiptsService.queueRead(conversationId);
+        };
+        markIfNeeded();
+        document.addEventListener('visibilitychange', markIfNeeded);
+        window.addEventListener('focus', markIfNeeded);
+        return () => {
+            receiptsService.setActiveConversation(null);
+            document.removeEventListener('visibilitychange', markIfNeeded);
+            window.removeEventListener('focus', markIfNeeded);
+        };
+    }, [conversationId, hasConversation, myId, isVanessaConversation]);
+
+    // Tant que la conversation est ouverte et visible, tout ce qui y arrive
+    // est lu : on tient le repère local à jour (point "non lu" de la liste).
+    const lastMessageAt = conversation?.lastMessageAt;
+    useEffect(() => {
+        if (!hasConversation || !myId || isVanessaConversation) return;
+        if (document.visibilityState === 'visible') markReadLocally(myId, conversationId);
+    }, [conversationId, hasConversation, myId, isVanessaConversation, lastMessageAt, messages.length]);
+
+    // Envoi avec affichage IMMÉDIAT : le message apparaît avant même l'appel
+    // réseau (avec une horloge à la place des coches), puis est remplacé par
+    // la version confirmée — par le temps réel ou par la réponse, selon ce
+    // qui arrive en premier.
+    const dispatch = async (
+        optimistic: Message,
+        send: () => Promise<Message>,
+        failText: (err: any) => string,
+        waitForVanessa: boolean
+    ) => {
         setSending(true);
         setSendError(null);
-        startWaitingForVanessa();
-
-        // Affichage optimiste IMMÉDIAT du message — AVANT même l'appel
-        // réseau, exactement comme le fait Astra sur DataInsight (comparé
-        // et vérifié). Auparavant, le message n'apparaissait qu'une fois
-        // la Function entièrement terminée (message créé + réponse de
-        // Vanessa générée), ce qui donnait l'impression que "les points de
-        // réflexion" arrivaient avant le message lui-même — déroutant pour
-        // l'utilisateur.
-        const tempId = `temp-${Date.now()}`;
-        pendingTempIds.current.push(tempId);
-        setMessages((prev) => [...prev, buildOptimisticMessage(conversation.$id, user.$id, content.trim(), tempId)]);
-
+        if (waitForVanessa) startWaitingForVanessa();
+        pendingTempIds.current.push(optimistic.$id);
+        setMessages((prev) => [...prev, optimistic]);
         try {
-            const sentMessage = await messageService.send(conversation, user.$id, content.trim());
-            if (sentMessage && pendingTempIds.current.includes(tempId)) {
+            const sent = await send();
+            if (sent && pendingTempIds.current.includes(optimistic.$id)) {
                 // Toujours en attente : le temps réel n'a pas encore
                 // remplacé ce message temporaire, on le fait ici.
-                pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
-                seenIds.current.add(sentMessage.$id);
-                setMessages((prev) => prev.map((m) => (m.$id === tempId ? sentMessage : m)));
+                pendingTempIds.current = pendingTempIds.current.filter((id) => id !== optimistic.$id);
+                seenIds.current.add(sent.$id);
+                setMessages((prev) => prev.map((m) => (m.$id === optimistic.$id ? sent : m)));
             }
-        } catch {
-            pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
+        } catch (err: any) {
+            pendingTempIds.current = pendingTempIds.current.filter((id) => id !== optimistic.$id);
             // Retire le message optimiste raté — sinon l'utilisateur croit
             // qu'il est parti alors que ce n'est pas le cas.
-            setMessages((prev) => prev.filter((m) => m.$id !== tempId));
-            setSendError("Impossible d'envoyer le message, réessaie.");
+            setMessages((prev) => prev.filter((m) => m.$id !== optimistic.$id));
+            setSendError(failText(err));
             setVanessaTyping(false);
             clearTypingTimeout();
         } finally {
@@ -193,63 +278,66 @@ export const useConversationThread = (conversationId: string) => {
         }
     };
 
-    const sendVoiceMessage = async (blob: Blob, durationSeconds: number) => {
-        if (!user || !conversation || sending) return;
-        setSending(true);
-        setSendError(null);
-        startWaitingForVanessa();
+    const sendMessage = async (content: string, replyTarget?: Message | null) => {
+        if (!user || !conversation || !content.trim() || sending) return;
+        const tempId = `temp-${Date.now()}`;
+        await dispatch(
+            buildOptimisticMessage(conversation.$id, user.$id, content.trim(), tempId, replyJson(replyTarget)),
+            () => messageService.send(conversation, user.$id, content.trim(), replyTarget?.$id),
+            () => "Impossible d'envoyer le message, réessaie.",
+            true
+        );
+    };
 
+    const sendVoiceMessage = async (blob: Blob, durationSeconds: number, replyTarget?: Message | null) => {
+        if (!user || !conversation || sending) return;
         // Un vocal ne peut pas être "joué" avant la fin de l'upload (il
         // faut le fichier réel), mais on montre tout de suite qu'il part,
         // pour garder le bon ordre visuel (message avant points de
         // réflexion).
         const tempId = `temp-${Date.now()}`;
-        pendingTempIds.current.push(tempId);
-        setMessages((prev) => [...prev, buildOptimisticMessage(conversation.$id, user.$id, '🎤 Envoi du vocal...', tempId)]);
-
-        try {
-            const sentMessage = await messageService.sendVoice(conversation, blob, durationSeconds);
-            if (sentMessage && pendingTempIds.current.includes(tempId)) {
-                pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
-                seenIds.current.add(sentMessage.$id);
-                setMessages((prev) => prev.map((m) => (m.$id === tempId ? sentMessage : m)));
-            }
-        } catch {
-            pendingTempIds.current = pendingTempIds.current.filter((id) => id !== tempId);
-            setMessages((prev) => prev.filter((m) => m.$id !== tempId));
-            setSendError("Impossible d'envoyer le vocal, réessaie.");
-            setVanessaTyping(false);
-            clearTypingTimeout();
-        } finally {
-            setSending(false);
-        }
+        await dispatch(
+            buildOptimisticMessage(conversation.$id, user.$id, '🎤 Envoi du vocal...', tempId, replyJson(replyTarget)),
+            () => messageService.sendVoice(conversation, blob, durationSeconds, replyTarget?.$id),
+            () => "Impossible d'envoyer le vocal, réessaie.",
+            true
+        );
     };
 
-    // Une image seule ne déclenche jamais de réponse automatique — pas de
-    // startWaitingForVanessa() ici, elle ne se déclenche que sur le
-    // prochain message texte qui en fera la demande.
-    const sendImageMessage = async (file: File) => {
+    // Photo, avec légende optionnelle dans le MÊME message. Sans légende,
+    // avec Vanessa : aucune réponse automatique (elle attend une demande
+    // explicite). Avec légende, la légende EST la demande.
+    const sendImageMessage = async (file: File, caption = '', replyTarget?: Message | null) => {
         if (!user || !conversation || sending) return;
-        setSending(true);
-        setSendError(null);
-        try {
-            const sentMessage = await messageService.sendImage(conversation, file);
-            if (sentMessage && !seenIds.current.has(sentMessage.$id)) {
-                seenIds.current.add(sentMessage.$id);
-                setMessages((prev) => [...prev, sentMessage]);
-            }
-        } catch (err: any) {
+        const tempId = `temp-${Date.now()}`;
+        const localImageUrl = URL.createObjectURL(file);
+        await dispatch(
+            buildOptimisticMessage(conversation.$id, user.$id, caption.trim(), tempId, { type: 'image', localImageUrl, ...replyJson(replyTarget) }),
+            () => messageService.sendImage(conversation, file, caption, replyTarget?.$id),
             // Le message d'erreur du quota est spécifique et utile à
             // afficher tel quel (ex: "Tu as atteint la limite...").
-            setSendError(err?.message || "Impossible d'envoyer l'image, réessaie.");
-        } finally {
-            setSending(false);
-        }
+            (err) => err?.message || "Impossible d'envoyer l'image, réessaie.",
+            !!caption.trim()
+        );
+        // L'aperçu local n'est plus utile une fois le vrai message affiché.
+        setTimeout(() => URL.revokeObjectURL(localImageUrl), 30_000);
+    };
+
+    // Document joint (PDF, Word, Excel...), avec légende optionnelle.
+    const sendFileMessage = async (file: File, caption = '', replyTarget?: Message | null) => {
+        if (!user || !conversation || sending) return;
+        const tempId = `temp-${Date.now()}`;
+        await dispatch(
+            buildOptimisticMessage(conversation.$id, user.$id, caption.trim(), tempId, { type: 'file', localFile: { name: file.name, size: file.size }, ...replyJson(replyTarget) }),
+            () => messageService.sendFile(conversation, file, caption, replyTarget?.$id),
+            (err) => err?.message || "Impossible d'envoyer le document, réessaie.",
+            false
+        );
     };
 
     return {
         conversation, otherName, otherId, messages, loading, sending, error, sendError, sendMessage, sendVoiceMessage,
-        sendImageMessage, isVanessaConversation,
-        loadingOlder, hasMoreOlder, loadOlder, vanessaTyping,
+        sendImageMessage, sendFileMessage, isVanessaConversation,
+        loadingOlder, hasMoreOlder, loadOlder, loadOlderUntil, vanessaTyping,
     };
 };

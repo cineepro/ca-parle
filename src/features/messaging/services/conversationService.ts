@@ -1,9 +1,10 @@
 // src/features/messaging/services/conversationService.ts — Vanessa
-import { databases } from '@/api/appwrite';
+import { databases, client } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/auth';
 import { Query } from 'appwrite';
 import type { Models } from 'appwrite';
 import { callFunction } from '@/api/functionsClient';
+import { receiptsService } from './receiptsService';
 
 export interface Conversation extends Models.Document {
     participantIds: string[];
@@ -27,6 +28,10 @@ export interface Conversation extends Models.Document {
     // messages, eux, restent intacts en base pour l'autre participant
     // (Vanessa) et ne sont jamais réellement effacés.
     hiddenFor?: string[];
+    // Accusés de réception, par participant : {"<userId>":{"d":"<ISO>","r":"<ISO>"}}
+    // — `d` : dernier moment où cet appareil a reçu des messages, `r` :
+    // dernier moment où il les a lus. Voir la Function mark-receipts.
+    receipts?: string;
     createdAt: string;
 }
 
@@ -85,7 +90,24 @@ export const conversationService = {
             Query.orderDesc('lastMessageAt'),
             Query.limit(50),
         ]);
-        return result.documents.filter((c) => !(c.hiddenFor || []).includes(userId));
+        const visible = result.documents.filter((c) => !(c.hiddenFor || []).includes(userId));
+        // Charger cette liste prouve que CET appareil est en ligne et reçoit ses
+        // messages : on en profite pour accuser réception (✓✓) de ce qui est
+        // arrivé pendant qu'il était fermé, et pour suivre les nouveaux
+        // messages en temps réel. Aucune lecture supplémentaire.
+        receiptsService.onConversationsLoaded(visible, userId);
+        return visible;
+    },
+
+    // Suit les mises à jour d'UNE conversation (c'est ainsi que les coches
+    // passent de ✓ à ✓✓ chez l'expéditeur sans recharger). Un abonnement
+    // sur un seul document : aucun trafic temps réel inutile.
+    subscribeToConversation(conversationId: string, onUpdate: (conversation: Conversation) => void): () => void {
+        const channel = `databases.${DATABASE_ID}.collections.${COLLECTIONS.CONVERSATIONS}.documents.${conversationId}`;
+        return client.subscribe(channel, (response: any) => {
+            const isUpdate = response.events?.some((e: string) => e.endsWith('.update'));
+            if (isUpdate) onUpdate(response.payload as Conversation);
+        });
     },
 
     async getById(conversationId: string): Promise<Conversation> {

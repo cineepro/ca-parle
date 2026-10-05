@@ -11,13 +11,56 @@ export interface Message extends Models.Document {
     conversationId: string;
     senderId: string;
     content: string;
-    type?: 'text' | 'audio' | 'image';
+    type?: 'text' | 'audio' | 'image' | 'file';
     audioFileId?: string;
     audioDuration?: number;
     imageFileId?: string;
+    // JSON, écrit seulement quand il sert : {"id","senderId","type","preview"}
+    // — le message auquel celui-ci répond.
+    replyTo?: string;
+    // JSON : {"id","name","size","mime"} — le document joint.
+    file?: string;
     feedback?: 'up' | 'down' | '';
     readBy?: string[];
     createdAt: string;
+    // Uniquement pour un message en cours d'envoi (affichage immédiat avant
+    // que le serveur ait répondu) — jamais présents sur un vrai message.
+    localImageUrl?: string;
+    localFile?: { name: string; size: number };
+}
+
+export interface ReplyRef { id: string; senderId: string; type: string; preview: string }
+export interface FileMeta { id: string; name: string; size: number; mime: string }
+
+function safeParse<T>(json?: string): T | null {
+    if (!json) return null;
+    try {
+        const value = JSON.parse(json);
+        return value && typeof value === 'object' ? (value as T) : null;
+    } catch {
+        return null;
+    }
+}
+export const parseReplyTo = (m: Pick<Message, 'replyTo'>): ReplyRef | null => safeParse<ReplyRef>(m.replyTo);
+export const parseFileMeta = (m: Pick<Message, 'file'>): FileMeta | null => safeParse<FileMeta>(m.file);
+
+// Même liste blanche et même plafond que côté serveur (send-message) : le
+// contrôle ici n'évite qu'un envoi inutile, le vrai contrôle reste au serveur.
+export const ALLOWED_DOC_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf', 'odt', 'ods', 'odp'];
+export const MAX_DOC_BYTES = 10 * 1024 * 1024;
+export const documentsEnabled = (): boolean => !!BUCKETS.MESSAGE_FILES;
+
+// Lien d'ouverture / de téléchargement d'un document joint.
+export function getMessageFileUrl(fileId: string): string {
+    return storage.getFileView(BUCKETS.MESSAGE_FILES, fileId).toString();
+}
+export function getMessageFileDownloadUrl(fileId: string): string {
+    return storage.getFileDownload(BUCKETS.MESSAGE_FILES, fileId).toString();
+}
+
+export async function uploadMessageFile(file: File): Promise<string> {
+    const uploaded = await storage.createFile(BUCKETS.MESSAGE_FILES, ID.unique(), file);
+    return uploaded.$id;
 }
 
 // Construit l'URL de lecture d'un fichier vocal.
@@ -51,10 +94,11 @@ export const messageService = {
     // lisible par TOUS les participants de la conversation, pas seulement
     // par l'expéditeur — même contrainte de permissions que pour
     // start-conversation, impossible à poser depuis le client.
-    async send(conversation: Conversation, _senderId: string, content: string): Promise<Message> {
+    async send(conversation: Conversation, _senderId: string, content: string, replyToId?: string): Promise<Message> {
         const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
             conversationId: conversation.$id,
             content,
+            ...(replyToId ? { replyToId } : {}),
         });
         return result.message;
     },
@@ -62,12 +106,13 @@ export const messageService = {
     // Envoi d'un message vocal : upload direct du fichier audio, puis la
     // Function se charge de la transcription et, si Vanessa est concernée,
     // de générer sa réponse (éventuellement elle aussi en voix).
-    async sendVoice(conversation: Conversation, audioBlob: Blob, durationSeconds: number): Promise<Message> {
+    async sendVoice(conversation: Conversation, audioBlob: Blob, durationSeconds: number, replyToId?: string): Promise<Message> {
         const audioFileId = await uploadVoiceMessage(audioBlob);
         const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
             conversationId: conversation.$id,
             audioFileId,
             audioDuration: Math.round(durationSeconds),
+            ...(replyToId ? { replyToId } : {}),
         });
         return result.message;
     },
@@ -75,11 +120,29 @@ export const messageService = {
     // Envoi d'une image : upload direct, puis la Function crée le message.
     // Elle ne déclenche JAMAIS de réponse automatique à elle seule — il
     // faut un message suivant qui demande explicitement une description.
-    async sendImage(conversation: Conversation, file: File): Promise<Message> {
+    // Une légende peut accompagner l'image dans le MÊME message ; avec
+    // Vanessa, cette légende vaut demande ("qu'est-ce que t'en penses ?").
+    async sendImage(conversation: Conversation, file: File, caption = '', replyToId?: string): Promise<Message> {
         const imageFileId = await uploadChatImage(file);
         const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
             conversationId: conversation.$id,
             imageFileId,
+            ...(caption.trim() ? { content: caption.trim() } : {}),
+            ...(replyToId ? { replyToId } : {}),
+        });
+        return result.message;
+    },
+
+    // Document joint (PDF, Word, Excel...) avec légende optionnelle. Le
+    // serveur relit nom et taille depuis le fichier réellement déposé, et
+    // refuse (puis supprime) tout ce qui n'est pas dans la liste blanche.
+    async sendFile(conversation: Conversation, file: File, caption = '', replyToId?: string): Promise<Message> {
+        const fileId = await uploadMessageFile(file);
+        const result = await callFunction<{ message: Message }>(FUNCTIONS.SEND_MESSAGE, {
+            conversationId: conversation.$id,
+            fileId,
+            ...(caption.trim() ? { content: caption.trim() } : {}),
+            ...(replyToId ? { replyToId } : {}),
         });
         return result.message;
     },

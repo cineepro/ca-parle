@@ -1,10 +1,18 @@
 // src/features/messaging/components/MessageComposer.tsx — Vanessa
 import { useState, useRef, useEffect } from 'react';
+import { ALLOWED_DOC_EXTENSIONS, MAX_DOC_BYTES } from '../services/messageService';
+import { formatFileSize } from '../utils/messagePreview';
 
 interface Props {
     onSend: (content: string) => void;
     onSendVoice?: (blob: Blob, durationSeconds: number) => void;
-    onSendImage?: (file: File) => void;
+    // Photo ou document, avec une légende : tout part dans UN seul message.
+    onSendAttachment?: (file: File, caption: string, kind: 'image' | 'file') => void;
+    // Propose aussi les documents (PDF, Word...) en plus des photos.
+    allowDocuments?: boolean;
+    // Le message auquel on est en train de répondre (encadré au-dessus du champ).
+    replyingTo?: { label: string; preview: string } | null;
+    onCancelReply?: () => void;
     sending: boolean;
     // Pré-remplit le champ (ex : suggestion "✍️ Demande-lui de rédiger
     // quelque chose") sans envoyer automatiquement — la personne garde la
@@ -18,12 +26,17 @@ interface Props {
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
 
-export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, prefill, onStartCall }: Props) => {
+export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDocuments, replyingTo, onCancelReply, sending, prefill, onStartCall }: Props) => {
     const [content, setContent] = useState('');
     const [recording, setRecording] = useState(false);
     const [recordSeconds, setRecordSeconds] = useState(0);
     const [micError, setMicError] = useState<string | null>(null);
     const [imageError, setImageError] = useState<string | null>(null);
+    // Pièce jointe choisie mais PAS encore envoyée : elle attend la légende
+    // éventuelle et le clic sur "Envoyer" (avant, elle partait dès le choix).
+    const [attachment, setAttachment] = useState<{ file: File; kind: 'image' | 'file'; previewUrl?: string } | null>(null);
+    const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+    const docInputRef = useRef<HTMLInputElement>(null);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -40,27 +53,78 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, pre
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefill]);
 
+    const clearAttachment = () => {
+        setAttachment((current) => {
+            if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+            return null;
+        });
+    };
+    useEffect(() => () => { if (attachment?.previewUrl) URL.revokeObjectURL(attachment.previewUrl); }, [attachment]);
+
+    useEffect(() => {
+        if (replyingTo) textareaRef.current?.focus();
+    }, [replyingTo]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (attachment && onSendAttachment) {
+            onSendAttachment(attachment.file, content, attachment.kind);
+            clearAttachment();
+            setContent('');
+            return;
+        }
         if (!content.trim()) return;
         onSend(content);
         setContent('');
     };
 
-    const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Valide puis garde la pièce jointe en attente (aperçu + légende).
+    const acceptFile = (file: File, kind: 'image' | 'file') => {
+        setImageError(null);
+        if (kind === 'image') {
+            if (!file.type.startsWith('image/')) {
+                setImageError('Ce fichier n\'est pas une image.');
+                return;
+            }
+            if (file.size > MAX_IMAGE_SIZE) {
+                setImageError('Image trop lourde (5 Mo maximum).');
+                return;
+            }
+        } else {
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (!ALLOWED_DOC_EXTENSIONS.includes(ext)) {
+                setImageError('Type de document non accepté (PDF, Word, Excel, PowerPoint, texte ou CSV).');
+                return;
+            }
+            if (file.size > MAX_DOC_BYTES) {
+                setImageError('Document trop lourd (10 Mo maximum).');
+                return;
+            }
+        }
+        clearAttachment();
+        setAttachment({ file, kind, previewUrl: kind === 'image' ? URL.createObjectURL(file) : undefined });
+        textareaRef.current?.focus();
+    };
+
+    const handlePick = (kind: 'image' | 'file') => (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = ''; // permet de resélectionner le même fichier ensuite
-        setImageError(null);
-        if (!file || !onSendImage) return;
-        if (!file.type.startsWith('image/')) {
-            setImageError('Seules les images sont acceptées (pas de vidéo ni de document).');
-            return;
+        if (file) acceptFile(file, kind);
+    };
+
+    // Coller une image depuis le presse-papiers (capture d'écran...).
+    const handlePaste = (e: React.ClipboardEvent) => {
+        if (!onSendAttachment) return;
+        const image = Array.from(e.clipboardData?.files || []).find((f) => f.type.startsWith('image/'));
+        if (image) {
+            e.preventDefault();
+            acceptFile(image, 'image');
         }
-        if (file.size > MAX_IMAGE_SIZE) {
-            setImageError('Image trop lourde (5 Mo maximum).');
-            return;
-        }
-        onSendImage(file);
+    };
+
+    const openAttachMenu = () => {
+        if (allowDocuments) setAttachMenuOpen((open) => !open);
+        else fileInputRef.current?.click();
     };
 
     const startRecording = async () => {
@@ -144,49 +208,98 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, pre
         );
     }
 
+    const canSend = !!content.trim() || !!attachment;
+
     return (
         <div>
             {micError && <p className="text-xs text-red-500 px-3 pt-2">{micError}</p>}
             {imageError && <p className="text-xs text-red-500 px-3 pt-2">{imageError}</p>}
-            <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3 bg-white border-t border-gray-100">
-                {onSendImage && (
-                    <>
+
+            {/* Réponse à un message précis */}
+            {replyingTo && (
+                <div className="flex items-start gap-2 px-3 pt-3 bg-white border-t border-gray-100">
+                    <div className="flex-1 min-w-0 rounded-lg bg-gray-50 border-l-4 border-[#FF4757] px-3 py-1.5">
+                        <p className="text-[11px] font-semibold text-[#FF4757]">Réponse à {replyingTo.label}</p>
+                        <p className="text-xs text-gray-500 truncate">{replyingTo.preview}</p>
+                    </div>
+                    <button type="button" onClick={onCancelReply} aria-label="Annuler la réponse" className="shrink-0 w-7 h-7 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* Pièce jointe en attente : aperçu, et la légende se tape juste en dessous */}
+            {attachment && (
+                <div className="flex items-center gap-3 px-3 pt-3 bg-white border-t border-gray-100">
+                    {attachment.kind === 'image' ? (
+                        <img src={attachment.previewUrl} alt="Aperçu" className="w-14 h-14 rounded-lg object-cover bg-gray-100" />
+                    ) : (
+                        <span className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-2xl">📎</span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{attachment.file.name}</p>
+                        <p className="text-xs text-gray-400">{formatFileSize(attachment.file.size)} · ajoute une légende si tu veux</p>
+                    </div>
+                    <button type="button" onClick={clearAttachment} aria-label="Retirer la pièce jointe" className="shrink-0 w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            <form onSubmit={handleSubmit} className={`flex items-end gap-2 p-3 bg-white ${replyingTo || attachment ? '' : 'border-t border-gray-100'}`}>
+                {onSendAttachment && (
+                    <div className="relative shrink-0">
+                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePick('image')} className="hidden" />
                         <input
-                            ref={fileInputRef}
+                            ref={docInputRef}
                             type="file"
-                            accept="image/*"
-                            onChange={handleImagePick}
+                            accept={ALLOWED_DOC_EXTENSIONS.map((ext) => `.${ext}`).join(',')}
+                            onChange={handlePick('file')}
                             className="hidden"
                         />
                         <button
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={openAttachMenu}
                             disabled={sending}
-                            className="shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center disabled:opacity-40 hover:bg-gray-200 transition-colors"
-                            aria-label="Envoyer une photo"
+                            className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center disabled:opacity-40 hover:bg-gray-200 transition-colors"
+                            aria-label={allowDocuments ? 'Joindre un fichier' : 'Envoyer une photo'}
                         >
-                            📷
+                            {allowDocuments ? '📎' : '📷'}
                         </button>
-                    </>
+                        {attachMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-30" onClick={() => setAttachMenuOpen(false)} />
+                                <div className="absolute bottom-12 left-0 z-40 w-44 rounded-2xl bg-white shadow-lg border border-gray-100 py-1.5 text-sm text-gray-700">
+                                    <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-gray-50" onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}>
+                                        📷 Photo
+                                    </button>
+                                    <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-gray-50" onClick={() => { setAttachMenuOpen(false); docInputRef.current?.click(); }}>
+                                        📄 Document
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 )}
 
                 <textarea
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
+                    onPaste={handlePaste}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             handleSubmit(e);
                         }
                     }}
-                    placeholder="Écris un message..."
+                    placeholder={attachment ? 'Ajouter une légende...' : replyingTo ? 'Écris ta réponse...' : 'Écris un message...'}
                     rows={1}
                     maxLength={2000}
                     className="flex-1 resize-none rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 max-h-32"
                 />
 
-                {onStartCall && !content.trim() && (
+                {onStartCall && !canSend && (
                     <button
                         type="button"
                         onClick={onStartCall}
@@ -201,7 +314,7 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendImage, sending, pre
                     </button>
                 )}
 
-                {content.trim() ? (
+                {canSend ? (
                     <button
                         type="submit"
                         disabled={sending}

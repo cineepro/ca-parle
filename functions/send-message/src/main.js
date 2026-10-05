@@ -54,6 +54,32 @@ async function sendPush(messaging, userId, title, body, url, log) {
 }
 
 const DAILY_IMAGE_LIMIT = 2;
+
+// Pièces jointes (documents) entre deux personnes. Liste BLANCHE : jamais
+// d'exécutable, d'archive ni de page web (.exe, .apk, .zip, .html, .svg...).
+const ALLOWED_FILE_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf', 'odt', 'ods', 'odp'];
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 Mo
+
+// Résumé court d'un message, pour l'encadré de citation d'une réponse
+// ("en réponse à…") et pour que Vanessa sache de quoi on lui parle.
+function buildReplyPreview(target) {
+    const text = String(target.content || '').replace(/\[\[SUGGESTION_POST[\s\S]*$/, '').trim();
+    if (target.type === 'audio') return '🎤 Message vocal';
+    if (target.type === 'image') return `📷 ${text ? text.slice(0, 120) : 'Photo'}`;
+    if (target.type === 'file') {
+        let name = 'Document';
+        try { name = JSON.parse(target.file || '{}').name || name; } catch { /* nom par défaut */ }
+        return `📎 ${name}`.slice(0, 140);
+    }
+    return text.slice(0, 140);
+}
+
+// Ajoute, pour Vanessa uniquement, ce à quoi la personne répond.
+function withReplyContext(text, replyTo, vanessaId) {
+    if (!replyTo) return text;
+    const who = replyTo.senderId === vanessaId ? 'ton message' : 'un message';
+    return `[En réponse à ${who} : « ${replyTo.preview} »]\n${text}`;
+}
 const DAILY_VANESSA_TOKEN_LIMIT = 15000; // ≈ 25-30 échanges/jour — protège le compte Anthropic partagé (Ça Parle + Vanessa API + automatisations) d'un usage individuel démesuré
 // Phrases de quota écrites d'avance, dans le ton de Vanessa — postées SANS
 // appeler Claude quand le quota est dépassé, pour ne pas payer un appel
@@ -851,6 +877,7 @@ export default async ({ req, res, log, error }) => {
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     const BUCKET_VOICE_MESSAGES = process.env.BUCKET_VOICE_MESSAGES;
     const BUCKET_STORY_IMAGES = process.env.BUCKET_STORY_IMAGES;
+    const BUCKET_MESSAGE_FILES = process.env.BUCKET_MESSAGE_FILES;
     const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
     const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID;
 
@@ -866,14 +893,15 @@ export default async ({ req, res, log, error }) => {
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
-        const { conversationId, content, audioFileId, audioDuration, imageFileId } = body;
+        const { conversationId, content, audioFileId, audioDuration, imageFileId, fileId, replyToId } = body;
         const isVoice = !!audioFileId;
         const isImage = !!imageFileId;
-        log(`📩 conversationId=${conversationId} isVoice=${isVoice} isImage=${isImage}`);
+        const isFile = !!fileId;
+        log(`📩 conversationId=${conversationId} isVoice=${isVoice} isImage=${isImage} isFile=${isFile} reply=${!!replyToId}`);
 
-        if (!conversationId || (!isVoice && !isImage && (!content || !content.trim()))) {
-            log('❌ conversationId manquant, ou ni content, audioFileId, ni imageFileId fournis.');
-            return res.json({ success: false, error: 'conversationId et (content, audioFileId ou imageFileId) requis.' }, 400);
+        if (!conversationId || (!isVoice && !isImage && !isFile && (!content || !content.trim()))) {
+            log('❌ conversationId manquant, ou ni content, audioFileId, imageFileId ni fileId fournis.');
+            return res.json({ success: false, error: 'conversationId et (content, audioFileId, imageFileId ou fileId) requis.' }, 400);
         }
 
         log('🔍 Récupération de la conversation...');
@@ -884,6 +912,7 @@ export default async ({ req, res, log, error }) => {
             log(`❌ ${callerId} ne fait pas partie de participantIds.`);
             return res.json({ success: false, error: "Tu ne fais pas partie de cette conversation." }, 403);
         }
+        const vanessaInConversation = !!VANESSA_USER_ID && conversation.participantIds.includes(VANESSA_USER_ID);
 
         // Première fois qu'on écrit dans cette conversation avec Vanessa :
         // on lui donne un titre, une seule fois — jamais régénéré ensuite,
@@ -906,7 +935,9 @@ export default async ({ req, res, log, error }) => {
         // uniquement quand une image est envoyée, et uniquement côté
         // serveur (impossible à contourner depuis le client).
         let callerUser = null;
-        if (isImage && COLLECTION_USERS) {
+        // Le quota protège l'analyse d'image PAR VANESSA : il ne s'applique pas
+        // aux photos échangées entre deux personnes.
+        if (isImage && COLLECTION_USERS && vanessaInConversation) {
             log('👤 Vérification du quota image...');
             callerUser = await databases.getDocument(DATABASE_ID, COLLECTION_USERS, callerId);
             const today = new Date().toISOString().slice(0, 10);
@@ -945,6 +976,44 @@ export default async ({ req, res, log, error }) => {
             log(`✅ Transcription : ${finalContent.slice(0, 80)}`);
         }
 
+        // Document joint : les métadonnées sont relues CÔTÉ SERVEUR depuis le
+        // fichier réellement déposé (nom, taille) — jamais crues sur parole
+        // depuis le client.
+        let fileMeta = null;
+        if (isFile) {
+            if (vanessaInConversation) {
+                return res.json({ success: false, error: 'Vanessa ne sait pas encore lire les documents — envoie-lui plutôt du texte ou une photo.' }, 400);
+            }
+            if (!BUCKET_MESSAGE_FILES) {
+                log('❌ BUCKET_MESSAGE_FILES manquant.');
+                return res.json({ success: false, error: "L'envoi de documents n'est pas encore configuré." }, 500);
+            }
+            const stored = await storage.getFile(BUCKET_MESSAGE_FILES, fileId);
+            const name = String(stored.name || 'document').slice(0, 150);
+            const ext = (name.split('.').pop() || '').toLowerCase();
+            if (!ALLOWED_FILE_EXTENSIONS.includes(ext) || stored.sizeOriginal > MAX_FILE_BYTES) {
+                // Refusé : on supprime aussi le fichier déposé, pour ne pas
+                // laisser de document inutilisable dans le stockage.
+                await storage.deleteFile(BUCKET_MESSAGE_FILES, fileId).catch(() => {});
+                log(`❌ Document refusé : ${name} (${stored.sizeOriginal} octets).`);
+                return res.json({ success: false, error: 'Ce type de fichier ou sa taille (10 Mo maximum) n\'est pas accepté.' }, 400);
+            }
+            fileMeta = { id: fileId, name, size: stored.sizeOriginal, mime: stored.mimeType || '' };
+        }
+
+        // Réponse à un message précis : le message visé doit exister ET
+        // appartenir à CETTE conversation (impossible de citer un message
+        // d'une conversation privée à laquelle on ne participe pas).
+        let replyTo = null;
+        if (replyToId) {
+            try {
+                const target = await databases.getDocument(DATABASE_ID, COLLECTION_MESSAGES, replyToId);
+                if (target.conversationId === conversationId) {
+                    replyTo = { id: target.$id, senderId: target.senderId, type: target.type || 'text', preview: buildReplyPreview(target) };
+                }
+            } catch { /* message introuvable : on envoie simplement sans citation */ }
+        }
+
         log('✏️ Création du message...');
         const message = await databases.createDocument(
             DATABASE_ID,
@@ -954,18 +1023,26 @@ export default async ({ req, res, log, error }) => {
                 conversationId,
                 senderId: callerId,
                 content: finalContent,
-                type: isImage ? 'image' : (isVoice ? 'audio' : 'text'),
+                type: isImage ? 'image' : (isFile ? 'file' : (isVoice ? 'audio' : 'text')),
                 audioFileId: isVoice ? audioFileId : '',
                 audioDuration: isVoice ? (audioDuration || 0) : 0,
                 imageFileId: isImage ? imageFileId : '',
                 readBy: [callerId],
                 createdAt: new Date().toISOString(),
+                // Écrits SEULEMENT quand ils servent : un message ordinaire se
+                // crée exactement comme avant, même si ces deux attributs
+                // n'existent pas encore dans la collection.
+                ...(fileMeta ? { file: JSON.stringify(fileMeta) } : {}),
+                ...(replyTo ? { replyTo: JSON.stringify(replyTo) } : {}),
             },
             permissions
         );
         log(`✅ Message créé : ${message.$id}`);
 
-        const lastPreview = isImage ? '📷 Photo' : (isVoice ? '🎤 Message vocal' : finalContent);
+        const captionOrEmpty = finalContent ? ` ${finalContent}` : '';
+        const lastPreview = isImage ? (finalContent ? `📷 ${finalContent}` : '📷 Photo')
+            : isFile ? `📎 ${fileMeta.name}${captionOrEmpty ? ' —' + captionOrEmpty : ''}`
+            : (isVoice ? '🎤 Message vocal' : finalContent);
         await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
             lastMessage: lastPreview.length > 200 ? lastPreview.slice(0, 200) : lastPreview,
             lastMessageAt: new Date().toISOString(),
@@ -974,7 +1051,7 @@ export default async ({ req, res, log, error }) => {
         log('✅ Conversation mise à jour.');
 
         const preview = lastPreview.length > 60 ? `${lastPreview.slice(0, 60)}…` : lastPreview;
-        const notifTitle = isImage ? '📷 Nouvelle photo' : (isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message');
+        const notifTitle = isImage ? '📷 Nouvelle photo' : (isFile ? '📎 Nouveau document' : (isVoice ? '🎤 Nouveau message vocal' : '💬 Nouveau message'));
         const recipients = conversation.participantIds.filter((id) => id !== callerId);
 
         await Promise.allSettled(
@@ -999,10 +1076,11 @@ export default async ({ req, res, log, error }) => {
                 .map((id) => sendPush(messaging, id, notifTitle, preview, `/messages/${conversationId}`, log))
         );
 
-        // Une image seule ne déclenche JAMAIS de réponse automatique —
-        // Vanessa attend une demande explicite dans un message suivant.
-        if (isImage) {
-            log('📷 Image envoyée, en attente d\'une demande explicite avant toute description.');
+        // Une image SANS légende ne déclenche JAMAIS de réponse automatique —
+        // Vanessa attend une demande explicite dans un message suivant. Avec
+        // une légende dans le même message, cette légende EST la demande.
+        if ((isImage && !(vanessaInConversation && finalContent)) || isFile) {
+            log('📎 Pièce jointe envoyée, aucune réponse automatique à générer.');
             return res.json({ success: true, message });
         }
 
@@ -1049,18 +1127,27 @@ export default async ({ req, res, log, error }) => {
                     });
                 } else {
                     const history = await fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, conversationId);
+                    // Si la personne répond à un message précis, Vanessa doit
+                    // savoir lequel — sinon "oui, celle-là" n'a aucun sens pour elle.
+                    if (replyTo && history.length > 0) {
+                        const lastDoc = history[history.length - 1];
+                        history[history.length - 1] = { ...lastDoc, content: withReplyContext(lastDoc.content || '', replyTo, VANESSA_USER_ID) };
+                    }
                     // Le message qu'on vient de créer est le dernier de cet
                     // historique — on regarde celui juste AVANT pour savoir si
-                    // c'est une image en attente de description.
+                    // c'est une image en attente de description. Une image
+                    // arrivée AVEC sa légende est, elle, traitée tout de suite.
                     const previous = history[history.length - 2];
-                    const pendingImage = previous && previous.type === 'image' && previous.senderId === callerId && previous.imageFileId;
+                    const pendingImage = isImage
+                        ? { imageFileId }
+                        : (previous && previous.type === 'image' && previous.senderId === callerId && previous.imageFileId ? previous : null);
 
                     let result;
                     if (pendingImage && BUCKET_STORY_IMAGES) {
                         log('📷 Image en attente détectée — analyse Claude Vision...');
                         result = await generateVanessaImageRoast({
                             storage, BUCKET_STORY_IMAGES, ANTHROPIC_API_KEY,
-                            imageFileId: previous.imageFileId, requestText: finalContent, log,
+                            imageFileId: pendingImage.imageFileId, requestText: withReplyContext(finalContent, replyTo, VANESSA_USER_ID), log,
                         });
                     } else {
                         result = await generateVanessaReply({

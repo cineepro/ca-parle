@@ -1,9 +1,16 @@
 // src/features/messaging/components/MessageBubble.tsx — Vanessa
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { Message } from '../services/messageService';
-import { getVoiceMessageUrl, getChatImageUrl, messageService } from '../services/messageService';
+import {
+    getVoiceMessageUrl, getChatImageUrl, getMessageFileDownloadUrl, messageService,
+    parseReplyTo, parseFileMeta, documentsEnabled,
+} from '../services/messageService';
 import { VANESSA_USER_ID } from '@/api/constants';
+import { LinkifiedText } from './LinkifiedText';
+import { StatusTicks } from './StatusTicks';
+import type { MessageStatus } from '../utils/receipts';
+import { getCopyableText, copyToClipboard, formatFileSize } from '../utils/messagePreview';
 
 const formatTime = (dateStr: string): string =>
     new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -21,20 +28,54 @@ function parseSuggestion(content: string): { text: string; suggestion: { title: 
     };
 }
 
-export const MessageBubble = ({ message, isMine }: { message: Message; isMine: boolean }) => {
-    const { text, suggestion } = parseSuggestion(message.content);
+// Sur écran tactile : appui long = menu, et pas de sélection de texte
+// native qui se déclencherait en même temps.
+const IS_TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+const LONG_PRESS_MS = 450;
+
+const fileIcon = (name: string): { emoji: string; bg: string } => {
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') return { emoji: 'PDF', bg: 'bg-red-500' };
+    if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(ext)) return { emoji: 'DOC', bg: 'bg-blue-500' };
+    if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return { emoji: 'XLS', bg: 'bg-green-600' };
+    if (['ppt', 'pptx', 'odp'].includes(ext)) return { emoji: 'PPT', bg: 'bg-orange-500' };
+    return { emoji: 'FILE', bg: 'bg-gray-500' };
+};
+
+interface Props {
+    message: Message;
+    isMine: boolean;
+    // null = pas de coches (conversation avec Vanessa, ou message reçu).
+    status?: MessageStatus | null;
+    senderLabel: (senderId: string) => string;
+    onReply?: (message: Message) => void;
+    onJumpTo?: (messageId: string) => void;
+}
+
+export const MessageBubble = ({ message, isMine, status = null, senderLabel, onReply, onJumpTo }: Props) => {
+    const { text, suggestion } = parseSuggestion(message.content || '');
     const isVoice = message.type === 'audio' && !!message.audioFileId;
-    const isImage = message.type === 'image' && !!message.imageFileId;
+    const isImage = message.type === 'image' && !!(message.imageFileId || message.localImageUrl);
+    const isFile = message.type === 'file';
     const isFromVanessa = !isMine && message.senderId === VANESSA_USER_ID;
+    const isPending = message.$id.startsWith('temp-');
+    const reply = parseReplyTo(message);
+    const fileMeta = isFile ? (parseFileMeta(message) ?? (message.localFile ? { id: '', ...message.localFile, mime: '' } : null)) : null;
+    const copyable = getCopyableText(message);
 
     const [copied, setCopied] = useState(false);
     const [feedback, setFeedback] = useState<'up' | 'down' | ''>(message.feedback || '');
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const bubbleRef = useRef<HTMLDivElement>(null);
+    const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleCopy = () => {
-        if (!text) return;
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+    const handleCopy = async () => {
+        if (!copyable) return;
+        if (await copyToClipboard(copyable)) {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        }
     };
 
     const handleFeedback = (value: 'up' | 'down') => {
@@ -45,23 +86,123 @@ export const MessageBubble = ({ message, isMine }: { message: Message; isMine: b
         });
     };
 
+    // --- Menu d'actions : "⋯" au survol (ordinateur) ou appui long (mobile) ---
+    const openMenu = () => {
+        if (isPending || !bubbleRef.current) return;
+        const rect = bubbleRef.current.getBoundingClientRect();
+        const MENU_W = 176;
+        const MENU_H = 96;
+        const below = rect.bottom + 6 + MENU_H < window.innerHeight;
+        const top = below ? rect.bottom + 6 : Math.max(8, rect.top - MENU_H - 6);
+        const preferred = isMine ? rect.right - MENU_W : rect.left;
+        const left = Math.min(Math.max(8, preferred), window.innerWidth - MENU_W - 8);
+        setMenuPos({ top, left });
+    };
+
+    const cancelPress = () => {
+        if (pressTimer.current) {
+            clearTimeout(pressTimer.current);
+            pressTimer.current = null;
+        }
+    };
+
+    useEffect(() => {
+        if (!menuPos) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuPos(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [menuPos]);
+    useEffect(() => cancelPress, []);
+
+    const displayedImageUrl = message.localImageUrl && isPending ? message.localImageUrl : (message.imageFileId ? getChatImageUrl(message.imageFileId) : message.localImageUrl || '');
+
     return (
-        <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-            <div className="max-w-[75%]">
+        <div id={`msg-${message.$id}`} className={`group flex items-center gap-1 rounded-xl ${isMine ? 'justify-end' : 'justify-start'}`}>
+            {/* "⋯" — à gauche de mes messages, à droite des autres */}
+            {isMine && !isPending && (
+                <button
+                    onClick={openMenu}
+                    aria-label="Actions sur le message"
+                    className="hidden md:flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                    ⋯
+                </button>
+            )}
+
+            <div className="max-w-[75%] min-w-0">
                 <div
-                    className={`rounded-2xl px-4 py-2.5 text-sm ${
+                    ref={bubbleRef}
+                    onTouchStart={() => { cancelPress(); pressTimer.current = setTimeout(openMenu, LONG_PRESS_MS); }}
+                    onTouchMove={cancelPress}
+                    onTouchEnd={cancelPress}
+                    onTouchCancel={cancelPress}
+                    onContextMenu={(e) => {
+                        // Garde le menu du navigateur sur un lien (copier l'adresse...).
+                        if ((e.target as HTMLElement).closest('a')) return;
+                        e.preventDefault();
+                        openMenu();
+                    }}
+                    style={IS_TOUCH ? { WebkitTouchCallout: 'none', userSelect: 'none' } : undefined}
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm ${
                         isMine
                             ? 'bg-[#FF4757] text-white rounded-br-sm'
                             : 'bg-gray-100 text-gray-800 rounded-bl-sm'
                     }`}
                 >
-                    {isImage ? (
-                        <img
-                            src={getChatImageUrl(message.imageFileId!)}
-                            alt="Photo envoyée"
-                            className="max-w-full max-h-64 rounded-xl object-contain bg-black/5"
-                        />
-                    ) : isVoice ? (
+                    {/* Citation : le message auquel celui-ci répond */}
+                    {reply && (
+                        <button
+                            type="button"
+                            onClick={() => onJumpTo?.(reply.id)}
+                            className={`block w-full text-left rounded-lg px-2.5 py-1.5 mb-1.5 border-l-4 ${
+                                isMine ? 'bg-white/15 border-white/70' : 'bg-white border-[#FF4757]'
+                            }`}
+                        >
+                            <span className={`block text-[11px] font-semibold ${isMine ? 'text-white' : 'text-[#FF4757]'}`}>
+                                {senderLabel(reply.senderId)}
+                            </span>
+                            <span className={`block text-xs line-clamp-2 ${isMine ? 'text-white/85' : 'text-gray-600'}`}>
+                                {reply.preview}
+                            </span>
+                        </button>
+                    )}
+
+                    {isImage && (
+                        <button type="button" onClick={() => !isPending && setViewerOpen(true)} className="block">
+                            <img
+                                src={displayedImageUrl}
+                                alt="Photo envoyée"
+                                loading="lazy"
+                                className={`max-w-full max-h-64 rounded-xl object-contain bg-black/5 ${isPending ? 'opacity-70' : ''}`}
+                            />
+                        </button>
+                    )}
+
+                    {fileMeta && (() => {
+                        const icon = fileIcon(fileMeta.name);
+                        const linkable = !!fileMeta.id && documentsEnabled();
+                        const inner = (
+                            <>
+                                <span className={`shrink-0 w-10 h-10 rounded-lg ${icon.bg} text-white text-[10px] font-bold flex items-center justify-center`}>
+                                    {icon.emoji}
+                                </span>
+                                <span className="min-w-0 flex-1 text-left">
+                                    <span className="block text-sm font-medium truncate">{fileMeta.name}</span>
+                                    <span className={`block text-[11px] ${isMine ? 'text-white/75' : 'text-gray-500'}`}>
+                                        {formatFileSize(fileMeta.size)}{linkable ? ' · Ouvrir' : isPending ? ' · Envoi…' : ''}
+                                    </span>
+                                </span>
+                            </>
+                        );
+                        const cardClass = `flex items-center gap-2.5 rounded-xl p-2 min-w-[200px] ${isMine ? 'bg-white/15' : 'bg-white'}`;
+                        return linkable ? (
+                            <a href={getMessageFileDownloadUrl(fileMeta.id)} target="_blank" rel="noopener noreferrer" className={cardClass}>{inner}</a>
+                        ) : (
+                            <div className={cardClass}>{inner}</div>
+                        );
+                    })()}
+
+                    {isVoice && (
                         <div className="flex items-center gap-2 min-w-[180px]">
                             <span>🎤</span>
                             <audio
@@ -71,8 +212,15 @@ export const MessageBubble = ({ message, isMine }: { message: Message; isMine: b
                                 style={{ height: '32px' }}
                             />
                         </div>
-                    ) : (
-                        text && <p className="whitespace-pre-wrap break-words">{text}</p>
+                    )}
+
+                    {/* Texte : message, ou légende d'une photo / d'un document.
+                        Un vocal affiche son lecteur seulement (la transcription
+                        reste copiable via le menu). */}
+                    {!isVoice && text && (
+                        <p className={`whitespace-pre-wrap break-words ${isImage || isFile ? 'mt-1.5' : ''}`}>
+                            <LinkifiedText text={text} isMine={isMine} />
+                        </p>
                     )}
 
                     {suggestion && (
@@ -92,9 +240,11 @@ export const MessageBubble = ({ message, isMine }: { message: Message; isMine: b
                         </div>
                     )}
 
-                    <p className={`text-[10px] mt-1 ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
-                        {formatTime(message.$createdAt)}
-                    </p>
+                    <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
+                        {copied && <span className="font-medium">Copié ✓</span>}
+                        <span>{formatTime(message.$createdAt)}</span>
+                        {isMine && status && <StatusTicks status={status} />}
+                    </div>
                 </div>
 
                 {/* Copier + réactions — uniquement sur les messages texte de
@@ -138,6 +288,61 @@ export const MessageBubble = ({ message, isMine }: { message: Message; isMine: b
                     </div>
                 )}
             </div>
+
+            {!isMine && !isPending && (
+                <button
+                    onClick={openMenu}
+                    aria-label="Actions sur le message"
+                    className="hidden md:flex opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity w-7 h-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                    ⋯
+                </button>
+            )}
+
+            {/* Menu d'actions — pas de "Supprimer", volontairement */}
+            {menuPos && (
+                <div className="fixed inset-0 z-50" onClick={() => setMenuPos(null)}>
+                    <div
+                        role="menu"
+                        style={{ top: menuPos.top, left: menuPos.left }}
+                        className="absolute w-44 rounded-2xl bg-white shadow-lg border border-gray-100 py-1.5 text-sm text-gray-700"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {onReply && (
+                            <button
+                                role="menuitem"
+                                onClick={() => { setMenuPos(null); onReply(message); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50"
+                            >
+                                ↩ Répondre
+                            </button>
+                        )}
+                        {copyable && (
+                            <button
+                                role="menuitem"
+                                onClick={() => { setMenuPos(null); handleCopy(); }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gray-50"
+                            >
+                                ⧉ Copier le texte
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Visionneuse de photo */}
+            {viewerOpen && isImage && (
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4" onClick={() => setViewerOpen(false)}>
+                    <button
+                        aria-label="Fermer"
+                        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 text-white text-xl flex items-center justify-center"
+                        onClick={() => setViewerOpen(false)}
+                    >
+                        ✕
+                    </button>
+                    <img src={displayedImageUrl} alt="Photo en grand" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+                </div>
+            )}
         </div>
     );
 };

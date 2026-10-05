@@ -40,6 +40,9 @@ export const BUCKETS = {
     STORY_IMAGES: import.meta.env.VITE_APPWRITE_BUCKET_STORY_IMAGES || '',
     VOICE_MESSAGES: import.meta.env.VITE_APPWRITE_BUCKET_VOICE_MESSAGES || '',
     CONNECTOR_DOCUMENTS: import.meta.env.VITE_APPWRITE_BUCKET_CONNECTOR_DOCUMENTS || '',
+    // Documents joints à un message (PDF, Word, Excel...). Vide = l'envoi de
+    // documents est simplement masqué, seules les photos restent proposées.
+    MESSAGE_FILES: import.meta.env.VITE_APPWRITE_BUCKET_MESSAGE_FILES || '',
 } as const;
 
 // Compte utilisateur de Vanessa (l'IA de Ça Parle) — un vrai compte
@@ -59,6 +62,7 @@ export const FUNCTIONS = {
     INCREMENT_VIEW: import.meta.env.VITE_APPWRITE_FUNCTION_INCREMENT_VIEW || '',
     START_CONVERSATION: import.meta.env.VITE_APPWRITE_FUNCTION_START_CONVERSATION || '',
     SEND_MESSAGE: import.meta.env.VITE_APPWRITE_FUNCTION_SEND_MESSAGE || '',
+    MARK_RECEIPTS: import.meta.env.VITE_APPWRITE_FUNCTION_MARK_RECEIPTS || '',
     SEND_NEWSLETTER: import.meta.env.VITE_APPWRITE_FUNCTION_SEND_NEWSLETTER || '',
     UNSUBSCRIBE_NEWSLETTER: import.meta.env.VITE_APPWRITE_FUNCTION_UNSUBSCRIBE_NEWSLETTER || '',
     MANAGE_VANESSA_KNOWLEDGE: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_VANESSA_KNOWLEDGE || '',
