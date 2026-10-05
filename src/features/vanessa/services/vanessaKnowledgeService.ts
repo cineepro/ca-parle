@@ -14,6 +14,33 @@ export interface VanessaKnowledge {
     createdAt: string;
 }
 
+// Un "type" de connaissance : la page n'en charge qu'un à la fois.
+export type KnowledgeScope = 'lexique' | 'urgence' | 'general' | 'connector';
+
+export interface KnowledgeListParams {
+    scope: KnowledgeScope;
+    connectorId?: string; // requis si scope === 'connector'
+    active?: boolean; // true = activées, false = à activer
+    search?: string;
+    cursor?: string; // id de la dernière note déjà reçue (page suivante)
+    limit?: number;
+}
+
+export interface KnowledgeListResult {
+    documents: VanessaKnowledge[];
+    total: number; // notes correspondant au filtre (statut courant)
+    otherTotal: number; // notes de l'autre statut — pour afficher les deux compteurs
+    nextCursor: string | null; // null = plus de page suivante
+}
+
+// Notes en attente d'activation, par type — sans avoir lu les notes.
+export interface PendingCounts {
+    lexique: number;
+    urgence: number;
+    general: number;
+    connectors: { $id: string; name: string; icon: string; color: string; active: boolean; pending: number }[];
+}
+
 export interface VanessaConnector {
     $id: string;
     name: string;
@@ -81,9 +108,15 @@ export async function uploadConnectorPdf(file: File): Promise<string> {
 
 export const vanessaKnowledgeService = {
     // --- Notes de connaissance ---
-    async list(): Promise<VanessaKnowledge[]> {
-        const result = await callFunction<{ documents: VanessaKnowledge[] }>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'list' });
-        return result.documents;
+    // Liste filtrée et paginée : un type à la fois, 25 notes par page.
+    // Ne jamais rappeler sans `scope` — ce serait relire des notes de tous
+    // les types pour rien.
+    async list(params: KnowledgeListParams): Promise<KnowledgeListResult> {
+        return callFunction<KnowledgeListResult>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'list', ...params });
+    },
+
+    async pendingCounts(): Promise<PendingCounts> {
+        return callFunction<PendingCounts>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'pending_counts' });
     },
 
     async create(category: string, content: string, connectorId?: string): Promise<void> {

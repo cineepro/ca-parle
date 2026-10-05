@@ -23,6 +23,24 @@
 // qu'un modérateur ne l'a pas validée).
 import { Client, Databases, Query, ID } from 'node-appwrite';
 
+// Catégories techniques reconnues par send-message et par la page
+// Connaissances — ne jamais renommer sans changer aussi les constantes
+// équivalentes côté send-message et VanessaKnowledgeManager.
+const LEXICON_CATEGORY = 'lexique';
+const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
+
+// "Sans connecteur" : les notes créées avant l'ajout de l'attribut
+// connectorId n'ont aucune valeur dessus (Appwrite ne rétro-remplit jamais
+// les documents existants), les plus récentes ont une chaîne vide — une
+// requête stricte sur '' exclurait silencieusement les premières.
+const noConnectorFilter = () => Query.or([Query.equal('connectorId', ''), Query.isNull('connectorId')]);
+
+const generalScopeFilters = (withOr = true) => [
+    Query.notEqual('category', LEXICON_CATEGORY),
+    Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+    withOr ? noConnectorFilter() : Query.equal('connectorId', ''),
+];
+
 // --- Grille tarifaire (voir Vanessa-API-Grille-Tarifaire.docx) ---
 // À remettre à jour manuellement ici si la grille change un jour (taux
 // USD/FCFA, tarif Anthropic, ou marge appliquée).
@@ -137,20 +155,118 @@ export default async ({ req, res, error }) => {
         switch (action) {
             // --- Notes de connaissance ---
             case 'list': {
-                // Cette page a besoin de TOUT récupérer d'un coup (lexique,
-                // notes générales, notes de connecteurs en attente de
-                // relecture) — le tri par catégorie se fait ensuite côté
-                // client. Avec une limite trop juste (100 auparavant), les
-                // notes de connecteurs les plus récentes (tous les nouveaux
-                // sites branchés via sync-connector-sources) ont fini par
-                // remplir toute la fenêtre récupérée, ne laissant plus
-                // aucune place pour les notes générales une fois triées —
-                // alors qu'elles existaient toujours, intactes, en base.
-                const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                    Query.orderDesc('createdAt'),
-                    Query.limit(500),
+                // Liste FILTRÉE ET PAGINÉE — jamais toute la collection d'un
+                // coup. Avant, chaque ouverture de la page relisait jusqu'à
+                // 500 notes de tous les types mélangés (coût de lecture
+                // Appwrite proportionnel au volume, et défilement
+                // interminable). Désormais : un type à la fois (scope), un
+                // statut à la fois (active), 25 notes par page.
+                //   scope : 'lexique' | 'urgence' | 'general' | 'connector'
+                const { scope, search, cursor } = body;
+                const limit = Math.min(50, Math.max(1, parseInt(body.limit, 10) || 25));
+
+                // Sans scope (ancien appel) : on renvoie seulement les plus
+                // récentes, jamais tout.
+                if (!scope) {
+                    const recent = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                        Query.orderDesc('createdAt'), Query.limit(25),
+                    ]);
+                    return res.json({ success: true, documents: recent.documents, total: recent.total, otherTotal: 0, nextCursor: null });
+                }
+
+                const scopeFilters = (withOr) => {
+                    switch (scope) {
+                        case 'lexique': return [Query.equal('category', LEXICON_CATEGORY)];
+                        case 'urgence': return [Query.equal('category', URGENT_RESOURCES_CATEGORY)];
+                        case 'general': return generalScopeFilters(withOr);
+                        case 'connector': return connectorId ? [Query.equal('connectorId', connectorId)] : null;
+                        default: return null;
+                    }
+                };
+                if (!scopeFilters(true)) {
+                    return res.json({ success: false, error: scope === 'connector' ? 'connectorId requis.' : `Type inconnu : ${scope}` }, 400);
+                }
+
+                const extra = [];
+                if (search) extra.push(Query.search('content', String(search).slice(0, 100)));
+                const statusFilter = active === undefined ? [] : [Query.equal('active', !!active)];
+                const page = [Query.orderDesc('createdAt'), Query.limit(limit)];
+                if (cursor) page.push(Query.cursorAfter(cursor));
+
+                // "Sans connecteur" via Query.or ; si le serveur le refuse,
+                // repli sur la requête stricte (chaîne vide) plutôt que
+                // d'échouer entièrement.
+                const run = async (statusQueries, pageQueries) => {
+                    try {
+                        return await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                            ...scopeFilters(true), ...extra, ...statusQueries, ...pageQueries,
+                        ]);
+                    } catch (e) {
+                        if (scope !== 'general' || search) throw e;
+                        return await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                            ...scopeFilters(false), ...extra, ...statusQueries, ...pageQueries,
+                        ]);
+                    }
+                };
+
+                try {
+                    const result = await run(statusFilter, page);
+                    // Total de l'AUTRE statut (pour afficher "À activer (n) /
+                    // Activées (m)") : une requête d'une seule ligne,
+                    // seulement à la première page.
+                    let otherTotal = 0;
+                    if (active !== undefined && !cursor) {
+                        otherTotal = (await run([Query.equal('active', !active)], [Query.limit(1)])).total;
+                    }
+                    const docs = result.documents;
+                    return res.json({
+                        success: true,
+                        documents: docs,
+                        total: result.total,
+                        otherTotal,
+                        nextCursor: docs.length === limit ? docs[docs.length - 1].$id : null,
+                    });
+                } catch (e) {
+                    if (search && /fulltext|index/i.test(e.message || '')) {
+                        return res.json({ success: false, error: "La recherche par texte demande un index « fulltext » sur l'attribut content de la collection vanessa_knowledge (Appwrite → Databases → Indexes)." });
+                    }
+                    throw e;
+                }
+            }
+            case 'pending_counts': {
+                // Combien de notes attendent d'être activées, par type et par
+                // connecteur — une requête d'UNE ligne par compteur (le total
+                // est renvoyé sans lire les notes), donc quelques lectures au
+                // lieu de centaines. Renvoie aussi la liste des connecteurs,
+                // ce qui évite un second appel à l'ouverture de la page.
+                const countPending = async (filtersWithOr, filtersFallback) => {
+                    try {
+                        return (await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                            Query.equal('active', false), ...filtersWithOr, Query.limit(1),
+                        ])).total;
+                    } catch (e) {
+                        if (!filtersFallback) throw e;
+                        return (await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                            Query.equal('active', false), ...filtersFallback, Query.limit(1),
+                        ])).total;
+                    }
+                };
+                const connectorsRes = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [
+                    Query.orderDesc('createdAt'), Query.limit(100),
                 ]);
-                return res.json({ success: true, documents: result.documents });
+                const [lexique, urgence, general, ...perConnector] = await Promise.all([
+                    countPending([Query.equal('category', LEXICON_CATEGORY)]),
+                    countPending([Query.equal('category', URGENT_RESOURCES_CATEGORY)]),
+                    countPending(generalScopeFilters(true), generalScopeFilters(false)),
+                    ...connectorsRes.documents.map((c) => countPending([Query.equal('connectorId', c.$id)])),
+                ]);
+                return res.json({
+                    success: true,
+                    lexique, urgence, general,
+                    connectors: connectorsRes.documents.map((c, i) => ({
+                        $id: c.$id, name: c.name, icon: c.icon, color: c.color, active: c.active, pending: perConnector[i],
+                    })),
+                });
             }
             case 'create': {
                 if (!category || !content) {
