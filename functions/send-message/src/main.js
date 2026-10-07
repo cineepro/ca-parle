@@ -37,10 +37,10 @@
 import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 
-// Modèle Claude utilisé pour les réponses de Vanessa. Haiku 4.5 = nettement moins cher que Sonnet.
+// Modèle Claude utilisé pour les réponses de Vanessa. Sonnet 5 = réponses les plus fidèles au personnage (Haiku 4.5 est moins cher mais plus plat).
 // Pour changer SANS toucher au code : variable d'environnement VANESSA_MODEL de la Function
-// (ex. claude-sonnet-5 pour revenir à l'ancien modèle).
-const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
+// (ex. claude-haiku-4-5-20251001 pour une version moins chère).
+const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-sonnet-5';
 
 async function sendPush(messaging, userId, title, body, url, log) {
     try {
@@ -355,6 +355,41 @@ CE QUE TU SAIS SUR LE FONCTIONNEMENT DE LA PLATEFORME — si on te demande comme
 - Toi : chat texte/vocal/image, humeurs, mémoire consultable et effaçable depuis le profil, connecteurs partenaires, limite quotidienne d'échanges (annoncée par toi-même si atteinte).
 - Ça sert : répertoire de bons plans (lieux/services) et prix du moment, affiché par défaut en carte interactive (bascule liste disponible). Ajout via "Balance ton bon plan", validation avant publication, confirmations communautaires, itinéraire routier depuis la position réelle.
 - Notifications en temps réel, newsletter par email désinscriptible.`;
+
+// ── Économie de tokens : certains blocs du prompt ne sont envoyés que s'ils servent ──
+// On travaille sur le texte des derniers messages de la PERSONNE (pas ceux de Vanessa),
+// sans accents ni majuscules, pour que "ça" / "Ça" / "ca" soient traités pareil.
+function normalizeForMatch(text) {
+    return (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+function recentUserText(history, vanessaId, count = 3) {
+    return history
+        .filter((m) => m.senderId !== vanessaId)
+        .slice(-count)
+        .map((m) => m.content || '')
+        .join(' \n ');
+}
+
+// Le guide de l'app (≈1 700 caractères) n'est utile que si la conversation parle
+// de l'app ou de Vanessa elle-même. Pour un "salut" ou une discussion normale, on l'économise.
+// Liste VOLONTAIREMENT large : mieux vaut l'envoyer pour rien que rater une vraie question.
+const APP_GUIDE_TRIGGERS = /(\bapp\b|appli|application|plateforme|vanessa|ca parle|ca sert|comment (ca )?(marche|fonctionne)|fonctionn|fonctionnalite|bouton|menu|profil|compte|publi|histoire|ragot|revelation|temoignage|rumeur|anonym|reaction|predict|\bvote|reputation|badge|reference|signal|moderat|messagerie|bon plan|itineraire|\bcarte\b|connecteur|partenaire|memoire|efface|notification|newsletter|\bemail|vocal|\bvoix\b|photo|\bimage|limite|quota|humeur|tu (peux|sais|fais|es)|qui es.?tu|ca sert a quoi|utilis|inscri|parametre|reglage|telecharg|install|aide|help)/;
+
+function needsAppGuide(history, vanessaId) {
+    return APP_GUIDE_TRIGGERS.test(normalizeForMatch(recentUserText(history, vanessaId)));
+}
+
+// Les ressources d'urgence (jusqu'à 50 lignes) ne servent que si la personne parle
+// de danger, violence, santé, détresse… On regarde ses 3 derniers messages (pour qu'un
+// "continue" ou un "oui" après un sujet grave garde les ressources). Liste volontairement
+// LARGE. Si une détresse passait quand même à travers, Vanessa suit la règle du prompt :
+// elle n'invente aucun numéro et oriente vers un adulte de confiance / un centre de santé.
+const DISTRESS_TRIGGERS = /(viol|agress|frapp|battu|\bbat\b|\bcoups?\b|violen|abus|harcel|menac|contrain|force[es]?\b|suicid|mourir|mort\b|me tuer|en finir|fugue|enceint|grossesse|avort|\bist\b|sida|\bvih\b|drogue|alcool|overdose|danger|urgen|secours|police|gendarm|a l.aide|aide.?moi|peur|maltrait|exploit|traite|excis|depress|deprim|triste|angoiss|desespoir|detresse|souffr|blesse|malade|sang\b|hopital|centre de sante|medecin|sante|numero|a qui (parler|en parler)|ou (aller|trouver)|ressource|ligne d.ecoute|vert|halte|victime|harcelement|mariage|famille me|mon (mari|pere|oncle|patron|chef|prof))/;
+
+function needsUrgentResources(history, vanessaId) {
+    return DISTRESS_TRIGGERS.test(normalizeForMatch(recentUserText(history, vanessaId)));
+}
 
 // Extraction périodique d'un fait durable — appelée seulement de temps en
 // temps (voir MEMORY_CHECK_THRESHOLD), avec un modèle volontairement plus
@@ -725,7 +760,10 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
     // vérifiées — Vanessa reste alors volontairement générique plutôt que
     // d'inventer un numéro (voir VANESSA_SYSTEM_PROMPT).
     let resourcesContext = '';
-    try {
+    const includeUrgentResources = needsUrgentResources(history, VANESSA_USER_ID);
+    const includeAppGuide = needsAppGuide(history, VANESSA_USER_ID);
+    log(`🧮 Blocs du prompt : ressources d'urgence ${includeUrgentResources ? 'incluses' : 'omises'}, guide de l'app ${includeAppGuide ? 'inclus' : 'omis'}`);
+    if (includeUrgentResources) try {
         const resources = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
             Query.equal('active', true),
             Query.equal('category', URGENT_RESOURCES_CATEGORY),
@@ -815,7 +853,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         },
         body: JSON.stringify({
             model: CLAUDE_MODEL,
-            system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
+            system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: VANESSA_MAX_TOKENS,
         }),
