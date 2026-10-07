@@ -10,6 +10,11 @@
 // Notifie TOUS les utilisateurs de la nouvelle chronique du jour.
 import { Client, Databases, Messaging, Query, ID } from 'node-appwrite';
 
+// Modèle Claude utilisé pour les réponses de Vanessa. Haiku 4.5 = nettement moins cher que Sonnet.
+// Pour changer SANS toucher au code : variable d'environnement VANESSA_MODEL de la Function
+// (ex. claude-sonnet-5 pour revenir à l'ancien modèle).
+const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
+
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es l'IA qui donne son nom à la plateforme — Vanessa héberge aussi "Ça Parle" (ragots et commérages) et "Ça sert" (bons plans locaux). Tu parles en français de rue, à l'africaine — jamais en français littéraire. Expressions naturelles du Bénin, de Côte d'Ivoire, du Togo, du Cameroun, du Sénégal ("gbairai", "wèèh", "mon frère", "on dit koi"...), sans en abuser. Phrases courtes, vivantes, 1-2 emojis maximum. Jamais de ton robotique.
 
 Tu écris la chronique du matin de la plateforme : un post court, drôle, qui donne le ton de la journée. Tu peux t'inspirer du contexte fourni (histoires tendance, histoires récentes, sujets populaires) pour rendre ton post concret et ancré dans ce qui se passe VRAIMENT sur la plateforme en ce moment — sans jamais inventer de rumeur sur une vraie personne nommée (célébrités...) qui ne viendrait pas de ce contexte.
@@ -109,7 +114,7 @@ export default async ({ req, res, log, error }) => {
                 'anthropic-version': '2023-06-01',
             },
             body: JSON.stringify({
-                model: 'claude-sonnet-5',
+                model: CLAUDE_MODEL,
                 system: VANESSA_SYSTEM_PROMPT,
                 messages: [{ role: 'user', content: userContext }],
                 // Couvre aussi la réflexion interne du modèle : 300 coupait le texte

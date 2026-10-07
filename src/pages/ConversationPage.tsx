@@ -14,6 +14,7 @@ import { documentsEnabled, type Message } from '@/features/messaging/services/me
 import { getMessageStatus } from '@/features/messaging/utils/receipts';
 import { getMessagePreview } from '@/features/messaging/utils/messagePreview';
 import { VANESSA_USER_ID } from '@/api/constants';
+import { VOICE_MESSAGES_ENABLED, LIVE_CALL_ENABLED } from '@/config/features';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -409,7 +410,7 @@ export default function ConversationPage() {
                 ) : (
                     <MessageComposer
                         onSend={handleSend}
-                        onSendVoice={handleSendVoice}
+                        onSendVoice={VOICE_MESSAGES_ENABLED ? handleSendVoice : undefined}
                         onSendAttachment={handleSendAttachment}
                         // Avec Vanessa : photos seulement (elle ne lit pas encore les documents).
                         allowDocuments={!isVanessaConversation && documentsEnabled()}
@@ -417,7 +418,7 @@ export default function ConversationPage() {
                         onCancelReply={() => setReplyingTo(null)}
                         sending={sending}
                         prefill={writingPrefill}
-                        onStartCall={isVanessaConversation ? call.start : undefined}
+                        onStartCall={LIVE_CALL_ENABLED && isVanessaConversation ? call.start : undefined}
                     />
                 )}
             </div>

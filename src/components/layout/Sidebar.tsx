@@ -8,6 +8,7 @@ import { conversationService, type Conversation } from '@/features/messaging/ser
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '@/features/vanessa/utils/questionCount';
 import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 import { VANESSA_USER_ID } from '@/api/constants';
+import { EMISSIONS_ENABLED } from '@/config/features';
 import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 interface NavItem {
@@ -469,7 +470,7 @@ export const Sidebar = () => {
                                     item={{ to: alertSummary.open > 0 ? '/moderation?section=alerts' : '/moderation', label: 'Console', badge: alertSummary.open }}
                                     onNavigate={close}
                                 />
-                                <NavLink item={{ to: '/emissions', label: 'Émissions' }} onNavigate={close} />
+                                {EMISSIONS_ENABLED && <NavLink item={{ to: '/emissions', label: 'Émissions' }} onNavigate={close} />}
                             </div>
                         </>
                     )}

@@ -12,6 +12,11 @@
 // harcèlement de rappels successifs.
 import { Client, Databases, Messaging, Query, ID, Permission, Role } from 'node-appwrite';
 
+// Modèle Claude utilisé pour les réponses de Vanessa. Haiku 4.5 = nettement moins cher que Sonnet.
+// Pour changer SANS toucher au code : variable d'environnement VANESSA_MODEL de la Function
+// (ex. claude-sonnet-5 pour revenir à l'ancien modèle).
+const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
+
 // Doit rester nettement sous le timeout réglé côté Appwrite pour cette Function.
 const SOFT_TIME_BUDGET_MS = 40_000;
 const INACTIVITY_DAYS = 4;
@@ -80,7 +85,7 @@ export default async ({ req, res, log, error }) => {
                         'anthropic-version': '2023-06-01',
                     },
                     body: JSON.stringify({
-                        model: 'claude-sonnet-5',
+                        model: CLAUDE_MODEL,
                         system: VANESSA_SYSTEM_PROMPT,
                         messages: [{ role: 'user', content: 'Relance-moi avec ta question gbaraï.' }],
                         // Couvre aussi la réflexion interne du modèle : 150 pouvait ne laisser

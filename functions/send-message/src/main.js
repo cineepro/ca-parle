@@ -37,6 +37,11 @@
 import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 
+// Modèle Claude utilisé pour les réponses de Vanessa. Haiku 4.5 = nettement moins cher que Sonnet.
+// Pour changer SANS toucher au code : variable d'environnement VANESSA_MODEL de la Function
+// (ex. claude-sonnet-5 pour revenir à l'ancien modèle).
+const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
+
 async function sendPush(messaging, userId, title, body, url, log) {
     try {
         await messaging.createPush(
@@ -809,7 +814,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'claude-sonnet-5',
+            model: CLAUDE_MODEL,
             system: VANESSA_SYSTEM_PROMPT + APP_GUIDE_CONTEXT + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: VANESSA_MAX_TOKENS,
@@ -862,7 +867,7 @@ async function generateVanessaImageRoast({ storage, BUCKET_STORY_IMAGES, ANTHROP
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: 'claude-sonnet-5',
+            model: CLAUDE_MODEL,
             system: VANESSA_IMAGE_ROAST_PROMPT,
             messages: [{
                 role: 'user',
