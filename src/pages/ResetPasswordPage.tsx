@@ -4,6 +4,7 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { account } from '@/api/appwrite';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 export default function ResetPasswordPage() {
     const [searchParams] = useSearchParams();
@@ -50,13 +51,13 @@ export default function ResetPasswordPage() {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-md bg-white rounded-3xl shadow-sm p-8">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-[#FF4757]">Vanessa</h1>
+                    <h1 className="text-2xl font-bold text-ochre">Vanessa</h1>
                     <p className="text-sm text-gray-500 mt-1">Nouveau mot de passe</p>
                 </div>
 
                 {success ? (
                     <div className="text-center space-y-3">
-                        <div className="text-4xl">✅</div>
+                        <div className=""><CheckCircle2 className="w-11 h-11 text-ochre mx-auto" aria-hidden="true" /></div>
                         <p className="text-sm text-gray-600">Mot de passe mis à jour ! Redirection vers la connexion...</p>
                     </div>
                 ) : (
@@ -80,14 +81,14 @@ export default function ResetPasswordPage() {
                         />
                         {error && (
                             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
-                                ❌ {error}
+                                <XCircle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {error}
                             </div>
                         )}
                         <Button type="submit" variant="primary" size="lg" className="w-full" isLoading={loading}>
                             Valider le nouveau mot de passe
                         </Button>
                         <div className="text-center text-sm">
-                            <Link to="/login" className="text-[#FF4757] font-semibold hover:underline">
+                            <Link to="/login" className="text-ochre font-semibold hover:underline">
                                 Retour à la connexion
                             </Link>
                         </div>

@@ -69,7 +69,7 @@ export const VanessaFeedbackReview = () => {
                 <div className="space-y-3">
                     {messages.map((m) => (
                         <div key={m.$id} className={`rounded-2xl p-4 border ${tab === 'down' ? 'border-red-100 bg-red-50/40' : 'border-green-100 bg-green-50/40'}`}>
-                            <p className="text-[11px] text-gray-400 mb-1.5">{formatDate(m.createdAt)}</p>
+                            <p className="text-xs text-gray-400 mb-1.5">{formatDate(m.createdAt)}</p>
                             {m.question && (
                                 <p className="text-xs text-gray-500 mb-1.5">
                                     <span className="font-semibold">Question :</span> {m.question}

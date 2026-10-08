@@ -15,6 +15,7 @@ import { getMessageStatus } from '@/features/messaging/utils/receipts';
 import { getMessagePreview } from '@/features/messaging/utils/messagePreview';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { VOICE_MESSAGES_ENABLED, LIVE_CALL_ENABLED } from '@/config/features';
+import { Camera, Sparkles } from 'lucide-react';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -201,7 +202,7 @@ export default function ConversationPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <svg className="animate-spin w-8 h-8 text-[#FF4757]" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin w-8 h-8 text-ochre" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
@@ -213,7 +214,7 @@ export default function ConversationPage() {
         return (
             <div className="flex flex-col items-center justify-center gap-3 py-20">
                 <p className="text-gray-500">{error}</p>
-                <Link to="/messages" className="text-[#FF4757] font-semibold hover:underline">Retour aux messages</Link>
+                <Link to="/messages" className="text-ochre font-semibold hover:underline">Retour aux messages</Link>
             </div>
         );
     }
@@ -247,7 +248,7 @@ export default function ConversationPage() {
                                     onBlur={confirmRenameTitle}
                                     onKeyDown={(e) => { if (e.key === 'Escape') setRenamingTitle(false); }}
                                     maxLength={100}
-                                    className="text-sm font-semibold text-gray-800 border-b border-[#FF4757]/40 focus:outline-none"
+                                    className="text-sm font-semibold text-gray-800 border-b border-brand/40 focus:outline-none"
                                 />
                             </form>
                         ) : (
@@ -263,7 +264,7 @@ export default function ConversationPage() {
                             </p>
                         )}
                         {activeConnector && (
-                            <p className="text-[11px] font-medium" style={{ color: activeConnector.color }}>
+                            <p className="text-xs font-medium" style={{ color: activeConnector.color }}>
                                 {activeConnector.icon} {activeConnector.description || activeConnector.name}
                             </p>
                         )}
@@ -297,7 +298,7 @@ export default function ConversationPage() {
                     <div className="px-4 pb-2">
                         <button
                             onClick={() => setWritingPrefill(`Vanessa, aide-moi à rédiger un post pour les réseaux sur : `)}
-                            className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1.5"
+                            className="text-xs font-semibold text-ochre bg-brand-tint hover:bg-brand-strong rounded-full px-3 py-1.5"
                         >
                             Demande-lui de rédiger quelque chose
                         </button>
@@ -315,7 +316,7 @@ export default function ConversationPage() {
                         <button
                             onClick={handleLoadOlder}
                             disabled={loadingOlder}
-                            className="text-xs text-[#FF4757] font-medium bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-4 py-1.5 disabled:opacity-50"
+                            className="text-xs text-ochre font-medium bg-brand-tint hover:bg-brand-strong rounded-full px-4 py-1.5 disabled:opacity-50"
                         >
                             {loadingOlder ? 'Chargement...' : '↑ Charger les messages précédents'}
                         </button>
@@ -336,7 +337,7 @@ export default function ConversationPage() {
                             <Fragment key={message.$id}>
                                 {showDay && (
                                     <div className="flex justify-center py-1.5">
-                                        <span className="text-[11px] text-gray-500 bg-gray-100 rounded-full px-3 py-1 capitalize">
+                                        <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1 capitalize">
                                             {dayLabel(message.$createdAt)}
                                         </span>
                                     </div>
@@ -356,7 +357,7 @@ export default function ConversationPage() {
 
                 {showImageHint && (
                     <p className="text-xs text-gray-400 text-center py-1">
-                        📷 Envoyée ! Écris un message pour demander à Vanessa ce qu'elle en pense 👀
+                        <Camera className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Envoyée ! Écris un message pour demander à Vanessa ce qu'elle en pense 👀
                     </p>
                 )}
 
@@ -376,7 +377,7 @@ export default function ConversationPage() {
             {showScrollToBottom && (
                 <button
                     onClick={scrollToBottom}
-                    className="absolute right-4 bottom-20 z-20 w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-[#FF4757] transition-colors"
+                    className="absolute right-4 bottom-20 z-20 w-10 h-10 rounded-full bg-white shadow-md border border-gray-100 flex items-center justify-center text-gray-500 hover:text-ochre transition-colors"
                     aria-label="Descendre en bas"
                 >
                     ↓
@@ -391,8 +392,8 @@ export default function ConversationPage() {
                     <p className="text-xs text-gray-500 text-center bg-gray-50 py-1.5 px-3">{jumpNotice}</p>
                 )}
                 {isVanessaConversation && (
-                    <p className="text-[11px] text-gray-400 text-center bg-gray-50 py-1 px-3 border-t border-gray-100">
-                        🔮 Vanessa est une intelligence artificielle. Elle peut se tromper.
+                    <p className="text-xs text-gray-400 text-center bg-gray-50 py-1 px-3 border-t border-gray-100">
+                        <Sparkles className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Vanessa est une intelligence artificielle. Elle peut se tromper.
                     </p>
                 )}
                 {call.active ? (

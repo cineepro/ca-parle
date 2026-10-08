@@ -46,7 +46,7 @@ export default function OAuthCallbackPage() {
                 <p className="text-sm text-red-500">{error}</p>
             ) : (
                 <>
-                    <div className="w-10 h-10 border-3 border-[#FF4757] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-10 h-10 border-3 border-brand border-t-transparent rounded-full animate-spin" />
                     <p className="text-sm text-gray-400">Finalisation de ta connexion...</p>
                 </>
             )}

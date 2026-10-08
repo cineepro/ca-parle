@@ -57,8 +57,8 @@ export const ConnectorChips = ({ conversationId, connectors, activeConnectorId, 
                             clients/institutions. */}
                         {count > 0 && (
                             <span
-                                className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${
-                                    isActive ? 'bg-white/25 text-white' : 'bg-[#FF4757] text-white'
+                                className={`text-xs font-bold rounded-full px-1.5 py-0.5 ${
+                                    isActive ? 'bg-white/25 text-ink' : 'bg-brand text-ink'
                                 }`}
                             >
                                 {formatQuestionCount(count)}

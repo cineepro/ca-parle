@@ -5,7 +5,7 @@ import { platformService, timeAgo, type PlatformAlert, type Severity } from '../
 const SEVERITY_STYLE: Record<Severity, string> = {
     critical: 'bg-red-50 text-red-600',
     warning: 'bg-amber-50 text-amber-600',
-    info: 'bg-blue-50 text-blue-600',
+    info: 'bg-sand text-brun',
 };
 const SEVERITY_LABEL: Record<Severity, string> = { critical: 'Critique', warning: 'Attention', info: 'Info' };
 
@@ -14,13 +14,13 @@ function AlertCard({ alert, onAcknowledge, busy }: { alert: PlatformAlert; onAck
     return (
         <div className={`rounded-2xl border p-4 ${muted ? 'bg-white border-gray-100' : alert.severity === 'critical' ? 'bg-red-50/50 border-red-100' : 'bg-white border-gray-200'}`}>
             <div className="flex items-start gap-3">
-                <span className={`text-[10px] font-bold rounded px-2 py-0.5 shrink-0 mt-0.5 ${SEVERITY_STYLE[alert.severity]}`}>
+                <span className={`text-xs font-bold rounded px-2 py-0.5 shrink-0 mt-0.5 ${SEVERITY_STYLE[alert.severity]}`}>
                     {SEVERITY_LABEL[alert.severity]}
                 </span>
                 <div className="flex-1 min-w-0">
                     <p className={`text-sm font-semibold ${muted ? 'text-gray-500' : 'text-gray-800'}`}>{alert.title}</p>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">{alert.details}</p>
-                    <p className="text-[11px] text-gray-400 mt-2">
+                    <p className="text-xs text-gray-400 mt-2">
                         Ouverte {timeAgo(alert.firstSeenAt)} · vue {alert.occurrences} fois
                         {alert.status === 'acknowledged' && alert.acknowledgedBy ? ` · prise en compte par ${alert.acknowledgedBy}` : ''}
                         {alert.status === 'resolved' && alert.resolvedAt ? ` · résolue ${timeAgo(alert.resolvedAt)}` : ''}
@@ -30,7 +30,7 @@ function AlertCard({ alert, onAcknowledge, busy }: { alert: PlatformAlert; onAck
                     <button
                         onClick={onAcknowledge}
                         disabled={busy}
-                        className="shrink-0 text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1.5 disabled:opacity-50"
+                        className="shrink-0 text-xs font-semibold text-ochre bg-brand-tint hover:bg-brand-strong rounded-full px-3 py-1.5 disabled:opacity-50"
                     >
                         Prendre en compte
                     </button>
@@ -99,7 +99,7 @@ export const ConsoleAlerts = () => {
                 <button
                     onClick={runNow}
                     disabled={checking}
-                    className="text-xs font-semibold text-white bg-[#FF4757] hover:bg-[#e63e4d] rounded-full px-4 py-2 disabled:opacity-50"
+                    className="text-xs font-semibold text-ink bg-brand hover:bg-brand-hover rounded-full px-4 py-2 disabled:opacity-50"
                 >
                     {checking ? 'Vérification...' : 'Vérifier maintenant'}
                 </button>

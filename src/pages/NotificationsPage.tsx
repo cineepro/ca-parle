@@ -2,6 +2,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import type { AppNotification } from '@/features/notifications/services/notificationService';
+import { Bell, BellOff } from 'lucide-react';
 
 const timeAgo = (dateStr: string): string => {
     const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -27,9 +28,9 @@ export default function NotificationsPage() {
             <div className="max-w-xl mx-auto space-y-4">
                 <div className="flex items-center gap-3">
                     <Link to="/accueil" className="text-gray-400 hover:text-gray-600">←</Link>
-                    <h1 className="text-xl font-bold text-gray-800">🔔 Notifications</h1>
+                    <h1 className="text-xl font-bold text-gray-800"><Bell className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Notifications</h1>
                     {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} className="text-xs text-[#FF4757] font-medium ml-auto hover:underline">
+                        <button onClick={markAllAsRead} className="text-xs text-ochre font-medium ml-auto hover:underline">
                             Tout marquer comme lu
                         </button>
                     )}
@@ -39,7 +40,7 @@ export default function NotificationsPage() {
                     <p className="text-sm text-gray-400 text-center py-8">Chargement...</p>
                 ) : notifications.length === 0 ? (
                     <div className="bg-white rounded-3xl p-8 text-center text-gray-400">
-                        <div className="text-3xl mb-2">🔕</div>
+                        <div className="mb-2"><BellOff className="w-9 h-9 text-ochre mx-auto" aria-hidden="true" /></div>
                         <p className="text-sm">Rien de nouveau pour l'instant.</p>
                     </div>
                 ) : (
@@ -48,14 +49,14 @@ export default function NotificationsPage() {
                             <button
                                 key={n.$id}
                                 onClick={() => handleClick(n)}
-                                className={`w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-[#FF4757]/5' : ''}`}
+                                className={`w-full text-left px-5 py-4 hover:bg-gray-50 transition-colors ${!n.read ? 'bg-brand-tint' : ''}`}
                             >
                                 <div className="flex items-start gap-2">
-                                    {!n.read && <span className="w-2 h-2 rounded-full bg-[#FF4757] mt-1.5 shrink-0" />}
+                                    {!n.read && <span className="w-2 h-2 rounded-full bg-brand mt-1.5 shrink-0" />}
                                     <div className="flex-1">
                                         <p className={`text-sm ${!n.read ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>{n.title}</p>
                                         <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
-                                        <p className="text-[11px] text-gray-300 mt-1">{timeAgo(n.$createdAt)}</p>
+                                        <p className="text-xs text-gray-300 mt-1">{timeAgo(n.$createdAt)}</p>
                                     </div>
                                 </div>
                             </button>

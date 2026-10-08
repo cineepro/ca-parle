@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { vanessaKnowledgeService, type VanessaConnector, type ConnectorSource } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '../utils/questionCount';
+import { AlertTriangle } from 'lucide-react';
 
 const SELL_PRICE_PER_MILLION_TOKENS_FCFA = 5100; // même taux que côté serveur — voir Vanessa-API-Grille-Tarifaire.docx
 
@@ -10,7 +11,7 @@ function fcfaToTokens(fcfa: number): number {
     return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
 }
 
-const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#FF4757', description: '' };
+const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#F5C032', description: '' };
 const EMPTY_SOURCE_FORM = { url: '', label: '', listingSelector: '' };
 
 function formatDate(iso?: string) {
@@ -101,19 +102,19 @@ function ConnectorSourcesPanel({ connectorId }: { connectorId: string }) {
                                     value={editValues.label}
                                     onChange={(e) => setEditValues((v) => ({ ...v, label: e.target.value }))}
                                     placeholder="Nom du site (ex: Assemblée nationale)"
-                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
                                 />
                                 <input
                                     value={editValues.url}
                                     onChange={(e) => setEditValues((v) => ({ ...v, url: e.target.value }))}
                                     placeholder="Lien à surveiller"
-                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
                                 />
                                 <input
                                     value={editValues.listingSelector}
                                     onChange={(e) => setEditValues((v) => ({ ...v, listingSelector: e.target.value }))}
                                     placeholder="Sélecteur CSS si page de liste sans RSS — sinon laisser vide"
-                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
                                 />
                                 <div className="flex gap-1.5">
                                     <Button size="sm" onClick={() => saveEditSource(s.$id)} isLoading={savingEdit}>Enregistrer</Button>
@@ -125,17 +126,17 @@ function ConnectorSourcesPanel({ connectorId }: { connectorId: string }) {
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                         <p className="text-xs font-semibold text-gray-700 truncate">{s.label || s.url}</p>
-                                        {s.label && <p className="text-[11px] text-gray-400 truncate">{s.url}</p>}
+                                        {s.label && <p className="text-xs text-gray-400 truncate">{s.url}</p>}
                                         {s.listingSelector && (
-                                            <p className="text-[11px] text-gray-400 font-mono truncate">Sélecteur : {s.listingSelector}</p>
+                                            <p className="text-xs text-gray-400 font-mono truncate">Sélecteur : {s.listingSelector}</p>
                                         )}
-                                        <p className="text-[11px] text-gray-300">
+                                        <p className="text-xs text-gray-300">
                                             {s.lastSyncedAt ? `Dernière vérification : ${formatDate(s.lastSyncedAt)}` : 'Jamais encore vérifié'}
                                         </p>
                                     </div>
                                     <div className="flex gap-2 shrink-0">
-                                        <button onClick={() => startEditSource(s)} className="text-[11px] font-semibold text-gray-400 hover:text-gray-600">Modifier</button>
-                                        <button onClick={() => removeSource(s.$id)} className="text-[11px] font-semibold text-red-400 hover:text-red-600">Retirer</button>
+                                        <button onClick={() => startEditSource(s)} className="text-xs font-semibold text-gray-400 hover:text-gray-600">Modifier</button>
+                                        <button onClick={() => removeSource(s.$id)} className="text-xs font-semibold text-red-400 hover:text-red-600">Retirer</button>
                                     </div>
                                 </div>
                             </div>
@@ -149,19 +150,19 @@ function ConnectorSourcesPanel({ connectorId }: { connectorId: string }) {
                     value={newSource.label}
                     onChange={(e) => setNewSource((v) => ({ ...v, label: e.target.value }))}
                     placeholder="Nom du site (optionnel, ex: Présidence)"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <input
                     value={newSource.url}
                     onChange={(e) => setNewSource((v) => ({ ...v, url: e.target.value }))}
                     placeholder="Lien à surveiller (site ou flux RSS)"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <input
                     value={newSource.listingSelector}
                     onChange={(e) => setNewSource((v) => ({ ...v, listingSelector: e.target.value }))}
                     placeholder="Sélecteur CSS si page de liste sans RSS (ex: a[href*=&quot;/article/&quot;]) — sinon laisser vide"
-                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <Button size="sm" onClick={handleAddSource} isLoading={adding} disabled={!newSource.url.trim()} className="w-full">
                     + Ajouter ce site
@@ -326,14 +327,14 @@ export const VanessaConnectorManager = () => {
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Nom (ex: Gouvernance)"
                     maxLength={100}
-                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <input
                     value={form.icon}
                     onChange={(e) => setForm({ ...form, icon: e.target.value })}
                     placeholder="Icône (emoji)"
                     maxLength={10}
-                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <input
                     type="color"
@@ -346,12 +347,12 @@ export const VanessaConnectorManager = () => {
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     placeholder="Description courte (ex: En partenariat avec ABMS)"
                     maxLength={200}
-                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <Button size="sm" onClick={handleAdd} isLoading={saving} disabled={!form.name.trim()} className="col-span-2">
                     + Créer le connecteur
                 </Button>
-                <p className="col-span-2 text-[11px] text-gray-400">
+                <p className="col-span-2 text-xs text-gray-400">
                     Les sites à surveiller s'ajoutent juste après, dans la fiche du connecteur créé (section "Sites").
                 </p>
             </div>
@@ -382,23 +383,23 @@ export const VanessaConnectorManager = () => {
                                             {c.name}
                                             <span
                                                 title={`${monthlyQuestionCount(c)} question(s) posée(s) en ${MONTH_LABELS[new Date().getMonth()]} — compteur remis à zéro chaque mois`}
-                                                className="inline-flex items-center align-super text-[10px] leading-none font-bold text-white bg-[#FF4757] rounded-full px-1.5 py-0.5"
+                                                className="inline-flex items-center align-super text-xs leading-none font-bold text-ink bg-brand rounded-full px-1.5 py-0.5"
                                             >
                                                 {formatQuestionCount(monthlyQuestionCount(c))}
                                             </span>
                                             {exhausted && (
-                                                <span className="text-[10px] font-bold text-white bg-red-500 rounded-full px-1.5 py-0.5">
+                                                <span className="text-xs font-bold text-white bg-red-500 rounded-full px-1.5 py-0.5">
                                                     QUOTA ÉPUISÉ
                                                 </span>
                                             )}
                                             {!exhausted && critical && (
-                                                <span className="text-[10px] font-bold text-white bg-red-400 rounded-full px-1.5 py-0.5">
-                                                    ⚠️ 95% consommé
+                                                <span className="text-xs font-bold text-white bg-red-400 rounded-full px-1.5 py-0.5">
+                                                    <AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> 95% consommé
                                                 </span>
                                             )}
                                             {!exhausted && !critical && warning && (
-                                                <span className="text-[10px] font-bold text-white bg-amber-400 rounded-full px-1.5 py-0.5">
-                                                    ⚠️ 90% consommé
+                                                <span className="text-xs font-bold text-ink bg-amber-300 rounded-full px-1.5 py-0.5">
+                                                    <AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> 90% consommé
                                                 </span>
                                             )}
                                         </p>
@@ -418,11 +419,11 @@ export const VanessaConnectorManager = () => {
                                     <div className="mt-2 pl-11">
                                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                             <div
-                                                className={`h-full rounded-full ${critical ? 'bg-red-500' : warning ? 'bg-amber-400' : 'bg-[#FF4757]'}`}
+                                                className={`h-full rounded-full ${critical ? 'bg-red-500' : warning ? 'bg-amber-400' : 'bg-brand'}`}
                                                 style={{ width: `${percent}%` }}
                                             />
                                         </div>
-                                        <p className="text-[11px] text-gray-400 mt-0.5">
+                                        <p className="text-xs text-gray-400 mt-0.5">
                                             {(c.tokensUsed || 0).toLocaleString('fr-FR')} / {(c.tokensGranted || 0).toLocaleString('fr-FR')} tokens ({percent}%)
                                         </p>
                                     </div>
@@ -441,7 +442,7 @@ export const VanessaConnectorManager = () => {
                                                 value={editPartner}
                                                 onChange={(e) => setEditPartner(e.target.value)}
                                                 placeholder="ID du compte partenaire (optionnel — pour l'espace partenaire)"
-                                                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                                className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
                                             />
                                             <div className="flex gap-1.5">
                                                 <Button size="sm" onClick={() => saveEdit(c.$id)} isLoading={savingEdit}>Enregistrer</Button>
@@ -457,13 +458,13 @@ export const VanessaConnectorManager = () => {
                                                     value={rechargeAmount}
                                                     onChange={(e) => setRechargeAmount(e.target.value)}
                                                     placeholder="Montant reçu (FCFA)"
-                                                    className="flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                                    className="flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand"
                                                 />
                                                 <Button size="sm" onClick={() => saveRecharge(c.$id)} isLoading={savingRecharge}>Ajouter</Button>
                                                 <Button size="sm" variant="secondary" onClick={() => setRechargingId(null)}>Annuler</Button>
                                             </div>
                                             {!!parseInt(rechargeAmount, 10) && (
-                                                <p className="text-[11px] text-gray-400">
+                                                <p className="text-xs text-gray-400">
                                                     ≈ {fcfaToTokens(parseInt(rechargeAmount, 10)).toLocaleString('fr-FR')} tokens à ce tarif (x3)
                                                 </p>
                                             )}
@@ -480,7 +481,7 @@ export const VanessaConnectorManager = () => {
                                             <button
                                                 onClick={() => fileInputRefs.current[c.$id]?.click()}
                                                 disabled={uploadingFor === c.$id}
-                                                className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 hover:bg-[#FF4757]/10 rounded-full px-3 py-1 disabled:opacity-50"
+                                                className="text-xs font-semibold text-ochre bg-brand-tint hover:bg-brand-strong rounded-full px-3 py-1 disabled:opacity-50"
                                             >
                                                 {uploadingFor === c.$id ? 'Lecture en cours...' : 'Ajouter un PDF'}
                                             </button>

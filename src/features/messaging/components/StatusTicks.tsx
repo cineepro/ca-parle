@@ -12,8 +12,8 @@ const LABELS: Record<MessageStatus, string> = {
 // `onLight` : sur fond clair (liste de conversations) — gris, et bleu quand lu.
 export const StatusTicks = ({ status, onLight = false }: { status: MessageStatus; onLight?: boolean }) => {
     const color = onLight
-        ? (status === 'read' ? 'text-sky-500' : 'text-gray-400')
-        : (status === 'read' ? 'text-cyan-200' : 'text-white/70');
+        ? (status === 'read' ? 'text-sky-700' : 'text-gray-500')
+        : (status === 'read' ? 'text-sky-800' : 'text-ink/70');
     return (
         <span className={`inline-flex items-center ${color}`} title={LABELS[status]} aria-label={LABELS[status]}>
             {status === 'pending' ? (

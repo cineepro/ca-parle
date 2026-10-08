@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useTrendingStories } from '@/features/stories/hooks/useTrendingStories';
 import { StoryCard } from '@/features/stories/components/StoryCard';
+import { Star } from 'lucide-react';
 
 export default function TrendingPage() {
     const { stories, loading, error } = useTrendingStories();
@@ -11,7 +12,7 @@ export default function TrendingPage() {
             <div className="max-w-2xl mx-auto space-y-4">
                 <div className="flex items-center gap-3">
                     <Link to="/ca-parle" className="text-gray-400 hover:text-gray-600">←</Link>
-                    <h1 className="text-xl font-bold text-gray-800">⭐ Tendances</h1>
+                    <h1 className="text-xl font-bold text-gray-800"><Star className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Tendances</h1>
                 </div>
                 <p className="text-sm text-gray-400 px-1">Les histoires qui font le plus réagir en ce moment.</p>
 
@@ -26,7 +27,7 @@ export default function TrendingPage() {
                         {stories.map((story, index) => (
                             <div key={story.$id} className="relative">
                                 {index < 3 && (
-                                    <span className="absolute -left-2 -top-2 z-10 bg-[#FF4757] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                    <span className="absolute -left-2 -top-2 z-10 bg-brand text-ink text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
                                         {index + 1}
                                     </span>
                                 )}

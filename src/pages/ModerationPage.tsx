@@ -67,7 +67,7 @@ export default function ModerationPage() {
 
     const itemClass = (active: boolean) =>
         `shrink-0 flex items-center justify-between gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
-            active ? 'bg-[#FF4757] text-white' : 'text-gray-600 hover:bg-gray-100'
+            active ? 'bg-brand text-ink' : 'text-gray-600 hover:bg-gray-100'
         }`;
 
     return (
@@ -86,14 +86,14 @@ export default function ModerationPage() {
                         <div className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0">
                             {groups.map((group) => (
                                 <div key={group.title} className="contents lg:block lg:mb-3">
-                                    <p className="hidden lg:block px-3 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">
+                                    <p className="hidden lg:block px-3 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">
                                         {group.title}
                                     </p>
                                     {group.entries.map((entry) => (
                                         <button key={entry.id} onClick={() => go(entry.id)} className={`${itemClass(section === entry.id)} lg:w-full`}>
                                             {entry.label}
                                             {!!entry.badge && (
-                                                <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${section === entry.id ? 'bg-white/25' : 'bg-[#FF4757] text-white'}`}>
+                                                <span className={`text-xs rounded-full px-1.5 py-0.5 ${section === entry.id ? 'bg-white/25' : 'bg-brand text-ink'}`}>
                                                     {entry.badge}
                                                 </span>
                                             )}

@@ -4,6 +4,7 @@ import maplibregl from '../lib/maplibreWorker';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { geolocationService } from '@/services/geolocationService';
 import { COUNTRY_MAP_CENTERS } from '../config/countryMapCenters';
+import { MapPin } from 'lucide-react';
 
 interface Props {
     // Pays choisi dans le formulaire — la carte se recentre dessus à
@@ -34,7 +35,7 @@ export const LocationPicker = ({ country, onChange }: Props) => {
             el.style.height = '22px';
             el.style.borderRadius = '50% 50% 50% 0';
             el.style.transform = 'rotate(-45deg)';
-            el.style.background = '#FF4757';
+            el.style.background = '#F5C032';
             el.style.border = '3px solid white';
             el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
             markerRef.current = new maplibregl.Marker({ element: el, anchor: 'bottom' })
@@ -105,17 +106,17 @@ export const LocationPicker = ({ country, onChange }: Props) => {
                     type="button"
                     onClick={handleLocateMe}
                     disabled={locating}
-                    className="absolute top-2 left-2 z-10 bg-white shadow-md rounded-full px-3 py-2 text-xs font-semibold text-[#FF4757] flex items-center gap-1.5 disabled:opacity-50"
+                    className="absolute top-2 left-2 z-10 bg-white shadow-md rounded-full px-3 py-2 text-xs font-semibold text-ochre flex items-center gap-1.5 disabled:opacity-50"
                 >
-                    {locating ? '⏳ Localisation...' : '📍 Me localiser ici'}
+                    {locating ? 'Localisation...' : <><MapPin className="w-4 h-4" aria-hidden="true" /> Me localiser ici</>}
                 </button>
             </div>
-            <p className={`text-xs mt-1.5 ${hasPosition ? 'text-green-600' : 'text-gray-400'}`}>
+            <p className={`text-sm mt-1.5 ${hasPosition ? 'text-green-700' : 'text-gray-600'}`}>
                 {hasPosition
-                    ? '✅ Position posée — tape ailleurs pour la déplacer.'
-                    : "👆 Touche la carte à l'endroit exact du lieu, ou utilise \"Me localiser ici\" si tu y es déjà."}
+                    ? 'Position posée — tape ailleurs pour la déplacer.'
+                    : "Touche la carte à l'endroit exact du lieu, ou utilise \"Me localiser ici\" si tu y es déjà."}
             </p>
-            {locateError && <p className="text-xs text-red-500 mt-1">{locateError}</p>}
+            {locateError && <p className="text-sm text-red-600 mt-1">{locateError}</p>}
         </div>
     );
 };

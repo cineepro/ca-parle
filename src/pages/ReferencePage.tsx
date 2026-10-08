@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useReference } from '@/features/references/hooks/useReference';
 import { StoryCard } from '@/features/stories/components/StoryCard';
 import { FollowButton } from '@/features/follow/components/FollowButton';
+import { BookOpen, CheckCircle2 } from 'lucide-react';
 
 const TYPE_LABEL: Record<string, string> = {
     personne: 'Personne', evenement: 'Événement', lieu: 'Lieu', entreprise: 'Entreprise', sujet: 'Sujet',
@@ -15,7 +16,7 @@ export default function ReferencePage() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <svg className="animate-spin w-8 h-8 text-[#FF4757]" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin w-8 h-8 text-ochre" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
@@ -27,7 +28,7 @@ export default function ReferencePage() {
         return (
             <div className="min-h-screen flex items-center justify-center flex-col gap-3">
                 <p className="text-gray-500">{error}</p>
-                <Link to="/ca-parle" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
+                <Link to="/ca-parle" className="text-ochre font-semibold hover:underline">Retour au fil</Link>
             </div>
         );
     }
@@ -45,7 +46,7 @@ export default function ReferencePage() {
                             </span>
                             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                                 {reference.name}
-                                {reference.isVerifiedEntity && <span title="Fiche vérifiée">✅</span>}
+                                {reference.isVerifiedEntity && <span title="Fiche vérifiée"><CheckCircle2 className="inline w-4 h-4 text-green-600" aria-label="Fiche vérifiée" /></span>}
                             </h1>
                         </div>
                     </div>
@@ -56,7 +57,7 @@ export default function ReferencePage() {
 
                     <div className="flex items-center justify-between pt-2">
                         <div className="flex gap-4 text-sm text-gray-400">
-                            <span>📚 {reference.storiesCount} histoires</span>
+                            <span><BookOpen className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {reference.storiesCount} histoires</span>
                         </div>
                         <FollowButton followingId={reference.$id} followingType="reference" initialCount={reference.followersCount} />
                     </div>

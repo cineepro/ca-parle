@@ -7,15 +7,13 @@ import { useState } from 'react';
 import { useReferenceSearch } from '../hooks/useReferenceSearch';
 import { referenceService, type Reference, type ReferenceType } from '../services/referenceService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { X } from 'lucide-react';
+import { ReferenceTypeIcon } from './ReferenceTypeIcon';
 
 interface Props {
     selected: Reference[];
     onChange: (refs: Reference[]) => void;
 }
-
-const TYPE_ICON: Record<ReferenceType, string> = {
-    personne: '👤', evenement: '📅', lieu: '📍', entreprise: '🏢', sujet: '🏷️',
-};
 
 export const ReferenceTagInput = ({ selected, onChange }: Props) => {
     const { user } = useAuth();
@@ -58,10 +56,10 @@ export const ReferenceTagInput = ({ selected, onChange }: Props) => {
                     {selected.map((ref) => (
                         <span
                             key={ref.$id}
-                            className="inline-flex items-center gap-1 bg-[#FF4757]/5 text-[#FF4757] rounded-full px-2.5 py-1 text-xs font-medium"
+                            className="inline-flex items-center gap-1 bg-brand-tint text-ochre rounded-full px-2.5 py-1 text-xs font-medium"
                         >
-                            {TYPE_ICON[ref.type]} {ref.name}
-                            <button type="button" onClick={() => removeReference(ref.$id)} className="ml-1 hover:text-red-700">✕</button>
+                            <ReferenceTypeIcon type={ref.type} /> {ref.name}
+                            <button type="button" onClick={() => removeReference(ref.$id)} className="ml-1 hover:text-red-700" aria-label="Fermer"><X className="w-4 h-4" aria-hidden="true" /></button>
                         </span>
                     ))}
                 </div>
@@ -72,7 +70,7 @@ export const ReferenceTagInput = ({ selected, onChange }: Props) => {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Rechercher ou créer une fiche (ex: Davido)..."
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
 
                 {query.trim() && (
@@ -87,7 +85,7 @@ export const ReferenceTagInput = ({ selected, onChange }: Props) => {
                                 disabled={isAlreadySelected(ref.$id)}
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 disabled:opacity-40"
                             >
-                                {TYPE_ICON[ref.type]} {ref.name}
+                                <ReferenceTypeIcon type={ref.type} /> {ref.name}
                                 <span className="text-xs text-gray-400 ml-auto">{ref.storiesCount} histoires</span>
                             </button>
                         ))}
@@ -97,7 +95,7 @@ export const ReferenceTagInput = ({ selected, onChange }: Props) => {
                                 type="button"
                                 onClick={handleCreateNew}
                                 disabled={creating}
-                                className="w-full text-left px-3 py-2 text-sm text-[#FF4757] font-medium hover:bg-gray-50 border-t border-gray-50"
+                                className="w-full text-left px-3 py-2 text-sm text-ochre font-medium hover:bg-gray-50 border-t border-gray-50"
                             >
                                 {creating ? 'Création...' : `+ Créer la fiche "${query.trim()}"`}
                             </button>

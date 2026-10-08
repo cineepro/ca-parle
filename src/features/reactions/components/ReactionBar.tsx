@@ -36,12 +36,12 @@ export const ReactionBar = ({ targetType, targetId, initialCount }: Props) => {
                 disabled={submitting}
                 title={label}
                 className={`flex flex-col items-center gap-0.5 rounded-xl px-3 py-2 text-xs font-medium transition-all disabled:opacity-50 ${
-                    isActive ? 'bg-[#FF4757]/10 text-[#FF4757] ring-1 ring-[#FF4757]/40' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    isActive ? 'bg-brand-tint text-ochre ring-1 ring-brand' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                 }`}
             >
                 <span className="text-lg leading-none">{emoji}</span>
                 <span>{count > 0 ? `${count}` : label}</span>
-                {counts && total > 0 && <span className="text-[10px] text-gray-400">{percent}%</span>}
+                {counts && total > 0 && <span className="text-xs text-gray-400">{percent}%</span>}
             </button>
         );
     };
@@ -60,7 +60,7 @@ export const ReactionBar = ({ targetType, targetId, initialCount }: Props) => {
                     {BELIEF_REACTIONS.map((r) => renderButton(r.type, r.emoji, r.label))}
                 </div>
             </div>
-            <p className="text-[11px] text-gray-300">Une seule réaction active à la fois.</p>
+            <p className="text-xs text-gray-300">Une seule réaction active à la fois.</p>
         </div>
     );
 };

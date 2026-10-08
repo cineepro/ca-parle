@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { vanessaMemoryService, type VanessaMemoryEntry } from '../services/vanessaMemoryService';
 import { Button } from '@/components/ui/button';
+import { Brain } from 'lucide-react';
 
 export const VanessaMemoryPanel = () => {
     const [memory, setMemory] = useState<VanessaMemoryEntry[]>([]);
@@ -49,7 +50,7 @@ export const VanessaMemoryPanel = () => {
                 className="w-full flex items-center justify-between text-left"
             >
                 <div>
-                    <p className="text-sm font-semibold text-gray-800">🧠 Ce que Vanessa se souvient de moi</p>
+                    <p className="text-sm font-semibold text-gray-800"><Brain className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Ce que Vanessa se souvient de moi</p>
                     <p className="text-xs text-gray-400 mt-0.5">Des faits qu'elle retient d'une conversation à l'autre, pas l'historique complet.</p>
                 </div>
                 <span className="text-gray-300 text-sm">{expanded ? '▲' : '▼'}</span>

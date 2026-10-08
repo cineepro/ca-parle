@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { account } from '@/api/appwrite';
 import { dbService } from '@/api/database';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 type Status = 'loading' | 'success' | 'error';
 
@@ -75,12 +76,12 @@ export default function EmailConfirmedPage() {
                 )}
                 {status === 'success' && (
                     <>
-                        <div className="text-5xl">✅</div>
+                        <div className=""><CheckCircle2 className="w-14 h-14 text-ochre mx-auto" aria-hidden="true" /></div>
                         <h1 className="text-xl font-bold text-gray-800">Email confirmé !</h1>
                         <p className="text-sm text-gray-500">Ton compte est activé, tu peux te connecter.</p>
                         <Link
                             to="/login"
-                            className="inline-block bg-[#FF4757] text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-[#e63e4d] transition-all"
+                            className="inline-block bg-brand text-ink px-5 py-2.5 rounded-xl font-semibold hover:bg-brand-hover transition-all"
                         >
                             Se connecter
                         </Link>
@@ -88,10 +89,10 @@ export default function EmailConfirmedPage() {
                 )}
                 {status === 'error' && (
                     <>
-                        <div className="text-5xl">⚠️</div>
+                        <div className=""><AlertTriangle className="w-14 h-14 text-ochre mx-auto" aria-hidden="true" /></div>
                         <h1 className="text-xl font-bold text-gray-800">Lien invalide ou expiré</h1>
                         <p className="text-sm text-gray-500">Réessaie de t'inscrire ou renvoie un nouvel email.</p>
-                        <Link to="/login" className="text-[#FF4757] font-semibold hover:underline">
+                        <Link to="/login" className="text-ochre font-semibold hover:underline">
                             Retour à la connexion
                         </Link>
                     </>

@@ -7,6 +7,7 @@ import { SPOT_CATEGORIES } from '../config/categories';
 import { COUNTRIES } from '@/config/countries';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Banknote, Eye, MapPin } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -104,7 +105,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             onClick={() => setStep('lieu')}
                             className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-2xl p-4 text-left"
                         >
-                            <span className="text-2xl">📍</span>
+                            <span className=""><MapPin className="w-7 h-7 text-ochre" aria-hidden="true" /></span>
                             <div>
                                 <p className="text-sm font-semibold text-gray-800">Un lieu ou un service</p>
                                 <p className="text-xs text-gray-400">Un maquis, un réparateur, une pharmacie...</p>
@@ -114,7 +115,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             onClick={() => setStep('prix')}
                             className="w-full flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-2xl p-4 text-left"
                         >
-                            <span className="text-2xl">💰</span>
+                            <span className=""><Banknote className="w-7 h-7 text-ochre" aria-hidden="true" /></span>
                             <div>
                                 <p className="text-sm font-semibold text-gray-800">Un prix du moment</p>
                                 <p className="text-xs text-gray-400">Essence, marché, transport...</p>
@@ -133,12 +134,12 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             placeholder="Nom (ex: La mafia du poulet braisé)"
                             required
                             maxLength={150}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <select
                             value={category}
                             onChange={(e) => setCategory(e.target.value)}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         >
                             {SPOT_CATEGORIES.filter((c) => c.slug !== 'tout').map((c) => (
                                 <option key={c.slug} value={c.slug}>{c.label}</option>
@@ -150,7 +151,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             placeholder="Décris-le à ta façon..."
                             rows={2}
                             maxLength={500}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                         />
                         <div className="grid grid-cols-2 gap-2">
                             <input
@@ -158,12 +159,12 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                                 onChange={(e) => setQuartier(e.target.value)}
                                 placeholder="Quartier"
                                 maxLength={100}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             />
                             <select
                                 value={country}
                                 onChange={(e) => setCountry(e.target.value)}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             >
                                 {COUNTRIES.filter((c) => c.slug !== 'tous').map((c) => (
                                     <option key={c.slug} value={c.slug}>{c.flag} {c.name}</option>
@@ -180,7 +181,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             onChange={(e) => setPhone(e.target.value)}
                             placeholder="Téléphone (optionnel)"
                             maxLength={30}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <input
                             type="file"
@@ -207,7 +208,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                             placeholder="Quoi ? (ex: Essence, Sac riz 25kg...)"
                             required
                             maxLength={100}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <div className="grid grid-cols-2 gap-2">
                             <input
@@ -217,14 +218,14 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                                 placeholder="Prix (FCFA)"
                                 required
                                 min={1}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             />
                             <input
                                 value={unit}
                                 onChange={(e) => setUnit(e.target.value)}
                                 placeholder="Unité (ex: L, tas, sac)"
                                 maxLength={30}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -233,12 +234,12 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
                                 onChange={(e) => setQuartier(e.target.value)}
                                 placeholder="Quartier/ville"
                                 maxLength={100}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             />
                             <select
                                 value={country}
                                 onChange={(e) => setCountry(e.target.value)}
-                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             >
                                 {COUNTRIES.filter((c) => c.slug !== 'tous').map((c) => (
                                     <option key={c.slug} value={c.slug}>{c.flag} {c.name}</option>
@@ -257,7 +258,7 @@ export const AddContributionModal = ({ onClose, onDone }: Props) => {
 
                 {step === 'envoye' && (
                     <div className="text-center space-y-3 py-4">
-                        <div className="text-4xl">👀</div>
+                        <div className=""><Eye className="w-11 h-11 text-ochre mx-auto" aria-hidden="true" /></div>
                         <p className="text-sm font-semibold text-gray-800">Envoyé pour validation !</p>
                         <p className="text-xs text-gray-500">
                             On vérifie vite fait avant que ça apparaisse pour tout le monde. Tu peux suivre l'avancement dans "Mes contributions".

@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Styles de base de l'identité "Pull moutarde" (voir tailwind.config.js). */
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply bg-cream font-sans text-ink antialiased;
+    }
+
+    /* Tous les titres prennent la police d'affichage automatiquement. */
+    h1,
+    h2,
+    h3,
+    h4 {
+        @apply font-display;
+        letter-spacing: -0.015em;
+    }
+
+    /* Contour de focus clavier visible partout (foncé, jamais jaune seul :
+       le jaune sur blanc n'a que 1,7:1 de contraste). Les champs qui
+       désactivent l'outline gèrent leur propre anneau foncé. */
+    :focus-visible {
+        outline: 2px solid theme('colors.ink');
+        outline-offset: 2px;
+    }
+
+    ::selection {
+        background: theme('colors.brand.DEFAULT');
+        color: theme('colors.ink');
+    }
+}

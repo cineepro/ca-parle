@@ -28,7 +28,7 @@ export const VanessaButton = () => {
             type="button"
             onClick={handleClick}
             disabled={loading}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-[#FF4757] text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-70"
+            className="flex items-center gap-1.5 bg-brand text-ink px-3.5 py-1.5 rounded-full font-display text-sm font-semibold hover:bg-brand-hover transition-colors disabled:opacity-70"
             title="Discuter avec Vanessa"
         >
             {loading ? (

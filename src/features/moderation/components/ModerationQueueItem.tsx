@@ -55,7 +55,7 @@ export const ModerationQueueItem = ({ item, onResolved }: Props) => {
                 <span className="inline-block bg-red-50 text-red-600 rounded-full px-2.5 py-0.5 text-xs font-semibold">
                     {REPORT_REASON_LABELS[report.reason]}
                 </span>
-                <span className="text-xs text-gray-400">{report.targetType === 'story' ? '📄 Histoire' : '💬 Commentaire'}</span>
+                <span className="text-sm text-gray-600">{report.targetType === 'story' ? 'Histoire' : 'Commentaire'}</span>
             </div>
 
             {report.description && (

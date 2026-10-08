@@ -1,6 +1,7 @@
 // src/features/predictions/components/CreatePredictionForm.tsx — Vanessa
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Sparkles, X } from 'lucide-react';
 
 interface Props {
     onSubmit: (question: string, options: string[]) => Promise<void>;
@@ -52,21 +53,21 @@ export const CreatePredictionForm = ({ onSubmit }: Props) => {
         return (
             <button
                 onClick={() => setOpen(true)}
-                className="text-sm text-[#FF4757] font-medium hover:underline"
+                className="text-sm text-ochre font-medium hover:underline"
             >
-                🔮 Lancer une prédiction sur cette histoire
+                <Sparkles className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Lancer une prédiction sur cette histoire
             </button>
         );
     }
 
     return (
-        <form onSubmit={handleSubmit} className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 space-y-3">
+        <form onSubmit={handleSubmit} className="bg-sand/50 border border-gray-200 rounded-2xl p-4 space-y-3">
             <input
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="Que va-t-il se passer ensuite ?"
                 maxLength={200}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
             />
 
             <div className="space-y-2">
@@ -77,11 +78,11 @@ export const CreatePredictionForm = ({ onSubmit }: Props) => {
                             onChange={(e) => updateOption(index, e.target.value)}
                             placeholder={`Option ${index + 1}`}
                             maxLength={100}
-                            className="flex-1 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="flex-1 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         {options.length > 2 && (
-                            <button type="button" onClick={() => removeOption(index)} className="text-gray-400 hover:text-red-500 px-2">
-                                ✕
+                            <button type="button" onClick={() => removeOption(index)} className="text-gray-400 hover:text-red-500 px-2" aria-label="Fermer">
+                                <X className="w-4 h-4" aria-hidden="true" />
                             </button>
                         )}
                     </div>

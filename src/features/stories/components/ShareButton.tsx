@@ -1,5 +1,6 @@
 // src/features/stories/components/ShareButton.tsx — Vanessa
 import { useState } from 'react';
+import { CheckCircle2, Share2 } from 'lucide-react';
 
 interface Props {
     storyId: string;
@@ -39,9 +40,9 @@ export const ShareButton = ({ storyId, title }: Props) => {
         <button
             type="button"
             onClick={handleShare}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#FF4757] transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-ochre transition-colors min-h-[32px]"
         >
-            {copied ? '✅ Lien copié' : '🔗 Partager'}
+            {copied ? <><CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Lien copié</> : <><Share2 className="w-4 h-4" aria-hidden="true" /> Partager</>}
         </button>
     );
 };

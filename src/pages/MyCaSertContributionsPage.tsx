@@ -4,11 +4,12 @@ import { Link } from 'react-router-dom';
 import { caSertService, type Spot, type MarketPrice } from '@/features/caSert/services/caSertService';
 import { SPOT_CATEGORIES } from '@/features/caSert/config/categories';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { Banknote, CheckCircle2, Wrench } from 'lucide-react';
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
     attente: { label: '⏳ En attente de validation', color: 'text-amber-600 bg-amber-50' },
-    visible: { label: '✅ Publié', color: 'text-green-600 bg-green-50' },
-    refuse: { label: '❌ Refusé', color: 'text-red-500 bg-red-50' },
+    visible: { label: 'Publié', color: 'text-green-600 bg-green-50' },
+    refuse: { label: 'Refusé', color: 'text-red-700 bg-red-50' },
 };
 
 export default function MyCaSertContributionsPage() {
@@ -40,9 +41,9 @@ export default function MyCaSertContributionsPage() {
                 <p className="text-sm text-gray-400 text-center py-10">Chargement...</p>
             ) : total === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center space-y-2">
-                    <div className="text-3xl">🧰</div>
+                    <div className=""><Wrench className="w-9 h-9 text-ochre mx-auto" aria-hidden="true" /></div>
                     <p className="text-sm text-gray-500">Tu n'as encore rien proposé.</p>
-                    <Link to="/ca-sert" className="text-sm text-[#FF4757] font-semibold hover:underline">Balance ton premier bon plan</Link>
+                    <Link to="/ca-sert" className="text-sm text-ochre font-semibold hover:underline">Balance ton premier bon plan</Link>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -57,7 +58,7 @@ export default function MyCaSertContributionsPage() {
                                 </div>
                                 <p className="text-sm font-semibold text-gray-800">{spot.name}</p>
                                 {spot.moderationStatus === 'visible' && (
-                                    <p className="text-xs text-gray-400 mt-1">✅ {spot.confirmCount} confirmation{spot.confirmCount > 1 ? 's' : ''}</p>
+                                    <p className="text-xs text-gray-400 mt-1"><CheckCircle2 className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {spot.confirmCount} confirmation{spot.confirmCount > 1 ? 's' : ''}</p>
                                 )}
                             </div>
                         );
@@ -68,7 +69,7 @@ export default function MyCaSertContributionsPage() {
                         return (
                             <div key={price.$id} className="bg-white rounded-2xl border border-gray-100 p-4">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-xs text-gray-400">💰 Prix</span>
+                                    <span className="text-xs text-gray-400"><Banknote className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Prix</span>
                                     <span className={`text-xs font-semibold rounded-full px-2.5 py-1 ${status.color}`}>{status.label}</span>
                                 </div>
                                 <p className="text-sm font-semibold text-gray-800">

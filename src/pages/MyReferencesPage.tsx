@@ -6,10 +6,8 @@ import { followService } from '@/features/follow/services/followService';
 import { referenceService, type Reference } from '@/features/references/services/referenceService';
 import { useReferenceSearch } from '@/features/references/hooks/useReferenceSearch';
 import { FollowButton } from '@/features/follow/components/FollowButton';
-
-const TYPE_ICON: Record<string, string> = {
-    personne: '👤', evenement: '📅', lieu: '📍', entreprise: '🏢', sujet: '🏷️',
-};
+import { Search } from 'lucide-react';
+import { ReferenceTypeIcon } from '@/features/references/components/ReferenceTypeIcon';
 
 export default function MyReferencesPage() {
     const { user } = useAuth();
@@ -47,7 +45,7 @@ export default function MyReferencesPage() {
             <div className="max-w-2xl mx-auto space-y-5">
                 <div className="flex items-center gap-3">
                     <Link to="/profil" className="text-gray-400 hover:text-gray-600">←</Link>
-                    <h1 className="text-xl font-bold text-gray-800">🔎 Mes références</h1>
+                    <h1 className="text-xl font-bold text-gray-800"><Search className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Mes références</h1>
                 </div>
 
                 {/* Recherche pour suivre de nouvelles fiches */}
@@ -56,7 +54,7 @@ export default function MyReferencesPage() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Rechercher une personne, un sujet à suivre..."
-                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                     />
                     {search.trim() && (
                         <div className="mt-2 bg-white rounded-2xl divide-y divide-gray-50 overflow-hidden">
@@ -67,7 +65,7 @@ export default function MyReferencesPage() {
                             {searchResultsToShow.map((ref) => (
                                 <div key={ref.$id} className="flex items-center justify-between px-4 py-3">
                                     <Link to={`/reference/${ref.slug}`} className="text-sm text-gray-700 hover:underline">
-                                        {TYPE_ICON[ref.type]} {ref.name}
+                                        <ReferenceTypeIcon type={ref.type} /> {ref.name}
                                     </Link>
                                     <FollowButton followingId={ref.$id} followingType="reference" initialCount={ref.followersCount} />
                                 </div>
@@ -85,7 +83,7 @@ export default function MyReferencesPage() {
                         <p className="text-sm text-gray-400 text-center py-8">Chargement...</p>
                     ) : followed.length === 0 ? (
                         <div className="bg-white rounded-2xl p-8 text-center text-gray-400">
-                            <div className="text-3xl mb-2">🔎</div>
+                            <div className="mb-2"><Search className="w-9 h-9 text-ochre mx-auto" aria-hidden="true" /></div>
                             <p className="text-sm">Tu ne suis encore aucune fiche.</p>
                             <p className="text-sm">Cherche une personne ou un sujet ci-dessus.</p>
                         </div>
@@ -98,7 +96,7 @@ export default function MyReferencesPage() {
                                     className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
                                 >
                                     <span className="text-sm text-gray-700">
-                                        {TYPE_ICON[ref.type]} {ref.name}
+                                        <ReferenceTypeIcon type={ref.type} /> {ref.name}
                                     </span>
                                     <span className="text-xs text-gray-400">{ref.storiesCount} histoires</span>
                                 </Link>

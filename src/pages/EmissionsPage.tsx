@@ -83,7 +83,7 @@ export default function EmissionsPage() {
                 {!showForm && (
                     <button
                         onClick={() => setShowForm(true)}
-                        className="w-full bg-[#FF4757] hover:bg-[#e63e4d] text-white font-semibold text-sm py-3 rounded-2xl transition-colors"
+                        className="w-full bg-brand hover:bg-brand-hover text-ink font-semibold text-sm py-3 rounded-2xl transition-colors"
                     >
                         + Nouvelle émission
                     </button>
@@ -97,14 +97,14 @@ export default function EmissionsPage() {
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="Titre de l'épisode"
                             maxLength={150}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <input
                             value={guestName}
                             onChange={(e) => setGuestName(e.target.value)}
                             placeholder="Nom de l'invité (optionnel)"
                             maxLength={100}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <textarea
                             value={topic}
@@ -112,7 +112,7 @@ export default function EmissionsPage() {
                             placeholder="Sujet de la discussion — décris-le comme tu le donnerais à un vrai animateur"
                             rows={3}
                             maxLength={500}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                         />
 
                         <div>
@@ -125,7 +125,7 @@ export default function EmissionsPage() {
                                         onClick={() => { setPostureChoice(preset.value); setCustomPosture(''); }}
                                         className={`text-xs font-semibold rounded-full px-3 py-1.5 ${
                                             postureChoice === preset.value && !customPosture
-                                                ? 'bg-[#FF4757] text-white'
+                                                ? 'bg-brand text-ink'
                                                 : 'bg-gray-100 text-gray-500'
                                         }`}
                                     >
@@ -139,7 +139,7 @@ export default function EmissionsPage() {
                                 placeholder="Ou décris ta propre posture, librement"
                                 rows={2}
                                 maxLength={400}
-                                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-xs text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                             />
                         </div>
 
@@ -149,7 +149,7 @@ export default function EmissionsPage() {
                             <button
                                 type="submit"
                                 disabled={saving || !title.trim() || !topic.trim()}
-                                className="flex-1 bg-[#FF4757] hover:bg-[#e63e4d] text-white font-semibold text-sm py-2.5 rounded-xl disabled:opacity-50"
+                                className="flex-1 bg-brand hover:bg-brand-hover text-ink font-semibold text-sm py-2.5 rounded-xl disabled:opacity-50"
                             >
                                 {saving ? 'Création...' : "Créer et ouvrir l'enregistrement"}
                             </button>
@@ -174,7 +174,7 @@ export default function EmissionsPage() {
                             <div key={emission.$id} className="bg-white rounded-2xl border border-gray-100 p-4">
                                 <div className="flex items-center justify-between gap-2 mb-1">
                                     <p className="text-sm font-semibold text-gray-800">{emission.title}</p>
-                                    <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 shrink-0 ${STATUS_COLORS[emission.status]}`}>
+                                    <span className={`text-xs font-bold rounded-full px-2 py-0.5 shrink-0 ${STATUS_COLORS[emission.status]}`}>
                                         {emission.status}
                                     </span>
                                 </div>
@@ -183,7 +183,7 @@ export default function EmissionsPage() {
                                 <div className="flex items-center gap-2">
                                     <Link
                                         to={`/emissions/${emission.conversationId}/enregistrement`}
-                                        className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/5 rounded-full px-3 py-1.5"
+                                        className="text-xs font-semibold text-ochre bg-brand-tint rounded-full px-3 py-1.5"
                                     >
                                         Ouvrir l'enregistrement
                                     </Link>

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { conversationService } from '@/features/messaging/services/conversationService';
+import { VANESSA_AVATAR_URL } from '@/api/constants';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
 // Vanessa est désormais l'expérience principale de la plateforme — c'est
@@ -26,8 +27,8 @@ export default function VanessaHomePage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3">
-            <div className="w-10 h-10 border-3 border-[#FF4757] border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-400">Ouverture de ta conversation avec Vanessa...</p>
+            <img src={VANESSA_AVATAR_URL} alt="" className="w-20 h-20 rounded-full object-cover ring-4 ring-brand animate-pulse" />
+            <p role="status" className="text-base text-gray-600">Ouverture de ta conversation avec Vanessa...</p>
         </div>
     );
 }

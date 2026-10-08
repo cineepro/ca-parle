@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { predictionService, type Prediction } from '../services/predictionService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { CheckCircle2, Sparkles } from 'lucide-react';
 
 interface Props {
     prediction: Prediction;
@@ -59,8 +60,8 @@ export const PredictionCard = ({ prediction, isStoryAuthor }: Props) => {
     };
 
     return (
-        <div className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-gray-700">🔮 {prediction.question}</p>
+        <div className="bg-sand/50 border border-gray-200 rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-700"><Sparkles className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {prediction.question}</p>
 
             <div className="space-y-2">
                 {prediction.options.map((option, index) => {
@@ -80,19 +81,19 @@ export const PredictionCard = ({ prediction, isStoryAuthor }: Props) => {
                                 isCorrect
                                     ? 'ring-2 ring-green-400 bg-green-50'
                                     : isMine
-                                        ? 'ring-2 ring-[#FF4757]/50 bg-white'
+                                        ? 'ring-2 ring-brand bg-white'
                                         : 'bg-white hover:bg-gray-50 border border-gray-100'
                             }`}
                         >
                             {hasVotedOrResolved && (
                                 <div
-                                    className="absolute inset-y-0 left-0 bg-purple-100/60"
+                                    className="absolute inset-y-0 left-0 bg-sand/60"
                                     style={{ width: `${percent}%` }}
                                 />
                             )}
                             <div className="relative flex items-center justify-between">
                                 <span className="text-gray-700">
-                                    {isCorrect && '✅ '}{option}
+                                    {isCorrect && <CheckCircle2 className="inline w-4 h-4 text-green-600 mr-1" aria-hidden="true" />}{option}
                                 </span>
                                 {hasVotedOrResolved && (
                                     <span className="text-xs text-gray-400">{percent}% · {count}</span>
@@ -104,17 +105,17 @@ export const PredictionCard = ({ prediction, isStoryAuthor }: Props) => {
             </div>
 
             {isResolved ? (
-                <p className="text-xs text-green-600 font-medium">✅ Résultat connu</p>
+                <p className="text-xs text-green-600 font-medium"><CheckCircle2 className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Résultat connu</p>
             ) : (
                 <p className="text-xs text-gray-400">{total} vote{total > 1 ? 's' : ''}</p>
             )}
 
             {isStoryAuthor && !isResolved && (
-                <div className="pt-2 border-t border-purple-100">
+                <div className="pt-2 border-t border-gray-200">
                     {!showResolvePicker ? (
                         <button
                             onClick={() => setShowResolvePicker(true)}
-                            className="text-xs text-[#FF4757] font-medium hover:underline"
+                            className="text-xs text-ochre font-medium hover:underline"
                         >
                             Marquer comme résolue
                         </button>

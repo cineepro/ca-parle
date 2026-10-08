@@ -7,6 +7,7 @@
 // cette fonctionnalité.
 import { useState } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { CheckCircle2, Megaphone } from 'lucide-react';
 
 export const InviteButton = () => {
     const { user } = useAuth();
@@ -39,9 +40,9 @@ export const InviteButton = () => {
         <button
             type="button"
             onClick={handleInvite}
-            className="flex items-center gap-1.5 bg-[#FF4757]/5 text-[#FF4757] rounded-full px-3.5 py-2 text-sm font-medium hover:bg-[#FF4757]/10 transition-colors"
+            className="flex items-center gap-1.5 bg-brand-tint text-ochre rounded-full px-3.5 py-2 text-sm font-medium hover:bg-brand-strong transition-colors"
         >
-            {copied ? '✅ Lien copié' : '📢 Inviter des amis'}
+            {copied ? <><CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Lien copié</> : <><Megaphone className="w-4 h-4" aria-hidden="true" /> Inviter des amis</>}
         </button>
     );
 };

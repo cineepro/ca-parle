@@ -22,11 +22,11 @@ function Queue({ label, value, onClick }: { label: string; value: number | null 
         <button
             onClick={onClick}
             className={`text-left rounded-2xl border p-4 transition-colors ${
-                has ? 'bg-[#FFF0F1] border-[#FF4757]/20 hover:bg-[#FFE6E8]' : 'bg-white border-gray-100 hover:bg-gray-50'
+                has ? 'bg-brand-tint border-brand/20 hover:bg-brand-strong' : 'bg-white border-gray-100 hover:bg-gray-50'
             }`}
         >
             <p className="text-xs text-gray-500">{label}</p>
-            <p className={`text-2xl font-bold mt-1 ${has ? 'text-[#FF4757]' : 'text-gray-800'}`}>{value ?? '—'}</p>
+            <p className={`text-2xl font-bold mt-1 ${has ? 'text-ochre' : 'text-gray-800'}`}>{value ?? '—'}</p>
         </button>
     );
 }
@@ -62,7 +62,7 @@ export const ConsoleOverview = ({ onNavigate }: Props) => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-400">Mis à jour {timeAgo(data.generatedAt)}</p>
-                <button onClick={load} disabled={loading} className="text-xs font-semibold text-[#FF4757] disabled:opacity-50">
+                <button onClick={load} disabled={loading} className="text-xs font-semibold text-ochre disabled:opacity-50">
                     {loading ? 'Actualisation...' : 'Actualiser'}
                 </button>
             </div>
@@ -134,7 +134,7 @@ export const ConsoleOverview = ({ onNavigate }: Props) => {
                     ) : data.moderators.map((u) => (
                         <div key={u.id} className="px-4 py-2.5 flex items-center justify-between">
                             <span className="text-sm text-gray-700">{u.name}</span>
-                            <span className="text-[11px] text-gray-300 font-mono">{u.id.slice(0, 8)}</span>
+                            <span className="text-xs text-gray-300 font-mono">{u.id.slice(0, 8)}</span>
                         </div>
                     ))}
                 </div>

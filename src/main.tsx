@@ -2,6 +2,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// Polices auto-hébergées (embarquées dans le build : aucune requête vers
+// Google, fonctionne aussi dans l'app Android Capacitor hors connexion).
+import '@fontsource-variable/figtree';
+import '@fontsource-variable/bricolage-grotesque';
 import './index.css';
 
 // ⚠️ L'appel killLegacyServiceWorker() a été retiré d'ici volontairement.

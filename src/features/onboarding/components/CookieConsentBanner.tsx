@@ -25,11 +25,11 @@ export const CookieConsentBanner = () => {
                 <p className="text-xs text-gray-600 flex-1">
                     Vanessa utilise le stockage local de ton navigateur pour te garder connecté(e) et te souvenir de tes préférences.
                     Pas de cookie publicitaire tiers. Voir notre{' '}
-                    <a href="/privacy" className="text-[#FF4757] underline">politique de confidentialité</a>.
+                    <a href="/privacy" className="text-ochre underline">politique de confidentialité</a>.
                 </p>
                 <button
                     onClick={accept}
-                    className="shrink-0 bg-[#FF4757] text-white text-sm font-semibold px-5 py-2 rounded-full hover:bg-[#e63e4d] transition-colors"
+                    className="shrink-0 bg-brand text-ink text-sm font-semibold px-5 py-2 rounded-full hover:bg-brand-hover transition-colors"
                 >
                     J'ai compris
                 </button>

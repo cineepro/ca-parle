@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { newsletterService } from '@/features/newsletter/services/newsletterService';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 type Status = 'loading' | 'success' | 'error';
 
@@ -33,17 +34,17 @@ export default function UnsubscribePage() {
                 {status === 'loading' && <p className="text-sm text-gray-400">Traitement en cours...</p>}
                 {status === 'success' && (
                     <>
-                        <div className="text-4xl">✅</div>
+                        <div className=""><CheckCircle2 className="w-11 h-11 text-ochre mx-auto" aria-hidden="true" /></div>
                         <p className="text-sm text-gray-700">Tu ne recevras plus la newsletter de Vanessa.</p>
                     </>
                 )}
                 {status === 'error' && (
                     <>
-                        <div className="text-4xl">⚠️</div>
+                        <div className=""><AlertTriangle className="w-11 h-11 text-ochre mx-auto" aria-hidden="true" /></div>
                         <p className="text-sm text-gray-700">Lien invalide ou expiré.</p>
                     </>
                 )}
-                <Link to="/" className="text-[#FF4757] font-semibold hover:underline text-sm">
+                <Link to="/" className="text-ochre font-semibold hover:underline text-sm">
                     Retour à Vanessa
                 </Link>
             </div>

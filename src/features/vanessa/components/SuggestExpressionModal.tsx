@@ -56,9 +56,9 @@ export const SuggestExpressionModal = ({ onClose }: Props) => {
                             placeholder='Ex : "Ça va aller" — pour rassurer quelqu\u2019un après une mauvaise nouvelle.'
                             maxLength={300}
                             rows={4}
-                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                         />
-                        <p className="text-[11px] text-gray-300 text-right">{content.length}/300</p>
+                        <p className="text-xs text-gray-300 text-right">{content.length}/300</p>
                         {error && <p className="text-xs text-red-500">{error}</p>}
                         <div className="flex gap-2">
                             <Button type="submit" isLoading={saving} disabled={content.trim().length < 5} className="flex-1">

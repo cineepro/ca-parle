@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ALLOWED_DOC_EXTENSIONS, MAX_DOC_BYTES } from '../services/messageService';
 import { formatFileSize } from '../utils/messagePreview';
+import { Camera, FileText, Mic, Paperclip, Send, X } from 'lucide-react';
 
 interface Props {
     onSend: (content: string) => void;
@@ -199,10 +200,10 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                 <button
                     type="button"
                     onClick={stopRecording}
-                    className="shrink-0 w-10 h-10 rounded-full bg-[#FF4757] text-white flex items-center justify-center hover:bg-[#e63e4d] transition-colors"
+                    className="shrink-0 w-10 h-10 rounded-full bg-brand text-ink flex items-center justify-center hover:bg-brand-hover transition-colors"
                     aria-label="Envoyer le vocal"
                 >
-                    ➤
+                    <Send className="w-5 h-5" aria-hidden="true" />
                 </button>
             </div>
         );
@@ -218,12 +219,12 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
             {/* Réponse à un message précis */}
             {replyingTo && (
                 <div className="flex items-start gap-2 px-3 pt-3 bg-white border-t border-gray-100">
-                    <div className="flex-1 min-w-0 rounded-lg bg-gray-50 border-l-4 border-[#FF4757] px-3 py-1.5">
-                        <p className="text-[11px] font-semibold text-[#FF4757]">Réponse à {replyingTo.label}</p>
+                    <div className="flex-1 min-w-0 rounded-lg bg-gray-50 border-l-4 border-brand px-3 py-1.5">
+                        <p className="text-xs font-semibold text-ochre">Réponse à {replyingTo.label}</p>
                         <p className="text-xs text-gray-500 truncate">{replyingTo.preview}</p>
                     </div>
                     <button type="button" onClick={onCancelReply} aria-label="Annuler la réponse" className="shrink-0 w-7 h-7 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                        ✕
+                        <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                 </div>
             )}
@@ -234,14 +235,14 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                     {attachment.kind === 'image' ? (
                         <img src={attachment.previewUrl} alt="Aperçu" className="w-14 h-14 rounded-lg object-cover bg-gray-100" />
                     ) : (
-                        <span className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-2xl">📎</span>
+                        <span className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center "><Paperclip className="w-6 h-6" aria-hidden="true" /></span>
                     )}
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-700 truncate">{attachment.file.name}</p>
                         <p className="text-xs text-gray-400">{formatFileSize(attachment.file.size)} · ajoute une légende si tu veux</p>
                     </div>
                     <button type="button" onClick={clearAttachment} aria-label="Retirer la pièce jointe" className="shrink-0 w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                        ✕
+                        <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                 </div>
             )}
@@ -264,17 +265,17 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                             className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center disabled:opacity-40 hover:bg-gray-200 transition-colors"
                             aria-label={allowDocuments ? 'Joindre un fichier' : 'Envoyer une photo'}
                         >
-                            {allowDocuments ? '📎' : '📷'}
+                            {allowDocuments ? <Paperclip className="w-5 h-5" aria-hidden="true" /> : <Camera className="w-5 h-5" aria-hidden="true" />}
                         </button>
                         {attachMenuOpen && (
                             <>
                                 <div className="fixed inset-0 z-30" onClick={() => setAttachMenuOpen(false)} />
                                 <div className="absolute bottom-12 left-0 z-40 w-44 rounded-2xl bg-white shadow-lg border border-gray-100 py-1.5 text-sm text-gray-700">
                                     <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-gray-50" onClick={() => { setAttachMenuOpen(false); fileInputRef.current?.click(); }}>
-                                        📷 Photo
+                                        <Camera className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Photo
                                     </button>
                                     <button type="button" className="w-full text-left px-4 py-2.5 hover:bg-gray-50" onClick={() => { setAttachMenuOpen(false); docInputRef.current?.click(); }}>
-                                        📄 Document
+                                        <FileText className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Document
                                     </button>
                                 </div>
                             </>
@@ -296,7 +297,7 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                     placeholder={attachment ? 'Ajouter une légende...' : replyingTo ? 'Écris ta réponse...' : 'Écris un message...'}
                     rows={1}
                     maxLength={2000}
-                    className="flex-1 resize-none rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 max-h-32"
+                    className="flex-1 resize-none rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand max-h-32"
                 />
 
                 {onStartCall && !canSend && (
@@ -306,7 +307,7 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                         disabled={sending}
                         title="Discuter en direct avec Vanessa"
                         aria-label="Discuter en direct avec Vanessa"
-                        className="shrink-0 w-10 h-10 rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center disabled:opacity-40 hover:bg-[#FF4757]/20 transition-colors"
+                        className="shrink-0 w-10 h-10 rounded-full bg-brand-tint text-ochre flex items-center justify-center disabled:opacity-40 hover:bg-brand-strong transition-colors"
                     >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                             <path d="M4 10v4M8 6v12M12 3v18M16 8v8M20 11v2" />
@@ -318,10 +319,10 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                     <button
                         type="submit"
                         disabled={sending}
-                        className="shrink-0 w-10 h-10 rounded-full bg-[#FF4757] text-white flex items-center justify-center disabled:opacity-40 hover:bg-[#e63e4d] transition-colors"
+                        className="shrink-0 w-10 h-10 rounded-full bg-brand text-ink flex items-center justify-center disabled:opacity-40 hover:bg-brand-hover transition-colors"
                         aria-label="Envoyer"
                     >
-                        ➤
+                        <Send className="w-5 h-5" aria-hidden="true" />
                     </button>
                 ) : onSendVoice ? (
                     <button
@@ -331,7 +332,7 @@ export const MessageComposer = ({ onSend, onSendVoice, onSendAttachment, allowDo
                         className="shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center disabled:opacity-40 hover:bg-gray-200 transition-colors"
                         aria-label="Enregistrer un vocal"
                     >
-                        🎤
+                        <Mic className="w-5 h-5" aria-hidden="true" />
                     </button>
                 ) : null}
             </form>

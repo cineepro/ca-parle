@@ -29,13 +29,13 @@ const SCOPE_META: Record<KnowledgeScope, { label: string; rowLabel: string; acce
     lexique: {
         label: '🗣️ Expressions',
         rowLabel: 'Expression',
-        accent: 'border-indigo-100 bg-indigo-50/30',
+        accent: 'border-gray-200 bg-sand/30',
         help: "Ce qui fait la différence de Vanessa : son registre familier et ses expressions. Toujours entièrement inclus dans ses réponses, même quand un connecteur partenaire est actif.",
     },
     urgence: {
         label: '🤍 Urgence',
         rowLabel: 'Ressource vérifiée',
-        accent: 'border-rose-100 bg-rose-50/30',
+        accent: 'border-red-100 bg-red-50/30',
         help: "Utilisées UNIQUEMENT quand une conversation touche un sujet grave (violence, détresse, grossesse non désirée...). Sans ressource ici, Vanessa reste volontairement générale plutôt que d'inventer un numéro ou une adresse. Vérifie chaque information avant de l'ajouter : une erreur peut faire du tort à quelqu'un en vraie détresse.",
     },
     general: {
@@ -55,7 +55,7 @@ const SCOPE_META: Record<KnowledgeScope, { label: string; rowLabel: string; acce
 function Badge({ n }: { n: number }) {
     if (!n) return null;
     return (
-        <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[#FF4757] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+        <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-brand px-1.5 py-0.5 text-xs font-bold leading-none text-ink">
             {n}
         </span>
     );
@@ -324,13 +324,13 @@ export const VanessaKnowledgeManager = () => {
                         key={id}
                         onClick={() => selectScope(id)}
                         className={`inline-flex items-center rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
-                            scope === id ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            scope === id ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                     >
                         {SCOPE_META[id].label}
                         {pending > 0 && (
-                            <span className={`ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                                scope === id ? 'bg-white/25 text-white' : 'bg-[#FF4757] text-white'
+                            <span className={`ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
+                                scope === id ? 'bg-white/25 text-ink' : 'bg-brand text-ink'
                             }`}>
                                 {pending}
                             </span>
@@ -345,7 +345,7 @@ export const VanessaKnowledgeManager = () => {
                 <select
                     value={connectorId}
                     onChange={(e) => selectConnector(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 >
                     <option value="">Choisis un connecteur…</option>
                     {(counts?.connectors ?? []).map((c) => (
@@ -387,7 +387,7 @@ export const VanessaKnowledgeManager = () => {
                         </button>
                         <button
                             onClick={() => { setShowAdd((v) => !v); setFlash(null); }}
-                            className="ml-auto rounded-full bg-[#FF4757]/10 px-3.5 py-1.5 text-xs font-bold text-[#FF4757] hover:bg-[#FF4757]/20"
+                            className="ml-auto rounded-full bg-brand-tint px-3.5 py-1.5 text-xs font-bold text-ochre hover:bg-brand-strong"
                         >
                             {showAdd ? 'Fermer' : '+ Ajouter'}
                         </button>
@@ -402,7 +402,7 @@ export const VanessaKnowledgeManager = () => {
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             placeholder="Rechercher dans ces connaissances…"
-                            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                         />
                         <Button size="sm" variant="secondary" type="submit">Rechercher</Button>
                         {appliedSearch && (
@@ -416,13 +416,13 @@ export const VanessaKnowledgeManager = () => {
 
                     {/* Ajout — le formulaire correspond au type choisi */}
                     {showAdd && scope === 'lexique' && (
-                        <div className="flex flex-col gap-2 bg-indigo-50/50 rounded-2xl p-4">
+                        <div className="flex flex-col gap-2 bg-sand/50 rounded-2xl p-4">
                             <input
                                 value={lexExpression}
                                 onChange={(e) => setLexExpression(e.target.value)}
                                 placeholder="Expression (ex: c'est chaud)"
                                 maxLength={100}
-                                className="rounded-xl border border-indigo-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
                             />
                             <textarea
                                 value={lexUsage}
@@ -430,14 +430,14 @@ export const VanessaKnowledgeManager = () => {
                                 placeholder="Description / usage (dans quel contexte, avec quel sens)"
                                 rows={2}
                                 maxLength={300}
-                                className="rounded-xl border border-indigo-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none bg-white"
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none bg-white"
                             />
                             <input
                                 value={lexExample}
                                 onChange={(e) => setLexExample(e.target.value)}
                                 placeholder="Exemple de phrase complète (optionnel mais recommandé)"
                                 maxLength={200}
-                                className="rounded-xl border border-indigo-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
                             />
                             <Button size="sm" onClick={handleAddLexicon} isLoading={saving} disabled={!lexExpression.trim() || !lexUsage.trim()}>
                                 + Ajouter au lexique
@@ -446,14 +446,14 @@ export const VanessaKnowledgeManager = () => {
                     )}
 
                     {showAdd && scope === 'urgence' && (
-                        <div className="flex flex-col gap-2 bg-rose-50/50 rounded-2xl p-4">
+                        <div className="flex flex-col gap-2 bg-red-50/50 rounded-2xl p-4">
                             <textarea
                                 value={resourceContent}
                                 onChange={(e) => setResourceContent(e.target.value)}
                                 placeholder="Ex: Pour une grossesse non désirée ou une question de santé sexuelle : Centre Jeune Amour & Vie le plus proche — [adresse/numéro vérifié]"
                                 rows={2}
                                 maxLength={2000}
-                                className="rounded-xl border border-rose-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none bg-white"
+                                className="rounded-xl border border-red-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 resize-none bg-white"
                             />
                             <Button size="sm" onClick={handleAddResource} isLoading={saving} disabled={!resourceContent.trim()}>
                                 + Ajouter une ressource vérifiée
@@ -473,7 +473,7 @@ export const VanessaKnowledgeManager = () => {
                                 onChange={(e) => setCategory(e.target.value)}
                                 placeholder="Catégorie (ex: expressions, événements, règles, publicite)"
                                 maxLength={50}
-                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                             />
                             <textarea
                                 value={content}
@@ -481,7 +481,7 @@ export const VanessaKnowledgeManager = () => {
                                 placeholder="Contenu de la note..."
                                 rows={2}
                                 maxLength={2000}
-                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                                className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                             />
                             <Button size="sm" onClick={handleAddNote} isLoading={saving} disabled={!category.trim() || !content.trim()}>
                                 + Ajouter
@@ -504,7 +504,7 @@ export const VanessaKnowledgeManager = () => {
                                         : 'Aucune connaissance activée ici.'}
                             </p>
                             {!appliedSearch && statusTab === 'pending' && !!meta && meta.otherTotal > 0 && (
-                                <button onClick={() => setStatusTab('active')} className="text-xs font-semibold text-[#FF4757]">
+                                <button onClick={() => setStatusTab('active')} className="text-xs font-semibold text-ochre">
                                     Voir les {meta.otherTotal} activée(s)
                                 </button>
                             )}
@@ -517,7 +517,7 @@ export const VanessaKnowledgeManager = () => {
                                     className={`rounded-xl p-3 border ${SCOPE_META[scope].accent}`}
                                 >
                                     <div className="flex items-center justify-between mb-1 gap-2">
-                                        <span className="text-xs font-semibold text-purple-600 truncate">
+                                        <span className="text-xs font-semibold text-brun truncate">
                                             {SCOPE_META[scope].rowLabel || item.category}
                                         </span>
                                         <div className="flex gap-3 shrink-0">
@@ -537,7 +537,7 @@ export const VanessaKnowledgeManager = () => {
                             ))}
 
                             <div className="flex items-center justify-between pt-1">
-                                <p className="text-[11px] text-gray-400">
+                                <p className="text-xs text-gray-400">
                                     {items.length} affichée(s){meta ? ` sur ${meta.total}` : ''}
                                 </p>
                                 {nextCursor && (

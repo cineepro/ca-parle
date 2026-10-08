@@ -11,7 +11,7 @@ export const CountryFilter = ({ selected, onSelect }: Props) => {
         <select
             value={selected}
             onChange={(e) => onSelect(e.target.value)}
-            className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+            className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand"
         >
             {COUNTRIES.map((c) => (
                 <option key={c.slug} value={c.slug}>

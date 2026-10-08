@@ -9,6 +9,7 @@ import { SPOT_CATEGORIES } from '../config/categories';
 import { FUNCTIONS } from '@/api/constants';
 import { geolocationService } from '@/services/geolocationService';
 import { COUNTRY_MAP_CENTERS } from '../config/countryMapCenters';
+import { Car, RefreshCw, X } from 'lucide-react';
 
 interface Props {
     spots: Spot[];
@@ -380,9 +381,9 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                     </p>
                     <button
                         onClick={handleRetry}
-                        className="bg-[#FF4757] hover:bg-[#e63e4d] text-white font-bold text-sm px-6 py-3 rounded-full"
+                        className="bg-brand hover:bg-brand-hover text-ink font-bold text-sm px-6 py-3 rounded-full"
                     >
-                        🔄 Réessayer
+                        <RefreshCw className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Réessayer
                     </button>
                 </div>
             )}
@@ -396,7 +397,7 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                     </p>
                     <button
                         onClick={handleEnter}
-                        className="bg-[#FF4757] hover:bg-[#e63e4d] text-white font-bold text-sm px-7 py-3.5 rounded-full shadow-lg transition-colors"
+                        className="bg-brand hover:bg-brand-hover text-ink font-bold text-sm px-7 py-3.5 rounded-full shadow-lg transition-colors"
                     >
                         Découvrir la carte
                     </button>
@@ -420,8 +421,8 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                     <button
                         onClick={() => setSelected(null)}
                         className="absolute -top-3 -right-3 z-20 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 text-sm"
-                    >
-                        ✕
+                     aria-label="Fermer">
+                        <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                     <SpotCard spot={selected} />
                 </div>
@@ -439,19 +440,19 @@ export const CaSertMapView = ({ spots, country }: Props) => {
                         <>
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700 font-semibold">
-                                    🚗 {routeInfo.distanceKm} km · {routeInfo.durationMin} min
+                                    <Car className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {routeInfo.distanceKm} km · {routeInfo.durationMin} min
                                 </span>
                                 <button
                                     onClick={() => { clearRoute(); setRouteInfo(null); stopLiveTracking(); }}
                                     className="text-gray-300 hover:text-gray-500 text-sm"
-                                >
-                                    ✕
+                                 aria-label="Fermer">
+                                    <X className="w-4 h-4" aria-hidden="true" />
                                 </button>
                             </div>
                             <button
                                 onClick={liveTracking ? stopLiveTracking : startLiveTracking}
                                 className={`w-full mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-full py-2 ${
-                                    liveTracking ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-[#4285F4]'
+                                    liveTracking ? 'bg-red-50 text-red-500' : 'bg-sand text-[#4285F4]'
                                 }`}
                             >
                                 {liveTracking ? 'Suivi en direct actif — arrêter' : 'Me suivre en direct sur la carte'}

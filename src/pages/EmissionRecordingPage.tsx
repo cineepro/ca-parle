@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useConversationThread } from '@/features/messaging/hooks/useConversationThread';
 import { getVoiceMessageUrl } from '@/features/messaging/services/messageService';
 import { VANESSA_USER_ID } from '@/api/constants';
+import { AlertTriangle, Mic } from 'lucide-react';
 
 // --- Réglages de la détection de silence (écoute continue) ---
 // Volontairement isolés ici, en toutes lettres : ce sont des valeurs de
@@ -32,11 +33,11 @@ const PHASE_LABEL: Record<Phase, string> = {
 };
 const PHASE_COLOR: Record<Phase, string> = {
     off: 'bg-gray-300',
-    paused: 'bg-gray-400',
-    listening: 'bg-blue-400',
-    recording: 'bg-red-500',
-    processing: 'bg-amber-400',
-    speaking: 'bg-[#FF4757]',
+    paused: 'bg-gray-300',
+    listening: 'bg-sky-300',
+    recording: 'bg-red-600',
+    processing: 'bg-amber-300',
+    speaking: 'bg-brand',
 };
 
 export default function EmissionRecordingPage() {
@@ -340,7 +341,7 @@ export default function EmissionRecordingPage() {
                                     {(phase === 'recording' || phase === 'listening') && (
                                         <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ backgroundColor: 'currentColor' }} />
                                     )}
-                                    <span className="text-white text-2xl relative">🎙️</span>
+                                    <Mic className={`w-8 h-8 relative ${phase === 'recording' ? 'text-white' : 'text-ink'}`} aria-hidden="true" />
                                 </div>
                             </div>
                             <p className="text-sm font-semibold text-gray-700">{PHASE_LABEL[phase]}</p>
@@ -348,7 +349,7 @@ export default function EmissionRecordingPage() {
                             {phase === 'off' ? (
                                 <button
                                     onClick={startEmission}
-                                    className="w-full rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
+                                    className="w-full rounded-full py-3.5 font-bold text-sm bg-brand hover:bg-brand-hover text-ink transition-colors"
                                 >
                                     Démarrer l'émission
                                 </button>
@@ -357,7 +358,7 @@ export default function EmissionRecordingPage() {
                                     {phase === 'paused' ? (
                                         <button
                                             onClick={resumeListening}
-                                            className="flex-1 rounded-full py-3.5 font-bold text-sm bg-[#FF4757] hover:bg-[#e63e4d] text-white transition-colors"
+                                            className="flex-1 rounded-full py-3.5 font-bold text-sm bg-brand hover:bg-brand-hover text-ink transition-colors"
                                         >
                                             Reprendre
                                         </button>
@@ -378,10 +379,10 @@ export default function EmissionRecordingPage() {
                                 </div>
                             )}
                             {micError && <p className="text-xs text-red-500 text-center">{micError}</p>}
-                            {sendError && <p className="text-xs text-red-500 text-center font-semibold">⚠️ {sendError}</p>}
+                            {sendError && <p className="text-xs text-red-500 text-center font-semibold"><AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {sendError}</p>}
                             {replyTimedOut && !sendError && (
                                 <p className="text-xs text-amber-600 text-center font-semibold">
-                                    ⚠️ Sa réponse n'est jamais arrivée ({REPLY_TIMEOUT_MS / 1000}s) — ouvre la console F12
+                                    <AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Sa réponse n'est jamais arrivée ({REPLY_TIMEOUT_MS / 1000}s) — ouvre la console F12
                                     (préfixe "[ÉMISSION]") pour voir exactement à quelle étape ça bloque.
                                 </p>
                             )}
@@ -413,7 +414,7 @@ export default function EmissionRecordingPage() {
                                     <div
                                         key={m.$id}
                                         className={`text-sm leading-relaxed p-3 rounded-xl ${
-                                            m.senderId === VANESSA_USER_ID ? 'bg-[#FFF0F1] text-gray-800' : 'bg-gray-50 text-gray-700'
+                                            m.senderId === VANESSA_USER_ID ? 'bg-brand-tint text-gray-800' : 'bg-gray-50 text-gray-700'
                                         }`}
                                     >
                                         <span className="font-semibold">{m.senderId === VANESSA_USER_ID ? 'Vanessa' : 'Invité'} — </span>

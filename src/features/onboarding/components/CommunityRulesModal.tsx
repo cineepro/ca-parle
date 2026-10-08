@@ -1,15 +1,18 @@
 // src/features/onboarding/components/CommunityRulesModal.tsx — Vanessa
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { VANESSA_AVATAR_URL } from '@/api/constants';
+import { Button } from '@/components/ui/button';
+import { UserX, ShieldAlert, Ban, EyeOff, Flag, type LucideIcon } from 'lucide-react';
 
 const STORAGE_KEY_PREFIX = 'ca_parle_rules_seen_';
 
-const RULES = [
-    { icon: '🙅‍♀️', text: "Ne cible jamais une personne réelle par son nom complet ou des détails qui l'identifient clairement dans une accusation grave (infidélité, délit...) sans preuve." },
-    { icon: '🔞', text: 'Aucun contenu sexuel impliquant des personnes réelles, et surtout jamais concernant des mineurs — tolérance zéro.' },
-    { icon: '🚫', text: 'Pas de harcèlement, de menaces, ni de divulgation de données privées de quelqu\'un (adresse, numéro...) sans son accord.' },
-    { icon: '🕵️', text: "L'anonymat protège ton identité vis-à-vis des autres utilisateurs, pas vis-à-vis de la plateforme en cas de signalement grave." },
-    { icon: '🚩', text: 'Signale tout contenu qui te semble abusif — notre équipe de modération traite chaque signalement.' },
+const RULES: { Icon: LucideIcon; text: string }[] = [
+    { Icon: UserX, text: "Ne cible jamais une personne réelle par son nom complet ou des détails qui l'identifient clairement dans une accusation grave (infidélité, délit...) sans preuve." },
+    { Icon: ShieldAlert, text: 'Aucun contenu sexuel impliquant des personnes réelles, et surtout jamais concernant des mineurs — tolérance zéro.' },
+    { Icon: Ban, text: 'Pas de harcèlement, de menaces, ni de divulgation de données privées de quelqu\'un (adresse, numéro...) sans son accord.' },
+    { Icon: EyeOff, text: "L'anonymat protège ton identité vis-à-vis des autres utilisateurs, pas vis-à-vis de la plateforme en cas de signalement grave." },
+    { Icon: Flag, text: 'Signale tout contenu qui te semble abusif — notre équipe de modération traite chaque signalement.' },
 ];
 
 export const CommunityRulesModal = () => {
@@ -34,29 +37,31 @@ export const CommunityRulesModal = () => {
     if (!visible) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-ink/50 flex items-end sm:items-center justify-center z-50 sm:px-4">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="rules-title"
+                className="bg-white rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md space-y-4 max-h-[90vh] overflow-y-auto shadow-xl"
+            >
                 <div className="text-center">
-                    <div className="text-3xl mb-2">👋</div>
-                    <h2 className="text-lg font-bold text-gray-800">Bienvenue sur Vanessa</h2>
-                    <p className="text-xs text-gray-400 mt-1">Quelques règles avant de commencer</p>
+                    <img src={VANESSA_AVATAR_URL} alt="" className="w-16 h-16 rounded-full object-cover mx-auto mb-3 ring-4 ring-brand" />
+                    <h2 id="rules-title" className="text-2xl font-semibold text-ink">Bienvenue sur Vanessa</h2>
+                    <p className="text-base text-gray-600 mt-1">Quelques règles avant de commencer</p>
                 </div>
 
-                <div className="space-y-3">
-                    {RULES.map((rule, i) => (
-                        <div key={i} className="flex items-start gap-3 bg-gray-50 rounded-2xl p-3">
-                            <span className="text-lg shrink-0">{rule.icon}</span>
-                            <p className="text-sm text-gray-600 leading-relaxed">{rule.text}</p>
-                        </div>
+                <ul className="space-y-3">
+                    {RULES.map(({ Icon, text }, i) => (
+                        <li key={i} className="flex items-start gap-3 bg-sand rounded-xl p-3">
+                            <Icon className="w-5 h-5 text-ochre shrink-0 mt-0.5" aria-hidden="true" />
+                            <p className="text-base text-gray-700 leading-relaxed">{text}</p>
+                        </li>
                     ))}
-                </div>
+                </ul>
 
-                <button
-                    onClick={accept}
-                    className="w-full bg-[#FF4757] text-white font-semibold py-3 rounded-xl hover:bg-[#e63e4d] transition-colors"
-                >
+                <Button onClick={accept} size="lg" fullWidth>
                     J'ai compris, c'est parti
-                </button>
+                </Button>
             </div>
         </div>
     );

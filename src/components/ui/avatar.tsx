@@ -24,7 +24,7 @@ export const Avatar = ({ name, userId, avatarUrl, sizeClass = 'w-9 h-9' }: Avata
     }
 
     return (
-        <div className={`${sizeClass} rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center font-bold text-sm shrink-0`}>
+        <div className={`${sizeClass} rounded-full bg-brand-tint text-ochre flex items-center justify-center font-display font-bold text-sm shrink-0`}>
             {name.charAt(0).toUpperCase() || '?'}
         </div>
     );

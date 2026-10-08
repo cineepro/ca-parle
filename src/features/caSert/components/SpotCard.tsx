@@ -2,11 +2,12 @@
 import { useState } from 'react';
 import { caSertService, getSpotImageUrl, type Spot } from '../services/caSertService';
 import { SPOT_CATEGORIES } from '../config/categories';
+import { CheckCircle2, Phone } from 'lucide-react';
 
 const CATEGORY_BG: Record<string, string> = {
-    manger: 'bg-orange-50',
-    services: 'bg-blue-50',
-    shopping: 'bg-pink-50',
+    manger: 'bg-amber-50',
+    services: 'bg-sand',
+    shopping: 'bg-sand',
     sante: 'bg-green-50',
     autre: 'bg-gray-50',
 };
@@ -60,14 +61,14 @@ export const SpotCard = ({ spot }: { spot: Spot }) => {
                             confirmed ? 'bg-green-100 text-green-700' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                         }`}
                     >
-                        ✅ {confirmCount > 0 ? confirmCount : ''} Confirmé{confirmCount > 1 ? 's' : ''}
+                        <CheckCircle2 className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {confirmCount > 0 ? confirmCount : ''} Confirmé{confirmCount > 1 ? 's' : ''}
                     </button>
                     {spot.phone && (
                         <a
                             href={`tel:${spot.phone}`}
-                            className="text-xs font-semibold text-[#FF4757] bg-[#FF4757]/10 rounded-full px-3 py-1.5"
+                            className="text-xs font-semibold text-ochre bg-brand-tint rounded-full px-3 py-1.5"
                         >
-                            📞 Appeler
+                            <Phone className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Appeler
                         </a>
                     )}
                 </div>

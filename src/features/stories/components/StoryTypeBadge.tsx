@@ -1,21 +1,22 @@
 // src/features/stories/components/StoryTypeBadge.tsx — Vanessa
+import { Eye, Zap, MessageSquare, HelpCircle, CheckCircle2, type LucideIcon } from 'lucide-react';
 import type { StoryType } from '../services/storyService';
+import { Badge, type BadgeTone } from '@/components/ui/badge';
 
-const TYPE_CONFIG: Record<StoryType, { label: string; icon: string; className: string }> = {
-    ragot: { label: 'Ragot', icon: '👀', className: 'bg-purple-50 text-purple-600' },
-    revelation: { label: 'Révélation', icon: '💥', className: 'bg-orange-50 text-orange-600' },
-    temoignage: { label: 'Témoignage', icon: '🗣️', className: 'bg-blue-50 text-blue-600' },
-    reaction: { label: 'Réaction', icon: '💬', className: 'bg-gray-100 text-gray-600' },
-    rumeur: { label: 'Rumeur', icon: '❓', className: 'bg-yellow-50 text-yellow-700' },
-    confirme: { label: 'Confirmé', icon: '✅', className: 'bg-green-50 text-green-700' },
+const TYPE_CONFIG: Record<StoryType, { label: string; Icon: LucideIcon; tone: BadgeTone }> = {
+    ragot: { label: 'Ragot', Icon: Eye, tone: 'brand' },
+    revelation: { label: 'Révélation', Icon: Zap, tone: 'danger' },
+    temoignage: { label: 'Témoignage', Icon: MessageSquare, tone: 'info' },
+    reaction: { label: 'Réaction', Icon: MessageSquare, tone: 'neutral' },
+    rumeur: { label: 'Rumeur', Icon: HelpCircle, tone: 'warning' },
+    confirme: { label: 'Confirmé', Icon: CheckCircle2, tone: 'success' },
 };
 
 export const StoryTypeBadge = ({ type }: { type: StoryType }) => {
-    const config = TYPE_CONFIG[type] || TYPE_CONFIG.ragot;
+    const { label, Icon, tone } = TYPE_CONFIG[type] || TYPE_CONFIG.ragot;
     return (
-        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${config.className}`}>
-            <span>{config.icon}</span>
-            {config.label}
-        </span>
+        <Badge tone={tone} icon={<Icon className="w-3.5 h-3.5" aria-hidden="true" />}>
+            {label}
+        </Badge>
     );
 };

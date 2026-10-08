@@ -2,6 +2,7 @@
 import { useFollow } from '../hooks/useFollow';
 import type { FollowingType } from '../services/followService';
 import { Button } from '@/components/ui/button';
+import { Check, Plus } from 'lucide-react';
 
 interface Props {
     followingId: string;
@@ -20,7 +21,7 @@ export const FollowButton = ({ followingId, followingType, initialCount }: Props
                 onClick={toggle}
                 isLoading={loading}
             >
-                {isFollowing ? '✓ Suivi' : '+ Suivre'}
+                {isFollowing ? <><Check className="w-4 h-4" aria-hidden="true" /> Suivi</> : <><Plus className="w-4 h-4" aria-hidden="true" /> Suivre</>}
             </Button>
             <span className="text-xs text-gray-400">{count} abonné{count > 1 ? 's' : ''}</span>
         </div>

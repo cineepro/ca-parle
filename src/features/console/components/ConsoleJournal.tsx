@@ -5,7 +5,7 @@ import { platformService, timeAgo, type PlatformEvent, type Severity } from '../
 const SEVERITY_STYLE: Record<Severity, string> = {
     critical: 'bg-red-50 text-red-600',
     warning: 'bg-amber-50 text-amber-600',
-    info: 'bg-blue-50 text-blue-600',
+    info: 'bg-sand text-brun',
 };
 const SEVERITY_LABEL: Record<Severity, string> = { critical: 'Critique', warning: 'Attention', info: 'Info' };
 
@@ -36,12 +36,12 @@ export const ConsoleJournal = () => {
                     <button
                         key={f}
                         onClick={() => setFilter(f)}
-                        className={`text-xs font-semibold rounded-full px-3.5 py-1.5 ${filter === f ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-500'}`}
+                        className={`text-xs font-semibold rounded-full px-3.5 py-1.5 ${filter === f ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-500'}`}
                     >
                         {f === 'all' ? 'Tout' : SEVERITY_LABEL[f]}
                     </button>
                 ))}
-                <button onClick={load} className="ml-auto text-xs font-semibold text-[#FF4757]">Actualiser</button>
+                <button onClick={load} className="ml-auto text-xs font-semibold text-ochre">Actualiser</button>
             </div>
 
             {loading ? (
@@ -60,12 +60,12 @@ export const ConsoleJournal = () => {
                     {events.map((e) => (
                         <button key={e.id} onClick={() => setOpenId(openId === e.id ? null : e.id)} className="w-full text-left px-4 py-3 hover:bg-gray-50">
                             <div className="flex items-center gap-2.5">
-                                <span className={`text-[10px] font-bold rounded px-2 py-0.5 shrink-0 ${SEVERITY_STYLE[e.severity]}`}>
+                                <span className={`text-xs font-bold rounded px-2 py-0.5 shrink-0 ${SEVERITY_STYLE[e.severity]}`}>
                                     {SEVERITY_LABEL[e.severity] ?? e.severity}
                                 </span>
                                 <span className="text-xs font-mono text-gray-500 shrink-0">{e.type}</span>
                                 <span className="text-sm text-gray-700 truncate flex-1">{e.message}</span>
-                                <span className="text-[11px] text-gray-400 shrink-0">{timeAgo(e.createdAt)}</span>
+                                <span className="text-xs text-gray-400 shrink-0">{timeAgo(e.createdAt)}</span>
                             </div>
                             {openId === e.id && (
                                 <div className="mt-2 text-xs text-gray-500 space-y-1">

@@ -49,7 +49,7 @@ export default function CaSertPage() {
                 <div>
                     <h1 className="text-xl font-bold text-gray-800">Ça sert</h1>
                     <p className="text-xs text-gray-400">Les vrais plans, par la communauté</p>
-                    <Link to="/ca-sert/mes-contributions" className="text-xs text-[#FF4757] font-semibold hover:underline">
+                    <Link to="/ca-sert/mes-contributions" className="text-xs text-ochre font-semibold hover:underline">
                         Mes contributions →
                     </Link>
                 </div>
@@ -65,7 +65,7 @@ export default function CaSertPage() {
                             key={c.slug}
                             onClick={() => setCategory(c.slug)}
                             className={`shrink-0 flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                                category === c.slug ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-600'
+                                category === c.slug ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-600'
                             }`}
                         >
                             {c.label}
@@ -114,7 +114,7 @@ export default function CaSertPage() {
 
             <button
                 onClick={() => setShowAddModal(true)}
-                className="fixed bottom-4 md:bottom-8 right-4 md:right-8 flex items-center gap-2 bg-[#FF4757] text-white font-semibold text-sm px-4 py-3 rounded-full shadow-lg hover:bg-[#e63e4d] transition-colors z-30"
+                className="fixed bottom-4 md:bottom-8 right-4 md:right-8 flex items-center gap-2 bg-brand text-ink font-semibold text-sm px-4 py-3 rounded-full shadow-lg hover:bg-brand-hover transition-colors z-30"
             >
                 Balance ton bon plan
             </button>

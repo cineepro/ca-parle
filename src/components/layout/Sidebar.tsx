@@ -25,18 +25,19 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
         <Link
             to={item.to}
             onClick={onNavigate}
-            className={`flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-[#FF4757]/10 text-[#FF4757] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+            aria-current={isActive ? 'page' : undefined}
+            className={`flex items-center justify-between rounded-xl px-3 py-2.5 min-h-[44px] text-base font-medium transition-colors border-l-4 ${
+                isActive ? 'bg-brand-tint text-ink font-semibold border-brand' : 'text-gray-700 border-transparent hover:bg-sand'
             }`}
         >
             {item.label}
             {!!item.badge && (
-                <span className="bg-[#FF4757] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                <span className="bg-brand text-ink text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                     {item.badge > 9 ? '9+' : item.badge}
                 </span>
             )}
             {item.badgeText && (
-                <span className="bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full px-2 py-0.5 shrink-0">
+                <span className="bg-gray-100 text-gray-500 text-xs font-bold rounded-full px-2 py-0.5 shrink-0">
                     {item.badgeText}
                 </span>
             )}
@@ -45,7 +46,7 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-    return <p className="px-3 pt-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">{children}</p>;
+    return <p className="px-3 pt-4 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide">{children}</p>;
 }
 
 // Section repliable — utilisée uniquement là où la liste peut devenir
@@ -77,7 +78,7 @@ function CollapsibleSection({
         <div>
             <button
                 onClick={toggle}
-                className="w-full flex items-center justify-between px-3 pt-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600"
+                className="w-full flex items-center justify-between px-3 pt-4 pb-1 text-xs font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600"
             >
                 <span>{title} {count > 0 && `(${count})`}</span>
                 <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>›</span>
@@ -265,10 +266,10 @@ export const Sidebar = () => {
                         <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
                     </svg>
                 </button>
-                <span className="text-lg font-bold text-[#FF4757]">Vanessa</span>
+                <span className="text-lg font-bold text-ochre">Vanessa</span>
                 {unreadCount > 0 && (
                     <Link to="/notifications" className="ml-auto relative text-gray-400">
-                        <span className="bg-[#FF4757] text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                        <span className="bg-brand text-ink text-xs font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
                             {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                     </Link>
@@ -290,7 +291,7 @@ export const Sidebar = () => {
                 }`}
             >
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                    <Link to="/accueil" onClick={close} className="text-xl font-bold text-[#FF4757]">
+                    <Link to="/accueil" onClick={close} className="text-xl font-bold text-ochre">
                         Vanessa
                     </Link>
                     <button onClick={close} className="md:hidden text-gray-400 p-1" aria-label="Fermer le menu">
@@ -310,7 +311,7 @@ export const Sidebar = () => {
 
                     {connectors.length > 0 && (
                         <CollapsibleSection title="Connecteurs" storageKey="connecteurs" count={connectors.length}>
-                            <p className="px-3 pb-1.5 text-[11px] text-gray-400">Touche à nouveau pour désactiver</p>
+                            <p className="px-3 pb-1.5 text-xs text-gray-400">Touche à nouveau pour désactiver</p>
                             <div className="space-y-0.5">
                                 {connectors.map((c) => {
                                     const count = monthlyQuestionCount(c);
@@ -335,13 +336,13 @@ export const Sidebar = () => {
                                                 {switchingConnector === c.$id ? 'Un instant...' : c.name}
                                             </span>
                                             {isActive && !switchingConnector && (
-                                                <span className="text-[10px] font-bold shrink-0" style={{ color: c.color }}>
+                                                <span className="text-xs font-bold shrink-0" style={{ color: c.color }}>
                                                     ACTIF
                                                 </span>
                                             )}
                                             {count > 0 && !isActive && (
                                                 <span
-                                                    className="text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-[#FF4757] text-white shrink-0"
+                                                    className="text-xs font-bold rounded-full px-1.5 py-0.5 bg-brand text-ink shrink-0"
                                                     title={`${count} question(s) en ${MONTH_LABELS[new Date().getMonth()]}`}
                                                 >
                                                     {formatQuestionCount(count)}
@@ -359,7 +360,7 @@ export const Sidebar = () => {
                             <button
                                 onClick={handleNewConversation}
                                 disabled={creatingConversation}
-                                className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-[#FF4757] hover:bg-[#FF4757]/5 disabled:opacity-50"
+                                className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-ochre hover:bg-brand-tint disabled:opacity-50"
                             >
                                 <span className="text-lg leading-none">+</span>
                                 {creatingConversation ? 'Ouverture...' : 'Nouvelle conversation'}
@@ -382,7 +383,7 @@ export const Sidebar = () => {
                                                 onBlur={confirmRename}
                                                 onKeyDown={(e) => { if (e.key === 'Escape') setRenamingId(null); }}
                                                 maxLength={100}
-                                                className="flex-1 rounded-lg border border-[#FF4757]/40 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/30"
+                                                className="flex-1 rounded-lg border border-brand/40 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                                             />
                                         </form>
                                     );
@@ -402,18 +403,18 @@ export const Sidebar = () => {
                                     <div
                                         key={c.$id}
                                         className={`group flex items-center gap-1 rounded-xl pr-1.5 transition-colors ${
-                                            isCurrent ? 'bg-[#FF4757]/10' : 'hover:bg-gray-50'
+                                            isCurrent ? 'bg-brand-tint' : 'hover:bg-gray-50'
                                         }`}
                                     >
                                         <Link
                                             to={`/messages/${c.$id}`}
                                             onClick={close}
                                             className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-3 py-2.5 text-sm ${
-                                                isCurrent ? 'text-[#FF4757] font-semibold' : 'text-gray-600'
+                                                isCurrent ? 'text-ochre font-semibold' : 'text-gray-600'
                                             }`}
                                         >
                                             <span className="truncate">{c.title || 'Nouvelle conversation'}</span>
-                                            <span className="text-[10px] text-gray-400 shrink-0">{relativeTime(c.lastMessageAt)}</span>
+                                            <span className="text-xs text-gray-400 shrink-0">{relativeTime(c.lastMessageAt)}</span>
                                         </Link>
                                         <button
                                             onClick={() => startRename(c)}

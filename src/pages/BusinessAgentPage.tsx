@@ -34,7 +34,7 @@ export default function BusinessAgentPage() {
                 <div className="bg-white rounded-3xl p-6 space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                         <h1 className="text-xl font-bold text-gray-800">Vanessa pour les entreprises</h1>
-                        <span className="bg-gray-100 text-gray-500 text-[11px] font-bold rounded-full px-2.5 py-1">
+                        <span className="bg-gray-100 text-gray-500 text-xs font-bold rounded-full px-2.5 py-1">
                             Bientôt disponible
                         </span>
                     </div>
@@ -62,7 +62,7 @@ export default function BusinessAgentPage() {
                     ))}
                 </div>
 
-                <div className="bg-[#FFF0F1] rounded-2xl p-5 space-y-1.5">
+                <div className="bg-brand-tint rounded-2xl p-5 space-y-1.5">
                     <p className="text-sm font-semibold text-gray-800">Pourquoi ce n'est pas encore actif</p>
                     <p className="text-sm text-gray-600">
                         On préfère d'abord bien faire ce qui existe déjà, et vérifier que cette idée trouve vraiment

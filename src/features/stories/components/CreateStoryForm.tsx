@@ -9,12 +9,13 @@ import { uploadStoryImage } from '../services/storyService';
 import { Button } from '@/components/ui/button';
 import { ReferenceTagInput } from '@/features/references/components/ReferenceTagInput';
 import type { Reference } from '@/features/references/services/referenceService';
+import { Camera, Eye, EyeOff, HelpCircle, MessageSquare, X, XCircle, Zap, type LucideIcon } from 'lucide-react';
 
-const TYPE_OPTIONS: { value: StoryType; label: string; icon: string }[] = [
-    { value: 'ragot', label: 'Ragot', icon: '👀' },
-    { value: 'revelation', label: 'Révélation', icon: '💥' },
-    { value: 'temoignage', label: 'Témoignage', icon: '🗣️' },
-    { value: 'rumeur', label: 'Rumeur', icon: '❓' },
+const TYPE_OPTIONS: { value: StoryType; label: string; Icon: LucideIcon }[] = [
+    { value: 'ragot', label: 'Ragot', Icon: Eye },
+    { value: 'revelation', label: 'Révélation', Icon: Zap },
+    { value: 'temoignage', label: 'Témoignage', Icon: MessageSquare },
+    { value: 'rumeur', label: 'Rumeur', Icon: HelpCircle },
 ];
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 Mo
@@ -94,11 +95,11 @@ export const CreateStoryForm = () => {
                             onClick={() => setType(opt.value)}
                             className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium border transition-all ${
                                 type === opt.value
-                                    ? 'border-[#FF4757] bg-[#FF4757]/5 text-[#FF4757]'
+                                    ? 'border-brand bg-brand-tint text-ochre'
                                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                             }`}
                         >
-                            <span>{opt.icon}</span>
+                            <opt.Icon className="w-4 h-4" aria-hidden="true" />
                             {opt.label}
                         </button>
                     ))}
@@ -115,7 +116,7 @@ export const CreateStoryForm = () => {
                         id="category"
                         value={categoryId}
                         onChange={(e) => setCategoryId(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                     >
                         {CATEGORIES.filter((c) => c.slug !== 'tout').map((cat) => (
                             <option key={cat.slug} value={cat.slug}>
@@ -132,7 +133,7 @@ export const CreateStoryForm = () => {
                         id="country"
                         value={country}
                         onChange={(e) => setCountry(e.target.value)}
-                        className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                        className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                     >
                         {COUNTRIES.filter((c) => c.slug !== 'tous').map((c) => (
                             <option key={c.slug} value={c.slug}>
@@ -155,7 +156,7 @@ export const CreateStoryForm = () => {
                     maxLength={150}
                     placeholder="Il paraît que..."
                     required
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
             </div>
 
@@ -172,7 +173,7 @@ export const CreateStoryForm = () => {
                     rows={6}
                     placeholder="Donne les détails, le contexte..."
                     required
-                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">{content.length}/5000</p>
             </div>
@@ -189,13 +190,13 @@ export const CreateStoryForm = () => {
                             type="button"
                             onClick={removeImage}
                             className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm"
-                        >
-                            ✕
+                         aria-label="Fermer">
+                            <X className="w-4 h-4" aria-hidden="true" />
                         </button>
                     </div>
                 ) : (
                     <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-gray-200 rounded-xl py-6 cursor-pointer hover:border-gray-300 transition-colors">
-                        <span className="text-2xl">📷</span>
+                        <span className=""><Camera className="w-7 h-7 text-ochre" aria-hidden="true" /></span>
                         <span className="text-sm text-gray-400">Ajouter une image</span>
                         <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                     </label>
@@ -212,16 +213,16 @@ export const CreateStoryForm = () => {
                     id="anonymous"
                     checked={isAnonymous}
                     onChange={(e) => setIsAnonymous(e.target.checked)}
-                    className="w-4 h-4 accent-[#FF4757] cursor-pointer shrink-0"
+                    className="w-4 h-4 accent-brand cursor-pointer shrink-0"
                 />
                 <label htmlFor="anonymous" className="text-sm text-gray-600 cursor-pointer select-none">
-                    🕵️ Publier anonymement (ton nom ne sera pas affiché aux autres utilisateurs)
+                    <EyeOff className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Publier anonymement (ton nom ne sera pas affiché aux autres utilisateurs)
                 </label>
             </div>
 
             {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
-                    ❌ {error}
+                    <XCircle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {error}
                 </div>
             )}
 

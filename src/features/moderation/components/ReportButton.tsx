@@ -2,14 +2,15 @@
 import { useState } from 'react';
 import { ReportModal } from './ReportModal';
 import type { ReportTargetType } from '../services/reportService';
+import { Flag } from 'lucide-react';
 
 interface Props {
     targetType: ReportTargetType;
     targetId: string;
-    label?: string;
+    label?: React.ReactNode;
 }
 
-export const ReportButton = ({ targetType, targetId, label = '🚩 Signaler' }: Props) => {
+export const ReportButton = ({ targetType, targetId, label }: Props) => {
     const [open, setOpen] = useState(false);
 
     return (
@@ -17,9 +18,9 @@ export const ReportButton = ({ targetType, targetId, label = '🚩 Signaler' }: 
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-red-600 transition-colors min-h-[32px]"
             >
-                {label}
+                {label ?? <><Flag className="w-4 h-4" aria-hidden="true" /> Signaler</>}
             </button>
             {open && <ReportModal targetType={targetType} targetId={targetId} onClose={() => setOpen(false)} />}
         </>

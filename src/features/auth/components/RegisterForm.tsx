@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { authService } from '@/features/auth/services/authService';
 import { GoogleIcon } from './GoogleIcon';
+import { XCircle } from 'lucide-react';
 
 export const RegisterForm = () => {
     const { register, loading, error } = useRegister();
@@ -93,16 +94,16 @@ export const RegisterForm = () => {
                         id="accept-privacy"
                         checked={acceptedPrivacy}
                         onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 accent-[#FF4757] cursor-pointer shrink-0"
+                        className="mt-0.5 w-4 h-4 accent-brand cursor-pointer shrink-0"
                         required
                     />
                     <label htmlFor="accept-privacy" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
                         J'ai lu et j'accepte la{' '}
-                        <Link to="/privacy" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <Link to="/privacy" target="_blank" className="text-ochre font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
                             politique de confidentialité
                         </Link>{' '}
                         et les{' '}
-                        <Link to="/terms" target="_blank" className="text-[#FF4757] font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <Link to="/terms" target="_blank" className="text-ochre font-semibold hover:underline" onClick={(e) => e.stopPropagation()}>
                             conditions d'utilisation
                         </Link>{' '}
                         de Vanessa. Je comprends que mon email sera vérifié avant l'activation du compte.
@@ -111,7 +112,7 @@ export const RegisterForm = () => {
 
                 {error && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm">
-                        ❌ {error}
+                        <XCircle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {error}
                     </div>
                 )}
 
@@ -134,7 +135,7 @@ export const RegisterForm = () => {
 
                 <div className="text-center text-sm">
                     Déjà un compte ?{' '}
-                    <Link to="/login" className="text-[#FF4757] font-semibold hover:underline">
+                    <Link to="/login" className="text-ochre font-semibold hover:underline">
                         Se connecter
                     </Link>
                 </div>

@@ -57,7 +57,7 @@ export const RecipientPicker = ({ selectedIds, onChange }: Props) => {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Rechercher par nom..."
-                    className="flex-1 min-w-[140px] rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="flex-1 min-w-[140px] rounded-xl border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
                 <select
                     value={sort}
@@ -73,7 +73,7 @@ export const RecipientPicker = ({ selectedIds, onChange }: Props) => {
             <div className="flex items-center justify-between px-3 py-2 text-xs text-gray-500 bg-white border-b border-gray-100">
                 <span>{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''} sur {total}</span>
                 <div className="flex gap-3">
-                    <button type="button" onClick={selectAllVisible} className="text-[#FF4757] font-medium">
+                    <button type="button" onClick={selectAllVisible} className="text-ochre font-medium">
                         Tout sélectionner (affichés)
                     </button>
                     <button type="button" onClick={clearSelection} className="text-gray-400">
@@ -91,11 +91,11 @@ export const RecipientPicker = ({ selectedIds, onChange }: Props) => {
                             type="checkbox"
                             checked={selectedIds.has(u.$id)}
                             onChange={() => toggle(u.$id)}
-                            className="w-4 h-4 accent-[#FF4757]"
+                            className="w-4 h-4 accent-brand"
                         />
                         <span className="text-sm text-gray-700 flex-1">{u.name || 'Sans nom'}</span>
-                        {u.isBanned && <span className="text-[10px] text-red-400">banni</span>}
-                        {u.newsletterOptOut && <span className="text-[10px] text-gray-400">désabonné</span>}
+                        {u.isBanned && <span className="text-xs text-red-400">banni</span>}
+                        {u.newsletterOptOut && <span className="text-xs text-gray-400">désabonné</span>}
                     </label>
                 ))}
                 {!loading && users.length === 0 && (
@@ -108,7 +108,7 @@ export const RecipientPicker = ({ selectedIds, onChange }: Props) => {
                     type="button"
                     onClick={() => load(users.length, false)}
                     disabled={loading}
-                    className="w-full text-center text-sm text-[#FF4757] font-medium py-2 hover:bg-gray-50 disabled:opacity-50"
+                    className="w-full text-center text-sm text-ochre font-medium py-2 hover:bg-gray-50 disabled:opacity-50"
                 >
                     {loading ? 'Chargement...' : 'Voir plus'}
                 </button>

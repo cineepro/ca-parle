@@ -17,7 +17,7 @@ export const TopNav = () => {
     return (
         <header className="sticky top-0 z-30 bg-white border-b border-gray-100">
             <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-                <Link to="/accueil" className="text-lg font-bold text-[#FF4757]">
+                <Link to="/accueil" className="text-lg font-bold text-ochre">
                     Vanessa
                 </Link>
 
@@ -28,7 +28,7 @@ export const TopNav = () => {
                             key={link.to}
                             to={link.to}
                             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                                isActive(link.to) ? 'bg-[#FF4757]/10 text-[#FF4757]' : 'text-gray-500 hover:bg-gray-50'
+                                isActive(link.to) ? 'bg-brand-tint text-ochre' : 'text-gray-500 hover:bg-gray-50'
                             }`}
                         >
                             {link.label}

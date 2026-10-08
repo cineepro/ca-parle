@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { globalSearchService, type GlobalSearchResults } from '@/features/search/services/globalSearchService';
 import { StoryCard } from '@/features/stories/components/StoryCard';
+import { Search } from 'lucide-react';
 
 export default function SearchPage() {
     const [query, setQuery] = useState('');
@@ -31,14 +32,14 @@ export default function SearchPage() {
     return (
         <div className="px-4 py-6">
             <div className="max-w-2xl mx-auto space-y-5">
-                <h1 className="text-xl font-bold text-gray-800">🔎 Recherche</h1>
+                <h1 className="text-xl font-bold text-gray-800"><Search className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Recherche</h1>
 
                 <input
                     autoFocus
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Rechercher une histoire, une personne, un utilisateur..."
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
 
                 {loading && <p className="text-sm text-gray-400 text-center py-6">Recherche...</p>}
@@ -82,7 +83,7 @@ export default function SearchPage() {
                         <div className="bg-white rounded-2xl divide-y divide-gray-50 overflow-hidden">
                             {results.users.map((u) => (
                                 <div key={u.$id} className="flex items-center gap-3 px-4 py-3">
-                                    <div className="w-8 h-8 rounded-full bg-[#FF4757]/10 text-[#FF4757] flex items-center justify-center font-bold text-xs">
+                                    <div className="w-8 h-8 rounded-full bg-brand-tint text-ochre flex items-center justify-center font-bold text-xs">
                                         {u.name?.charAt(0).toUpperCase() || '?'}
                                     </div>
                                     <span className="text-sm text-gray-700">{u.name}</span>

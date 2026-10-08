@@ -8,6 +8,7 @@ import { dbService } from '@/api/database';
 import { normalizePhone } from '@/utils/phoneValidator';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Smartphone, X } from 'lucide-react';
 
 export const PhoneReminderBanner = () => {
     const { user, refresh } = useAuth();
@@ -37,10 +38,10 @@ export const PhoneReminderBanner = () => {
     };
 
     return (
-        <div className="bg-[#FF4757]/5 border border-[#FF4757]/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="bg-brand-tint border border-brand/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex-1">
                 <p className="text-sm font-medium text-gray-700">
-                    📱 Ajoute ton numéro pour sécuriser ton compte
+                    <Smartphone className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Ajoute ton numéro pour sécuriser ton compte
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
                     Optionnel, mais recommandé.
@@ -63,7 +64,7 @@ export const PhoneReminderBanner = () => {
                     className="text-gray-400 hover:text-gray-600 text-sm px-2"
                     aria-label="Fermer"
                 >
-                    ✕
+                    <X className="w-4 h-4" aria-hidden="true" />
                 </button>
             </div>
             {error && <p className="text-xs text-red-500 sm:ml-2">{error}</p>}

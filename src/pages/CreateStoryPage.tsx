@@ -1,6 +1,7 @@
 // src/pages/CreateStoryPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
 import { CreateStoryForm } from '@/features/stories/components/CreateStoryForm';
+import { Megaphone } from 'lucide-react';
 
 export default function CreateStoryPage() {
     return (
@@ -8,7 +9,7 @@ export default function CreateStoryPage() {
             <div className="max-w-xl mx-auto">
                 <div className="flex items-center gap-3 mb-6">
                     <Link to="/ca-parle" className="text-gray-400 hover:text-gray-600">←</Link>
-                    <h1 className="text-xl font-bold text-gray-800">📢 Publier une histoire</h1>
+                    <h1 className="text-xl font-bold text-gray-800"><Megaphone className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Publier une histoire</h1>
                 </div>
                 <div className="bg-white rounded-3xl p-6">
                     <CreateStoryForm />

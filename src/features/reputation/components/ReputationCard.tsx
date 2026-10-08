@@ -23,7 +23,7 @@ export const ReputationCard = ({ stats, name }: { stats: ReputationStats; name?:
                     </h2>
                 </div>
                 <div className="text-right">
-                    <p className="text-2xl font-bold text-[#FF4757]">{stats.reputationScore}</p>
+                    <p className="text-2xl font-bold text-ochre">{stats.reputationScore}</p>
                     <p className="text-xs text-gray-400">points</p>
                 </div>
             </div>
@@ -37,13 +37,13 @@ export const ReputationCard = ({ stats, name }: { stats: ReputationStats; name?:
                 <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-all ${
-                            stats.reliabilityIndex >= 70 ? 'bg-green-500' : stats.reliabilityIndex >= 40 ? 'bg-orange-400' : 'bg-red-400'
+                            stats.reliabilityIndex >= 70 ? 'bg-green-500' : stats.reliabilityIndex >= 40 ? 'bg-amber-400' : 'bg-red-400'
                         }`}
                         style={{ width: `${stats.reliabilityIndex}%` }}
                     />
                 </div>
                 {stats.predictionsTotal > 0 && (
-                    <p className="text-[11px] text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                         {stats.predictionsCorrect}/{stats.predictionsTotal} prédictions correctes
                     </p>
                 )}
@@ -53,15 +53,15 @@ export const ReputationCard = ({ stats, name }: { stats: ReputationStats; name?:
             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-50 text-center">
                 <div>
                     <p className="text-base font-bold text-gray-700">{stats.storiesCount}</p>
-                    <p className="text-[11px] text-gray-400">Histoires</p>
+                    <p className="text-xs text-gray-400">Histoires</p>
                 </div>
                 <div>
                     <p className="text-base font-bold text-gray-700">{stats.revelationsCount}</p>
-                    <p className="text-[11px] text-gray-400">Révélations</p>
+                    <p className="text-xs text-gray-400">Révélations</p>
                 </div>
                 <div>
                     <p className="text-base font-bold text-gray-700">{stats.commentsCount}</p>
-                    <p className="text-[11px] text-gray-400">Commentaires</p>
+                    <p className="text-xs text-gray-400">Commentaires</p>
                 </div>
             </div>
         </div>

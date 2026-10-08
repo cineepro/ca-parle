@@ -1,5 +1,6 @@
 // src/pages/PrivacyPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 
 export default function PrivacyPage() {
     return (
@@ -8,7 +9,7 @@ export default function PrivacyPage() {
                 <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">← Retour</Link>
 
                 <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-sm">
-                    ⚠️ Ce document est une rédaction complète de la dernière mise à jour.
+                    <AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Ce document est une rédaction complète de la dernière mise à jour.
                 </div>
 
                 <div className="bg-white rounded-3xl p-6 space-y-6 text-sm text-gray-700 leading-relaxed">

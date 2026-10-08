@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { newsletterService } from '../services/newsletterService';
 import { RecipientPicker } from './RecipientPicker';
 import { Button } from '@/components/ui/button';
+import { FlaskConical, Mail } from 'lucide-react';
 
 type Mode = 'all' | 'manual';
 
@@ -61,14 +62,14 @@ export const NewsletterComposer = () => {
 
     return (
         <div className="bg-white rounded-3xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-gray-800">📧 Envoyer une newsletter</h2>
+            <h2 className="text-base font-bold text-gray-800"><Mail className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Envoyer une newsletter</h2>
 
             <input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Objet de l'email"
                 maxLength={150}
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40"
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
             />
 
             <textarea
@@ -76,7 +77,7 @@ export const NewsletterComposer = () => {
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="Contenu du message..."
                 rows={8}
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
             />
 
             {/* Choix des destinataires */}
@@ -87,7 +88,7 @@ export const NewsletterComposer = () => {
                         type="button"
                         onClick={() => setMode('all')}
                         className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium border transition-all ${
-                            mode === 'all' ? 'border-[#FF4757] bg-[#FF4757]/5 text-[#FF4757]' : 'border-gray-200 text-gray-500'
+                            mode === 'all' ? 'border-brand bg-brand-tint text-ochre' : 'border-gray-200 text-gray-500'
                         }`}
                     >
                         Tous les utilisateurs abonnés
@@ -96,7 +97,7 @@ export const NewsletterComposer = () => {
                         type="button"
                         onClick={() => setMode('manual')}
                         className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium border transition-all ${
-                            mode === 'manual' ? 'border-[#FF4757] bg-[#FF4757]/5 text-[#FF4757]' : 'border-gray-200 text-gray-500'
+                            mode === 'manual' ? 'border-brand bg-brand-tint text-ochre' : 'border-gray-200 text-gray-500'
                         }`}
                     >
                         Sélection manuelle
@@ -125,7 +126,7 @@ export const NewsletterComposer = () => {
                     variant="secondary"
                     disabled={!subject.trim() || !body.trim()}
                 >
-                    🧪 M'envoyer un test
+                    <FlaskConical className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> M'envoyer un test
                 </Button>
 
                 {!confirmOpen ? (

@@ -111,7 +111,7 @@ export default function ImportOsmPage() {
                             <button
                                 key={r.value}
                                 onClick={() => setRadius(r.value)}
-                                className={`text-xs font-semibold rounded-full px-3 py-1.5 ${radius === r.value ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-500'}`}
+                                className={`text-xs font-semibold rounded-full px-3 py-1.5 ${radius === r.value ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-500'}`}
                             >
                                 {r.label}
                             </button>
@@ -124,7 +124,7 @@ export default function ImportOsmPage() {
                             <button
                                 key={c.slug}
                                 onClick={() => setCategory(c.slug)}
-                                className={`text-xs font-semibold rounded-full px-3 py-1.5 ${category === c.slug ? 'bg-[#FF4757] text-white' : 'bg-gray-100 text-gray-500'}`}
+                                className={`text-xs font-semibold rounded-full px-3 py-1.5 ${category === c.slug ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-500'}`}
                             >
                                 {c.label}
                             </button>
@@ -134,7 +134,7 @@ export default function ImportOsmPage() {
                     <button
                         onClick={handleSearch}
                         disabled={lat === null || searching}
-                        className="w-full bg-[#FF4757] hover:bg-[#e63e4d] disabled:opacity-40 text-white font-semibold text-sm py-3 rounded-2xl"
+                        className="w-full bg-brand hover:bg-brand-hover disabled:opacity-40 text-ink font-semibold text-sm py-3 rounded-2xl"
                     >
                         {searching ? 'Recherche en cours...' : lat === null ? 'Choisis un point sur la carte' : 'Chercher sur OpenStreetMap'}
                     </button>
@@ -145,7 +145,7 @@ export default function ImportOsmPage() {
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-bold text-gray-800">2. Relecture ({candidates.length} en attente)</h2>
-                        <button onClick={loadCandidates} className="text-xs font-semibold text-[#FF4757]">Actualiser</button>
+                        <button onClick={loadCandidates} className="text-xs font-semibold text-ochre">Actualiser</button>
                     </div>
 
                     {loadingList ? (
@@ -181,7 +181,7 @@ export default function ImportOsmPage() {
                                             <button
                                                 onClick={() => accept(c, true)}
                                                 disabled={busyId === c.$id}
-                                                className="flex-1 text-xs font-bold text-white bg-[#FF4757] rounded-full py-2 disabled:opacity-50"
+                                                className="flex-1 text-xs font-bold text-ink bg-brand rounded-full py-2 disabled:opacity-50"
                                             >
                                                 Enregistrer et accepter
                                             </button>
@@ -198,14 +198,14 @@ export default function ImportOsmPage() {
                                                     {c.quartier ? ` · ${c.quartier}` : ''}
                                                     {c.phone ? ` · ${c.phone}` : ''}
                                                 </p>
-                                                {c.addressHint && <p className="text-[11px] text-gray-300">{c.addressHint}</p>}
+                                                {c.addressHint && <p className="text-xs text-gray-300">{c.addressHint}</p>}
                                             </div>
                                         </div>
                                         <div className="flex gap-2 mt-3">
                                             <button
                                                 onClick={() => accept(c, false)}
                                                 disabled={busyId === c.$id}
-                                                className="text-xs font-bold text-white bg-[#FF4757] hover:bg-[#e63e4d] rounded-full px-3.5 py-1.5 disabled:opacity-50"
+                                                className="text-xs font-bold text-ink bg-brand hover:bg-brand-hover rounded-full px-3.5 py-1.5 disabled:opacity-50"
                                             >
                                                 Accepter
                                             </button>

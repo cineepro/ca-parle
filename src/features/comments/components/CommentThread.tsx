@@ -4,6 +4,7 @@ import { useComments } from '../hooks/useComments';
 import { CommentForm } from './CommentForm';
 import { CommentItem } from './CommentItem';
 import type { CommentType } from '../services/commentService';
+import { MessageCircle } from 'lucide-react';
 
 interface Props {
     storyId: string;
@@ -25,7 +26,7 @@ export const CommentThread = ({ storyId }: Props) => {
     return (
         <div className="space-y-5">
             <h2 className="text-sm font-bold text-gray-700">
-                💬 {topLevel.length + Object.values(repliesByParent).flat().length} commentaires
+                <MessageCircle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {topLevel.length + Object.values(repliesByParent).flat().length} commentaires
             </h2>
 
             <CommentForm onSubmit={handleMainSubmit} posting={posting} />

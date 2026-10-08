@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { CommentType } from '../services/commentService';
 import { Button } from '@/components/ui/button';
+import { EyeOff, MessageCircle, MessageSquare, Zap, type LucideIcon } from 'lucide-react';
 
 interface Props {
     onSubmit: (content: string, type: CommentType, isAnonymous: boolean) => void;
@@ -10,10 +11,10 @@ interface Props {
     compact?: boolean;
 }
 
-const TYPE_OPTIONS: { value: CommentType; label: string; icon: string }[] = [
-    { value: 'commentaire', label: 'Commentaire', icon: '💬' },
-    { value: 'temoignage', label: 'Témoignage', icon: '🗣️' },
-    { value: 'revelation', label: 'Révélation', icon: '💥' },
+const TYPE_OPTIONS: { value: CommentType; label: string; Icon: LucideIcon }[] = [
+    { value: 'commentaire', label: 'Commentaire', Icon: MessageCircle },
+    { value: 'temoignage', label: 'Témoignage', Icon: MessageSquare },
+    { value: 'revelation', label: 'Révélation', Icon: Zap },
 ];
 
 export const CommentForm = ({ onSubmit, posting, placeholder = 'Dis ce que tu en penses...', compact = false }: Props) => {
@@ -39,11 +40,11 @@ export const CommentForm = ({ onSubmit, posting, placeholder = 'Dis ce que tu en
                             onClick={() => setType(opt.value)}
                             className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-all ${
                                 type === opt.value
-                                    ? 'border-[#FF4757] bg-[#FF4757]/5 text-[#FF4757]'
+                                    ? 'border-brand bg-brand-tint text-ochre'
                                     : 'border-gray-200 text-gray-500 hover:border-gray-300'
                             }`}
                         >
-                            <span>{opt.icon}</span>
+                            <opt.Icon className="w-4 h-4" aria-hidden="true" />
                             {opt.label}
                         </button>
                     ))}
@@ -57,7 +58,7 @@ export const CommentForm = ({ onSubmit, posting, placeholder = 'Dis ce que tu en
                     placeholder={placeholder}
                     rows={compact ? 1 : 2}
                     maxLength={1000}
-                    className="flex-1 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF4757]/40 resize-none"
+                    className="flex-1 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                 />
                 <Button type="submit" size="sm" isLoading={posting} disabled={!content.trim()}>
                     Envoyer
@@ -70,9 +71,9 @@ export const CommentForm = ({ onSubmit, posting, placeholder = 'Dis ce que tu en
                         type="checkbox"
                         checked={isAnonymous}
                         onChange={(e) => setIsAnonymous(e.target.checked)}
-                        className="w-3.5 h-3.5 accent-[#FF4757] cursor-pointer"
+                        className="w-3.5 h-3.5 accent-brand cursor-pointer"
                     />
-                    🕵️ Rester anonyme
+                    <EyeOff className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Rester anonyme
                 </label>
             )}
         </form>

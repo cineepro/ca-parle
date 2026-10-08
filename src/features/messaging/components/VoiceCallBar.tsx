@@ -16,10 +16,10 @@ const PHASE_LABEL: Record<VoicePhase, string> = {
 const PHASE_DOT: Record<VoicePhase, string> = {
     off: 'bg-gray-300',
     paused: 'bg-gray-400',
-    listening: 'bg-blue-400',
+    listening: 'bg-sky-300',
     recording: 'bg-red-500',
     processing: 'bg-amber-400',
-    speaking: 'bg-[#FF4757]',
+    speaking: 'bg-brand',
 };
 
 interface Props {
@@ -39,7 +39,7 @@ export const VoiceCallBar = ({ phase, notice, micError, sendError, userLine, van
         {(userLine || vanessaLine) && (
             <div className="space-y-1">
                 {userLine && <p className="text-xs text-gray-500 line-clamp-2"><span className="font-semibold">Toi — </span>{userLine}</p>}
-                {vanessaLine && <p className="text-sm text-gray-800 line-clamp-3"><span className="font-semibold text-[#FF4757]">Vanessa — </span>{vanessaLine}</p>}
+                {vanessaLine && <p className="text-sm text-gray-800 line-clamp-3"><span className="font-semibold text-ochre">Vanessa — </span>{vanessaLine}</p>}
             </div>
         )}
 
@@ -52,12 +52,12 @@ export const VoiceCallBar = ({ phase, notice, micError, sendError, userLine, van
             </span>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800">{PHASE_LABEL[phase]}</p>
-                <p className="text-[11px] text-gray-400">
+                <p className="text-xs text-gray-400">
                     {phase === 'paused' ? "Rien n'est écouté ni envoyé." : 'Parle normalement, fais une pause : elle te répond.'}
                 </p>
             </div>
             {phase === 'paused' ? (
-                <button onClick={onResume} className="shrink-0 rounded-full bg-[#FF4757] hover:bg-[#e63e4d] text-white text-xs font-bold px-4 py-2.5">
+                <button onClick={onResume} className="shrink-0 rounded-full bg-brand hover:bg-brand-hover text-ink text-xs font-bold px-4 py-2.5">
                     Reprendre
                 </button>
             ) : (

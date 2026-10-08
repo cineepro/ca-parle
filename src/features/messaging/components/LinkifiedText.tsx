@@ -10,8 +10,8 @@ export const LinkifiedText = ({ text, isMine }: { text: string; isMine: boolean 
     const tokens = useMemo(() => tokenizeLinks(text, { ownHost: OWN_HOST }), [text]);
 
     const linkClass = isMine
-        ? 'underline underline-offset-2 decoration-white/60 hover:decoration-white break-all'
-        : 'text-[#FF4757] underline underline-offset-2 decoration-[#FF4757]/40 hover:decoration-[#FF4757] break-all';
+        ? 'underline underline-offset-2 decoration-ink/50 hover:decoration-ink break-all'
+        : 'text-ochre underline underline-offset-2 decoration-ochre/40 hover:decoration-ochre break-all';
 
     return (
         <>

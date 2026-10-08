@@ -23,7 +23,7 @@ export const PriceTicker = ({ prices }: Props) => {
     const renderItem = (p: MarketPrice, i: number) => (
         <span key={`${p.$id}-${i}`} className="text-xs text-gray-600 flex items-center gap-1.5 px-2 shrink-0">
             <span className="font-semibold text-gray-800">{p.item}</span>
-            <span className="text-[#FF4757] font-bold">
+            <span className="text-ochre font-bold">
                 {p.price.toLocaleString('fr-FR')} F{p.unit ? `/${p.unit}` : ''}
             </span>
             {p.quartier && <span className="text-gray-400">· {p.quartier}</span>}

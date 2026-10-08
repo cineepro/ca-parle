@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { vanessaKnowledgeService, type MyConnectorUsage } from '@/features/vanessa/services/vanessaKnowledgeService';
+import { Handshake, Lock } from 'lucide-react';
 
 export default function PartnerSpacePage() {
     const [connector, setConnector] = useState<MyConnectorUsage | null | undefined>(undefined);
@@ -18,14 +19,14 @@ export default function PartnerSpacePage() {
         <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
             <div className="flex items-center gap-3">
                 <Link to="/profil" className="text-gray-400 hover:text-gray-600">←</Link>
-                <h1 className="text-xl font-bold text-gray-800">🤝 Espace partenaire</h1>
+                <h1 className="text-xl font-bold text-gray-800"><Handshake className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Espace partenaire</h1>
             </div>
 
             {connector === undefined ? (
                 <p className="text-sm text-gray-400 text-center py-10">Chargement...</p>
             ) : connector === null ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center space-y-2">
-                    <div className="text-3xl">🔒</div>
+                    <div className=""><Lock className="w-9 h-9 text-ochre mx-auto" aria-hidden="true" /></div>
                     <p className="text-sm text-gray-500">
                         Aucun connecteur partenaire n'est associé à ton compte. Si tu penses que c'est une erreur,
                         contacte l'équipe Vanessa.
@@ -57,7 +58,7 @@ export default function PartnerSpacePage() {
                         <div>
                             <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div
-                                    className={`h-full rounded-full ${percent >= 95 ? 'bg-red-500' : percent >= 90 ? 'bg-amber-400' : 'bg-[#FF4757]'}`}
+                                    className={`h-full rounded-full ${percent >= 95 ? 'bg-red-500' : percent >= 90 ? 'bg-amber-400' : 'bg-brand'}`}
                                     style={{ width: `${percent}%` }}
                                 />
                             </div>

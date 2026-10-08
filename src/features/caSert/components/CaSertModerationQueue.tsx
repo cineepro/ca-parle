@@ -4,6 +4,7 @@ import { moderateCaSertService } from '../services/moderateCaSertService';
 import type { Spot, MarketPrice } from '../services/caSertService';
 import { SPOT_CATEGORIES } from '../config/categories';
 import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
 
 export const CaSertModerationQueue = () => {
     const [spots, setSpots] = useState<Spot[]>([]);
@@ -55,7 +56,7 @@ export const CaSertModerationQueue = () => {
     if (total === 0) {
         return (
             <div className="bg-white rounded-3xl p-8 text-center text-gray-400">
-                <div className="text-3xl mb-2">✨</div>
+                <div className="mb-2"><Sparkles className="w-9 h-9 text-ochre mx-auto" aria-hidden="true" /></div>
                 <p className="text-sm">Rien en attente sur Ça sert pour l'instant.</p>
             </div>
         );
@@ -68,7 +69,7 @@ export const CaSertModerationQueue = () => {
                 return (
                     <div key={spot.$id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-purple-600 bg-purple-50 rounded-full px-2.5 py-1">Lieu/service</span>
+                            <span className="text-xs font-semibold text-brun bg-sand rounded-full px-2.5 py-1">Lieu/service</span>
                             <span className="text-xs text-gray-400">{category?.label}</span>
                         </div>
                         <p className="text-sm font-semibold text-gray-800">{spot.name}</p>
@@ -94,7 +95,7 @@ export const CaSertModerationQueue = () => {
                 <div key={price.$id} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
                     <span className="text-xs font-semibold text-amber-600 bg-amber-50 rounded-full px-2.5 py-1">Prix</span>
                     <p className="text-sm font-semibold text-gray-800">
-                        {price.item} — <span className="text-[#FF4757]">{price.price.toLocaleString('fr-FR')} F{price.unit ? `/${price.unit}` : ''}</span>
+                        {price.item} — <span className="text-ochre">{price.price.toLocaleString('fr-FR')} F{price.unit ? `/${price.unit}` : ''}</span>
                     </p>
                     <p className="text-xs text-gray-400">{price.quartier}{price.quartier && price.country ? ' · ' : ''}{price.country}</p>
                     <p className="text-xs text-gray-300">Par {price.authorId}</p>

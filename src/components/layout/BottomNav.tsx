@@ -24,8 +24,8 @@ export const BottomNav = () => {
                     <Link
                         key={tab.to}
                         to={tab.to}
-                        className={`flex-1 text-center py-1 text-[11px] font-semibold ${
-                            isActive(tab.to) ? 'text-[#FF4757]' : 'text-gray-400'
+                        className={`flex-1 text-center py-1 text-xs font-semibold ${
+                            isActive(tab.to) ? 'text-ochre' : 'text-gray-400'
                         }`}
                     >
                         {tab.label}

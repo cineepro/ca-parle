@@ -43,8 +43,8 @@ export const ConversationListItem = ({ conversation, otherName }: ConversationWi
                 </p>
             </div>
             <div className="shrink-0 flex flex-col items-end gap-1.5">
-                <span className={`text-[11px] ${unread ? 'text-[#FF4757] font-semibold' : 'text-gray-300'}`}>{timeAgo(conversation.lastMessageAt)}</span>
-                {unread && <span className="w-2.5 h-2.5 rounded-full bg-[#FF4757]" aria-label="Message non lu" />}
+                <span className={`text-xs ${unread ? 'text-ochre font-semibold' : 'text-gray-300'}`}>{timeAgo(conversation.lastMessageAt)}</span>
+                {unread && <span className="w-2.5 h-2.5 rounded-full bg-brand" aria-label="Message non lu" />}
             </div>
         </Link>
     );

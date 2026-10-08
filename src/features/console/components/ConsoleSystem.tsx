@@ -33,7 +33,7 @@ export const ConsoleSystem = () => {
                     {updatedAt ? `Mis à jour ${timeAgo(updatedAt)} — ` : ''}
                     {loading ? '' : withProblems === 0 ? 'aucun plantage sur 24 h' : `${withProblems} Function(s) avec des plantages sur 24 h`}
                 </p>
-                <button onClick={load} disabled={loading} className="text-xs font-semibold text-[#FF4757] disabled:opacity-50">
+                <button onClick={load} disabled={loading} className="text-xs font-semibold text-ochre disabled:opacity-50">
                     {loading ? 'Analyse...' : 'Actualiser'}
                 </button>
             </div>
@@ -53,7 +53,7 @@ export const ConsoleSystem = () => {
                         <div key={f.id} className={`rounded-2xl border p-4 ${bad ? 'bg-red-50/50 border-red-100' : 'bg-white border-gray-100'}`}>
                             <div className="flex items-center justify-between gap-3">
                                 <p className="text-sm font-semibold text-gray-800">{f.name}</p>
-                                <div className="flex items-center gap-3 text-[11px] text-gray-400 shrink-0">
+                                <div className="flex items-center gap-3 text-xs text-gray-400 shrink-0">
                                     {f.timeout !== undefined && <span>timeout {f.timeout} s</span>}
                                     <span>{f.total24h ?? 0} exéc. / 24 h</span>
                                     {bad
@@ -68,7 +68,7 @@ export const ConsoleSystem = () => {
                                         Dernier problème {timeAgo(f.lastProblem.at)} — statut {f.lastProblem.status}
                                         {f.lastProblem.statusCode ? ` (${f.lastProblem.statusCode})` : ''}, durée {f.lastProblem.durationSeconds} s
                                     </p>
-                                    {f.lastProblem.error && <p className="font-mono text-[11px] text-red-600 break-words">{f.lastProblem.error}</p>}
+                                    {f.lastProblem.error && <p className="font-mono text-xs text-red-600 break-words">{f.lastProblem.error}</p>}
                                 </div>
                             )}
                         </div>

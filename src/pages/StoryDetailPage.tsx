@@ -20,6 +20,7 @@ import type { Reference } from '@/features/references/services/referenceService'
 import { ReportButton } from '@/features/moderation/components/ReportButton';
 import { ShareButton } from '@/features/stories/components/ShareButton';
 import { conversationService } from '@/features/messaging/services/conversationService';
+import { Eye, Sparkles } from 'lucide-react';
 
 export default function StoryDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -60,7 +61,7 @@ export default function StoryDetailPage() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <svg className="animate-spin w-8 h-8 text-[#FF4757]" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin w-8 h-8 text-ochre" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
@@ -72,7 +73,7 @@ export default function StoryDetailPage() {
         return (
             <div className="min-h-screen flex items-center justify-center flex-col gap-3">
                 <p className="text-gray-500">{error}</p>
-                <Link to="/ca-parle" className="text-[#FF4757] font-semibold hover:underline">Retour au fil</Link>
+                <Link to="/ca-parle" className="text-ochre font-semibold hover:underline">Retour au fil</Link>
             </div>
         );
     }
@@ -107,15 +108,15 @@ export default function StoryDetailPage() {
                     <h1 className="text-2xl font-bold text-gray-800 mb-2 leading-snug">{story.title}</h1>
 
                     <p className="text-sm text-gray-400 mb-4 flex items-center gap-2">
-                        {story.isAnonymous ? '🕵️ Publié anonymement' : `Par ${story.authorName || 'Utilisateur'}`}
+                        {story.isAnonymous ? 'Publié anonymement' : `Par ${story.authorName || 'Utilisateur'}`}
                         {canMessageAuthor && (
                             <button
                                 type="button"
                                 onClick={handleMessageAuthor}
                                 disabled={startingChat}
-                                className="text-[#FF4757] font-medium hover:underline disabled:opacity-50"
+                                className="text-ochre font-medium hover:underline disabled:opacity-50"
                             >
-                                {startingChat ? 'Ouverture...' : '✉️ Message'}
+                                {startingChat ? 'Ouverture...' : 'Message'}
                             </button>
                         )}
                     </p>
@@ -137,7 +138,7 @@ export default function StoryDetailPage() {
                     )}
 
                     <div className="flex items-center gap-4 mt-6 mb-4 text-sm text-gray-400">
-                        <span>👀 {story.viewCount} vues</span>
+                        <span><Eye className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> {story.viewCount} vues</span>
                         <span className="ml-auto">
                             <ShareButton storyId={story.$id} title={story.title} />
                         </span>
@@ -169,7 +170,7 @@ function PredictionsSection({ storyId, isStoryAuthor }: { storyId: string; isSto
 
     return (
         <div className="space-y-3">
-            <h2 className="text-sm font-bold text-gray-700">🔮 Prédictions</h2>
+            <h2 className="text-sm font-bold text-gray-700"><Sparkles className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Prédictions</h2>
 
             {predictions.length === 0 && (
                 <p className="text-sm text-gray-400">Aucune prédiction lancée sur cette histoire.</p>
