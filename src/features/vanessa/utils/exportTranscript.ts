@@ -4,7 +4,7 @@
 // elles n'alourdissent donc pas le reste de l'application.
 import { databases } from '@/api/appwrite';
 import { DATABASE_ID, COLLECTIONS } from '@/api/auth';
-import { Query } from 'appwrite';
+import { Query, type Models } from 'appwrite';
 
 export type ExportFormat = 'pdf' | 'docx';
 
@@ -53,14 +53,14 @@ export async function fetchAllMessages(conversationId: string): Promise<RawMessa
     let cursor: string | null = null;
     // Garde-fou : 100 pages × 100 = 10 000 messages maximum.
     for (let page = 0; page < 100; page++) {
-        const queries = [
+        const queries: string[] = [
             Query.equal('conversationId', conversationId),
             Query.orderAsc('createdAt'),
             Query.limit(100),
             ...(cursor ? [Query.cursorAfter(cursor)] : []),
         ];
-        const result = await databases.listDocuments<any>(DATABASE_ID, COLLECTIONS.MESSAGES, queries);
-        all.push(...(result.documents as RawMessage[]));
+        const result: Models.DocumentList<Models.Document> = await databases.listDocuments(DATABASE_ID, COLLECTIONS.MESSAGES, queries);
+        all.push(...(result.documents as unknown as RawMessage[]));
         if (result.documents.length < 100) break;
         cursor = result.documents[result.documents.length - 1].$id;
     }
