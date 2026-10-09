@@ -12,4 +12,4 @@ export const LIVE_CALL_ENABLED = false;
 
 /** Lien "Émissions" dans la barre latérale (réservé aux modérateurs).
  *  La page /emissions reste accessible directement par son adresse. */
-export const EMISSIONS_ENABLED = false;
+export const EMISSIONS_ENABLED = true;
