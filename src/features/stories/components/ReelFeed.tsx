@@ -2,7 +2,7 @@
 // Le fil plein écran : une histoire par écran, défilement vertical qui
 // "s'aimante" sur chaque histoire (comme TikTok). Le classement vient de
 // l'algorithme (utils/feedRanking.ts).
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Ear, RefreshCw } from 'lucide-react';
 import { useStoryFeed } from '../hooks/useStoryFeed';
 import { StoryReel } from './StoryReel';
@@ -24,8 +24,15 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
     const filterKey = `${categorySlug}|${countrySlug}`;
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const [activeIndex, setActiveIndex] = useState(0);
+    // Au retour d'une histoire, on repart de la position mémorisée (et non du
+    // haut) : l'index de départ est calculé dès le premier affichage.
+    const [activeIndex, setActiveIndex] = useState(() => {
+        const savedId = LAST_ACTIVE.get(filterKey);
+        const index = savedId ? stories.findIndex((s) => s.$id === savedId) : -1;
+        return index >= 0 ? index : 0;
+    });
     const restored = useRef(false);
+    const previousFilter = useRef(filterKey);
 
     // Quelle histoire est à l'écran ? (celle dont plus de 60 % est visible)
     useEffect(() => {
@@ -47,27 +54,31 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
         return () => observer.disconnect();
     }, [stories.length]);
 
-    // Retour d'une histoire : on revient exactement où on était.
-    useEffect(() => {
-        if (restored.current || stories.length === 0) return;
-        restored.current = true;
-        const id = LAST_ACTIVE.get(filterKey);
-        if (!id) return;
-        const el = containerRef.current?.querySelector<HTMLElement>(`[data-story="${id}"]`);
-        if (el) {
-            const root = containerRef.current!;
-            root.style.scrollBehavior = 'auto';
-            root.scrollTop = el.offsetTop;
-            root.style.scrollBehavior = '';
-        }
-    }, [stories.length, filterKey]);
-
-    // Nouveau filtre : on repart du début.
-    useEffect(() => {
+    // Changement de pays / catégorie : on repart du début (mais pas au simple
+    // retour sur la page, où le filtre est le même qu'avant).
+    useLayoutEffect(() => {
+        if (previousFilter.current === filterKey) return;
+        previousFilter.current = filterKey;
+        LAST_ACTIVE.delete(filterKey);
         restored.current = false;
         setActiveIndex(0);
         if (containerRef.current) containerRef.current.scrollTop = 0;
     }, [filterKey]);
+
+    // Retour d'une histoire : on remet le fil exactement où il était, avant
+    // l'affichage (useLayoutEffect = aucun saut visible, aucun défilement animé).
+    useLayoutEffect(() => {
+        const root = containerRef.current;
+        if (restored.current || !root || stories.length === 0) return;
+        restored.current = true;
+        const id = LAST_ACTIVE.get(filterKey);
+        if (!id) return;
+        const el = root.querySelector<HTMLElement>(`[data-story="${id}"]`);
+        if (!el) return;
+        root.style.scrollBehavior = 'auto';
+        root.scrollTop = el.offsetTop;
+        root.style.scrollBehavior = '';
+    }, [stories.length, filterKey]);
 
     // Histoire à l'écran : on mémorise sa position, puis après un court
     // moment on la compte comme vue (une seule fois) et on affine le profil.
@@ -112,8 +123,8 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
 
     if (loading) {
         return (
-            <div role="status" className="h-full flex items-center justify-center bg-ink text-white">
-                <svg className="animate-spin w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <div role="status" className="h-full flex items-center justify-center bg-cream text-ink">
+                <svg className="animate-spin w-8 h-8 text-ochre" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
@@ -124,7 +135,7 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
 
     if (error) {
         return (
-            <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 bg-ink px-8 text-center text-white">
+            <div role="alert" className="h-full flex flex-col items-center justify-center gap-4 bg-cream px-8 text-center text-ink">
                 <p className="text-lg">{error}</p>
                 <Button onClick={handleRefresh}>Réessayer</Button>
             </div>
@@ -133,10 +144,10 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
 
     if (stories.length === 0) {
         return (
-            <div className="h-full flex flex-col items-center justify-center gap-3 bg-ink px-8 text-center text-white">
-                <Ear className="w-12 h-12 text-brand" aria-hidden="true" />
+            <div className="h-full flex flex-col items-center justify-center gap-3 bg-cream px-8 text-center text-ink">
+                <Ear className="w-12 h-12 text-ochre" aria-hidden="true" />
                 <p className="text-xl font-display font-semibold">Rien ne se raconte encore ici.</p>
-                <p className="text-white/80">Sois le premier à lancer une histoire !</p>
+                <p className="text-gray-600">Sois le premier à lancer une histoire !</p>
             </div>
         );
     }
@@ -150,7 +161,7 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
                 aria-label="Histoires"
                 tabIndex={0}
                 onKeyDown={handleKeyDown}
-                className="h-full overflow-y-scroll snap-y snap-mandatory overscroll-y-contain motion-safe:scroll-smooth scrollbar-hide focus-visible:outline-brand"
+                className="h-full overflow-y-scroll snap-y snap-mandatory overscroll-y-contain motion-safe:scroll-smooth scrollbar-hide focus-visible:outline-ink"
             >
                 {stories.map((story, index) => (
                     <div
@@ -164,13 +175,13 @@ export const ReelFeed = ({ categorySlug, countrySlug }: { categorySlug: string; 
                 ))}
 
                 {/* Fin du fil */}
-                <div className="h-full w-full snap-start snap-always flex flex-col items-center justify-center gap-4 bg-ink px-8 text-center text-white">
+                <div className="h-full w-full snap-start snap-always flex flex-col items-center justify-center gap-4 bg-cream px-8 text-center text-ink">
                     {hasMore ? (
-                        <span role="status" className="text-white/80">Chargement de la suite…</span>
+                        <span role="status" className="text-gray-600">Chargement de la suite…</span>
                     ) : (
                         <>
                             <p className="font-display text-2xl font-semibold">Tu es à jour !</p>
-                            <p className="text-white/80">Tu as vu toutes les histoires du moment.</p>
+                            <p className="text-gray-600">Tu as vu toutes les histoires du moment.</p>
                             <Button onClick={handleRefresh}>
                                 <RefreshCw className="w-4 h-4" aria-hidden="true" /> Actualiser
                             </Button>
