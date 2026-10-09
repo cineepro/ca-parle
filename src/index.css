@@ -35,3 +35,14 @@
         color: theme('colors.ink');
     }
 }
+
+@layer utilities {
+    /* Masque la barre de défilement (chips de catégories, fil plein écran). */
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+}

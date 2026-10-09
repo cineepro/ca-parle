@@ -3,7 +3,7 @@
 // "Tu y crois ?", commentaires et chronologie seront branchés à l'étape
 // suivante (features reactions/comments/predictions).
 import { useEffect, useState, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { storyService, getStoryImageUrl, type Story } from '@/features/stories/services/storyService';
 import { StoryTypeBadge } from '@/features/stories/components/StoryTypeBadge';
 import { StoryStatusBadge } from '@/features/stories/components/StoryStatusBadge';
@@ -21,11 +21,13 @@ import { ReportButton } from '@/features/moderation/components/ReportButton';
 import { ShareButton } from '@/features/stories/components/ShareButton';
 import { conversationService } from '@/features/messaging/services/conversationService';
 import { Eye, Sparkles } from 'lucide-react';
+import { claimView } from '@/features/stories/utils/feedRanking';
 
 export default function StoryDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [story, setStory] = useState<Story | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,8 @@ export default function StoryDetailPage() {
 
                 if (!viewCounted.current) {
                     viewCounted.current = true;
-                    storyService.incrementView(id);
+                    // Déjà comptée si la personne l'a vue dans le fil plein écran.
+                    if (claimView(id)) storyService.incrementView(id);
                 }
             } catch {
                 setError('Cette histoire est introuvable.');
@@ -57,6 +60,12 @@ export default function StoryDetailPage() {
 
         load();
     }, [id]);
+
+    // Arrivée depuis le bouton « commentaires » du fil : on descend aux commentaires.
+    useEffect(() => {
+        if (loading || !story || location.hash !== '#commentaires') return;
+        document.getElementById('commentaires')?.scrollIntoView({ block: 'start' });
+    }, [loading, story, location.hash]);
 
     if (loading) {
         return (
@@ -157,7 +166,7 @@ export default function StoryDetailPage() {
                     <StoryTimeline storyId={story.$id} isStoryAuthor={user?.$id === story.authorId} />
                 </div>
 
-                <div className="bg-white rounded-3xl p-6">
+                <div id="commentaires" className="bg-white rounded-3xl p-6 scroll-mt-20">
                     <CommentThread storyId={story.$id} />
                 </div>
             </div>
