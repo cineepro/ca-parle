@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { emissionService, type Emission } from '@/features/vanessa/services/emissionService';
+import { exportEmissionTranscript, type ExportFormat } from '@/features/vanessa/utils/exportTranscript';
+import { VANESSA_USER_ID } from '@/api/constants';
 
 const POSTURE_PRESETS = [
     { label: 'Débat', value: 'Débat — cherche à confronter, challenger, pousser l\u2019invité dans ses retranchements, défendre un point de vue clair.' },
@@ -28,6 +30,9 @@ export default function EmissionsPage() {
     const [customPosture, setCustomPosture] = useState('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Téléchargement de la discussion d'une émission déjà enregistrée (PDF ou Word).
+    const [exportingKey, setExportingKey] = useState<string | null>(null);
+    const [exportError, setExportError] = useState<string | null>(null);
 
     const load = async () => {
         setLoading(true);
@@ -60,6 +65,24 @@ export default function EmissionsPage() {
             setError(err.message || "Impossible de créer l'émission.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleExport = async (emission: Emission, format: ExportFormat) => {
+        if (exportingKey) return;
+        setExportingKey(`${emission.$id}:${format}`);
+        setExportError(null);
+        try {
+            await exportEmissionTranscript({
+                format,
+                meta: { title: emission.title, guestName: emission.guestName, topic: emission.topic, posture: emission.posture, date: emission.createdAt },
+                vanessaId: VANESSA_USER_ID,
+                conversationId: emission.conversationId,
+            });
+        } catch (err: any) {
+            setExportError(err?.message || 'Impossible de préparer le fichier.');
+        } finally {
+            setExportingKey(null);
         }
     };
 
@@ -164,6 +187,8 @@ export default function EmissionsPage() {
                     </form>
                 )}
 
+                {exportError && <p className="text-xs text-red-500">{exportError}</p>}
+
                 {loading ? (
                     <p className="text-sm text-gray-400 text-center py-8">Chargement...</p>
                 ) : emissions.length === 0 ? (
@@ -180,13 +205,24 @@ export default function EmissionsPage() {
                                 </div>
                                 {emission.guestName && <p className="text-xs text-gray-400 mb-1">Invité : {emission.guestName}</p>}
                                 <p className="text-xs text-gray-500 mb-3">{emission.topic}</p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <Link
                                         to={`/emissions/${emission.conversationId}/enregistrement`}
                                         className="text-xs font-semibold text-ochre bg-brand-tint rounded-full px-3 py-1.5"
                                     >
                                         Ouvrir l'enregistrement
                                     </Link>
+                                    {(['pdf', 'docx'] as const).map((format) => (
+                                        <button
+                                            key={format}
+                                            onClick={() => handleExport(emission, format)}
+                                            disabled={!!exportingKey}
+                                            className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 disabled:opacity-50"
+                                            title="Télécharger la discussion de cette émission"
+                                        >
+                                            {exportingKey === `${emission.$id}:${format}` ? 'Préparation...' : format === 'pdf' ? '⬇ PDF' : '⬇ Word'}
+                                        </button>
+                                    ))}
                                     {(['préparé', 'enregistré', 'publié'] as const).filter((s) => s !== emission.status).map((s) => (
                                         <button
                                             key={s}

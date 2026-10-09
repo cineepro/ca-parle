@@ -13,6 +13,8 @@ function fcfaToTokens(fcfa: number): number {
 
 const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#F5C032', description: '', instructions: '', model: '' as ConnectorModel };
 const MAX_INSTRUCTIONS = 4000;
+// Connecteur « Mon cahier » : créé automatiquement, toujours en tête (voir manage-vanessa-knowledge).
+const NOTEBOOK_CONNECTOR_ID = 'mon-cahier';
 
 // Trame à remplir : plus court et plus clair qu'un texte libre, et ça évite que
 // Vanessa reçoive des consignes contradictoires ou trop vagues.
@@ -532,9 +534,13 @@ export const VanessaConnectorManager = () => {
                                     <button onClick={() => toggleActive(c)} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">
                                         {c.active ? 'Désactiver' : 'Activer'}
                                     </button>
-                                    <button onClick={() => remove(c.$id)} className="text-xs text-red-400 hover:text-red-600 shrink-0">
-                                        Supprimer
-                                    </button>
+                                    {c.$id === NOTEBOOK_CONNECTOR_ID ? (
+                                        <span className="text-xs text-gray-300 shrink-0" title="Connecteur par défaut : on peut le désactiver, pas le supprimer">Par défaut</span>
+                                    ) : (
+                                        <button onClick={() => remove(c.$id)} className="text-xs text-red-400 hover:text-red-600 shrink-0">
+                                            Supprimer
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Jauge de consommation — seulement si ce connecteur est facturé

@@ -266,6 +266,12 @@ export default function ConversationPage() {
                         {activeConnector && (
                             <p className="text-xs font-medium" style={{ color: activeConnector.color }}>
                                 {activeConnector.icon} {activeConnector.description || activeConnector.name}
+                                {activeConnector.$id === 'mon-cahier' && (
+                                    <>
+                                        {' · '}
+                                        <Link to="/cahier" className="underline">Ouvrir mon cahier</Link>
+                                    </>
+                                )}
                             </p>
                         )}
                     </div>

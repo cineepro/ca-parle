@@ -239,6 +239,7 @@ export const Sidebar = () => {
 
     const vanessaEtToi: NavItem[] = [
         { to: '/profil', label: 'Profil' },
+        { to: '/cahier', label: 'Mon cahier' },
         { to: '/memoire', label: 'Ce que Vanessa garde sur toi' },
         { to: '/espace-partenaire', label: 'Espace partenaire' },
         { to: '/mes-references', label: 'Mes références suivies' },

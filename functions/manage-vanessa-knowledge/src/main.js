@@ -41,6 +41,42 @@ const CONNECTOR_MODELS = ['', 'haiku', 'sonnet']; // '' = modèle par défaut de
 const cleanInstructions = (v) => String(v ?? '').replace(/\r\n/g, '\n').trim().slice(0, MAX_INSTRUCTIONS_CHARS);
 const cleanModel = (v) => (CONNECTOR_MODELS.includes(v) ? v : '');
 
+// Connecteur "Mon cahier" : créé automatiquement, toujours en tête de liste, base de
+// connaissances = le cahier de notes de CHAQUE utilisateur (voir send-message). L'identifiant
+// est fixe pour que send-message le reconnaisse sans attribut supplémentaire.
+const NOTEBOOK_CONNECTOR_ID = 'mon-cahier';
+
+async function ensureNotebookConnector(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, alreadyListed) {
+    if (alreadyListed.some((c) => c.$id === NOTEBOOK_CONNECTOR_ID)) return null;
+    try {
+        return await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, NOTEBOOK_CONNECTOR_ID);
+    } catch {
+        // Absent : on le crée. Un 409 (deux chargements simultanés) est sans conséquence.
+        try {
+            return await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, NOTEBOOK_CONNECTOR_ID, {
+                name: 'Mon cahier',
+                slug: 'mon-cahier',
+                icon: '📒',
+                color: '#F5C032',
+                description: 'Retrouve ce que tu as noté dans ton cahier',
+                partnerUserId: '',
+                tokensGranted: 0,
+                tokensUsed: 0,
+                active: true,
+                createdAt: new Date().toISOString(),
+            });
+        } catch {
+            return null;
+        }
+    }
+}
+
+// Met "Mon cahier" en premier, le reste dans l'ordre reçu.
+const notebookFirst = (list) => [
+    ...list.filter((c) => c.$id === NOTEBOOK_CONNECTOR_ID),
+    ...list.filter((c) => c.$id !== NOTEBOOK_CONNECTOR_ID),
+];
+
 const noConnectorFilter = () => Query.or([Query.equal('connectorId', ''), Query.isNull('connectorId')]);
 
 const generalScopeFilters = (withOr = true) => [
@@ -116,7 +152,11 @@ export default async ({ req, res, error }) => {
                 Query.orderAsc('name'),
                 Query.limit(50),
             ]);
-            const safe = result.documents
+            // Le connecteur "Mon cahier" doit toujours exister (et rester actif tant qu'on ne
+            // l'a pas désactivé volontairement depuis la Console).
+            const notebook = await ensureNotebookConnector(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, result.documents);
+            const visibleDocs = notebook && notebook.active ? [notebook, ...result.documents] : result.documents;
+            const safe = notebookFirst(visibleDocs)
                 .filter((c) => !isExhausted(c))
                 .map((c) => ({
                     $id: c.$id, name: c.name, slug: c.slug, icon: c.icon, color: c.color, description: c.description,
@@ -310,7 +350,7 @@ export default async ({ req, res, error }) => {
                     Query.orderDesc('createdAt'),
                     Query.limit(50),
                 ]);
-                return res.json({ success: true, connectors: result.documents });
+                return res.json({ success: true, connectors: notebookFirst(result.documents) });
             }
             case 'create_connector': {
                 if (!name || !slug) return res.json({ success: false, error: 'name et slug requis.' }, 400);
@@ -346,6 +386,9 @@ export default async ({ req, res, error }) => {
             }
             case 'delete_connector': {
                 if (!id) return res.json({ success: false, error: 'id requis.' }, 400);
+                if (id === NOTEBOOK_CONNECTOR_ID) {
+                    return res.json({ success: false, error: 'Le connecteur « Mon cahier » est un connecteur par défaut : il ne peut pas être supprimé (tu peux le désactiver).' });
+                }
                 await databases.deleteDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id);
                 // Les sites qui lui étaient rattachés n'ont plus aucun
                 // intérêt sans leur connecteur parent — nettoyage pour ne

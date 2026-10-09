@@ -17,6 +17,7 @@ import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
 import EmissionsPage from '@/pages/EmissionsPage';
+import NotesPage from '@/pages/NotesPage';
 import ImportOsmPage from '@/pages/ImportOsmPage';
 import EmissionRecordingPage from '@/pages/EmissionRecordingPage';
 import NotificationsPage from '@/pages/NotificationsPage';
@@ -141,6 +142,14 @@ export const AppRouter = () => {
                         <ModeratorRoute>
                             <EmissionRecordingPage />
                         </ModeratorRoute>
+                    }
+                />
+                <Route
+                    path="/cahier"
+                    element={
+                        <ProtectedRoute>
+                            <NotesPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route

@@ -5,6 +5,8 @@ import { useConversationThread } from '@/features/messaging/hooks/useConversatio
 import { getVoiceMessageUrl } from '@/features/messaging/services/messageService';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { AlertTriangle, Mic } from 'lucide-react';
+import { emissionService } from '@/features/vanessa/services/emissionService';
+import { exportEmissionTranscript, type ExportFormat } from '@/features/vanessa/utils/exportTranscript';
 
 // --- Réglages de la détection de silence (écoute continue) ---
 // Volontairement isolés ici, en toutes lettres : ce sont des valeurs de
@@ -42,7 +44,16 @@ const PHASE_COLOR: Record<Phase, string> = {
 
 export default function EmissionRecordingPage() {
     const { id } = useParams<{ id: string }>();
-    const { conversation, messages, sendVoiceMessage, loading, sendError } = useConversationThread(id!);
+    const { conversation, messages, sendMessage, sendVoiceMessage, sending, vanessaTyping, loading, sendError } = useConversationThread(id!);
+
+    // Deux façons de mener l'émission : à la voix (micro, réponses parlées — le système
+    // d'origine, inchangé) ou par écrit (texte contre texte, bien moins coûteux : aucune
+    // voix à transcrire ni à synthétiser).
+    const [mode, setMode] = useState<'vocal' | 'ecrit'>('ecrit');
+    const [draft, setDraft] = useState('');
+    const [guestName, setGuestName] = useState('');
+    const [exporting, setExporting] = useState<ExportFormat | null>(null);
+    const [exportError, setExportError] = useState<string | null>(null);
 
     const [phase, setPhase] = useState<Phase>('off');
     const [micError, setMicError] = useState<string | null>(null);
@@ -305,7 +316,49 @@ export default function EmissionRecordingPage() {
     useEffect(() => {
         const el = transcriptRef.current;
         if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-    }, [messages.length, loading]);
+    }, [messages.length, loading, vanessaTyping]);
+
+    // Nom de l'invité (fiche de l'émission) : sert d'étiquette dans la discussion exportée.
+    useEffect(() => {
+        let cancelled = false;
+        emissionService.list()
+            .then((list) => { if (!cancelled) setGuestName(list.find((e) => e.conversationId === id)?.guestName || ''); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [id]);
+
+    const handleExport = async (format: ExportFormat) => {
+        if (exporting) return;
+        setExporting(format);
+        setExportError(null);
+        try {
+            await exportEmissionTranscript({
+                format,
+                meta: {
+                    title: conversation?.title || 'Émission',
+                    guestName,
+                    topic: conversation?.emissionTopic,
+                    posture: conversation?.emissionPosture,
+                    date: conversation?.createdAt,
+                },
+                vanessaId: VANESSA_USER_ID,
+                conversationId: id!,
+                messages,
+            });
+        } catch (err: any) {
+            setExportError(err?.message || 'Impossible de préparer le fichier.');
+        } finally {
+            setExporting(null);
+        }
+    };
+
+    const handleSendWritten = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const text = draft.trim();
+        if (!text || sending) return;
+        setDraft('');
+        await sendMessage(text);
+    };
 
     if (loading) return <p className="text-sm text-gray-400 text-center py-20">Chargement...</p>;
 
@@ -335,6 +388,37 @@ export default function EmissionRecordingPage() {
                             )}
                         </div>
 
+                        <div className="bg-white rounded-2xl border border-gray-100 p-3 space-y-2">
+                            <p className="text-xs font-semibold text-gray-400 px-1">Type d'émission</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {([['ecrit', 'Écrite'], ['vocal', 'Vocale']] as const).map(([value, label]) => (
+                                    <button
+                                        key={value}
+                                        type="button"
+                                        onClick={() => setMode(value)}
+                                        disabled={phase !== 'off'}
+                                        className={`rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                                            mode === value ? 'bg-brand text-ink' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                            {phase !== 'off' && (
+                                <p className="text-xs text-gray-400 px-1">Arrête l'émission vocale en cours pour changer de type.</p>
+                            )}
+                        </div>
+
+                        {mode === 'ecrit' ? (
+                            <div className="bg-white rounded-3xl border border-gray-100 p-5 space-y-2">
+                                <p className="text-sm font-semibold text-gray-700">Émission écrite</p>
+                                <p className="text-xs text-gray-400">
+                                    Tu écris dans la zone de droite, Vanessa te répond par écrit, en direct, comme dans une
+                                    émission. Pas de micro, pas de voix : c'est l'option la plus économique.
+                                </p>
+                            </div>
+                        ) : (
                         <div className="bg-white rounded-3xl border border-gray-100 p-6 flex flex-col items-center gap-4">
                             <div className="relative">
                                 <div className={`w-24 h-24 rounded-full ${PHASE_COLOR[phase]} flex items-center justify-center transition-colors`}>
@@ -397,15 +481,31 @@ export default function EmissionRecordingPage() {
                                 </p>
                             )}
                         </div>
+                        )}
                     </div>
 
                     {/* Discussion écrite, pour l'animateur et l'invité — pas
                         pour le public, aucune émission n'est diffusée en
                         direct. */}
                     <div className="bg-white rounded-3xl border border-gray-100 flex flex-col h-[55vh] lg:h-full min-h-0">
-                        <div className="px-5 py-3 border-b border-gray-100">
+                        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-2 flex-wrap">
                             <p className="text-xs font-semibold text-gray-400">Discussion</p>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-gray-300">Télécharger :</span>
+                                {(['pdf', 'docx'] as const).map((format) => (
+                                    <button
+                                        key={format}
+                                        type="button"
+                                        onClick={() => handleExport(format)}
+                                        disabled={!!exporting || messages.length === 0}
+                                        className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1 disabled:opacity-40"
+                                    >
+                                        {exporting === format ? 'Préparation...' : format === 'pdf' ? 'PDF' : 'Word'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+                        {exportError && <p className="px-5 pt-2 text-xs text-red-500">{exportError}</p>}
                         <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 space-y-2.5">
                             {messages.length === 0 ? (
                                 <p className="text-sm text-gray-300 text-center py-10">La discussion s'affichera ici.</p>
@@ -422,7 +522,36 @@ export default function EmissionRecordingPage() {
                                     </div>
                                 ))
                             )}
+                            {mode === 'ecrit' && vanessaTyping && (
+                                <p className="text-xs text-gray-400 italic px-1">Vanessa écrit...</p>
+                            )}
                         </div>
+
+                        {mode === 'ecrit' && (
+                            <form onSubmit={handleSendWritten} className="border-t border-gray-100 p-3 flex items-end gap-2">
+                                <textarea
+                                    value={draft}
+                                    onChange={(e) => setDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendWritten(); }
+                                    }}
+                                    placeholder="Écris ta réplique... (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)"
+                                    rows={2}
+                                    maxLength={2000}
+                                    className="flex-1 resize-none rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand max-h-40"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!draft.trim() || sending}
+                                    className="shrink-0 rounded-full bg-brand hover:bg-brand-hover text-ink font-bold text-sm px-5 py-3 disabled:opacity-40 transition-colors"
+                                >
+                                    Envoyer
+                                </button>
+                            </form>
+                        )}
+                        {mode === 'ecrit' && sendError && (
+                            <p className="px-5 pb-3 text-xs text-red-500 font-semibold">{sendError}</p>
+                        )}
                     </div>
                 </div>
             </div>
