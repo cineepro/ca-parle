@@ -1,6 +1,6 @@
 // src/features/vanessa/components/VanessaConnectorManager.tsx — Vanessa
 import { useState, useEffect, useRef } from 'react';
-import { vanessaKnowledgeService, type VanessaConnector, type ConnectorSource } from '../services/vanessaKnowledgeService';
+import { vanessaKnowledgeService, type VanessaConnector, type ConnectorSource, type ConnectorModel } from '../services/vanessaKnowledgeService';
 import { Button } from '@/components/ui/button';
 import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '../utils/questionCount';
 import { AlertTriangle } from 'lucide-react';
@@ -11,7 +11,30 @@ function fcfaToTokens(fcfa: number): number {
     return Math.round((fcfa / SELL_PRICE_PER_MILLION_TOKENS_FCFA) * 1_000_000);
 }
 
-const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#F5C032', description: '' };
+const EMPTY_FORM = { name: '', slug: '', icon: '🔗', color: '#F5C032', description: '', instructions: '', model: '' as ConnectorModel };
+const MAX_INSTRUCTIONS = 4000;
+
+// Trame à remplir : plus court et plus clair qu'un texte libre, et ça évite que
+// Vanessa reçoive des consignes contradictoires ou trop vagues.
+const INSTRUCTIONS_TEMPLATE = `RÔLE : (qui tu es pour ce partenaire — ex : conseillère d'orientation des étudiants de l'UAC)
+
+TU PEUX :
+- (ce que tu sais faire ici, une ligne par capacité)
+
+TU NE FAIS PAS :
+- (ce qui est hors cadre — ex : promettre une admission, donner un avis médical)
+
+AVANT DE RÉPONDRE, DEMANDE (une ou deux questions à la fois) :
+- (infos à connaître sur la personne — ex : sa série du bac, sa moyenne, la ville)
+
+FORMAT DES RÉPONSES :
+- (ex : 2 à 3 pistes classées, avec une phrase de raison chacune)`;
+
+const MODEL_OPTIONS: { value: ConnectorModel; label: string }[] = [
+    { value: '', label: 'Par défaut (réglage du serveur)' },
+    { value: 'sonnet', label: 'Sonnet — plus fin, plus cher' },
+    { value: 'haiku', label: 'Haiku — plus économique' },
+];
 const EMPTY_SOURCE_FORM = { url: '', label: '', listingSelector: '' };
 
 function formatDate(iso?: string) {
@@ -172,6 +195,75 @@ function ConnectorSourcesPanel({ connectorId }: { connectorId: string }) {
     );
 }
 
+// --- Instructions + modèle d'un connecteur : texte modifiable à tout moment. Les
+// changements s'appliquent dès la prochaine question posée à ce connecteur. ---
+function ConnectorInstructionsPanel({ connector, onSaved }: { connector: VanessaConnector; onSaved: (c: VanessaConnector, patch: Partial<VanessaConnector>) => void }) {
+    const [text, setText] = useState(connector.instructions || '');
+    const [model, setModel] = useState<ConnectorModel>(connector.model || '');
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const dirty = text !== (connector.instructions || '') || model !== (connector.model || '');
+
+    const save = async () => {
+        setSaving(true);
+        setMessage('');
+        try {
+            const patch = { instructions: text.trim(), model };
+            await vanessaKnowledgeService.updateConnector(connector.$id, patch);
+            onSaved(connector, patch);
+            setText(patch.instructions);
+            setMessage('✅ Enregistré — appliqué dès la prochaine question.');
+        } catch (err: any) {
+            setMessage(`❌ ${err.message || 'Échec de l\'enregistrement.'}`);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-500">
+                Instructions pour Vanessa dans ce connecteur — son rôle, ce qu'elle peut faire ou non, les questions
+                à poser. Elles ne s'appliquent qu'ici, et ne remplacent jamais ses règles de sécurité.
+            </p>
+            <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value.slice(0, MAX_INSTRUCTIONS))}
+                rows={12}
+                placeholder="Laisse vide pour garder le comportement actuel (réponses à partir des notes du connecteur)."
+                className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+            />
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+                <button
+                    type="button"
+                    onClick={() => setText((t) => (t.trim() ? t : INSTRUCTIONS_TEMPLATE))}
+                    disabled={!!text.trim()}
+                    className="text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-100 rounded-full px-3 py-1 disabled:opacity-40"
+                    title={text.trim() ? 'Vide d\'abord le texte pour insérer la trame' : 'Insérer une trame à remplir'}
+                >
+                    Insérer la trame à remplir
+                </button>
+                <span className="text-xs text-gray-400">{text.length} / {MAX_INSTRUCTIONS}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs text-gray-500">Modèle :</label>
+                <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value as ConnectorModel)}
+                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                >
+                    {MODEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button size="sm" onClick={save} isLoading={saving} disabled={!dirty}>Enregistrer</Button>
+                {message && <p className="text-xs text-gray-500">{message}</p>}
+            </div>
+        </div>
+    );
+}
+
 export const VanessaConnectorManager = () => {
     const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
     const [loading, setLoading] = useState(true);
@@ -188,6 +280,9 @@ export const VanessaConnectorManager = () => {
 
     // Zone "Sites" dépliée, un connecteur à la fois.
     const [sourcesOpenId, setSourcesOpenId] = useState<string | null>(null);
+
+    // Zone "Instructions" dépliée, un connecteur à la fois.
+    const [instructionsOpenId, setInstructionsOpenId] = useState<string | null>(null);
 
     // Recharge de tokens, connecteur par connecteur.
     const [rechargingId, setRechargingId] = useState<string | null>(null);
@@ -221,6 +316,8 @@ export const VanessaConnectorManager = () => {
                 icon: form.icon.trim() || '🔗',
                 color: form.color,
                 description: form.description.trim(),
+                instructions: form.instructions.trim(),
+                model: form.model,
                 active: true,
             });
             setForm(EMPTY_FORM);
@@ -349,6 +446,29 @@ export const VanessaConnectorManager = () => {
                     maxLength={200}
                     className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
                 />
+                <textarea
+                    value={form.instructions}
+                    onChange={(e) => setForm({ ...form, instructions: e.target.value.slice(0, MAX_INSTRUCTIONS) })}
+                    rows={form.instructions ? 8 : 3}
+                    placeholder="Instructions pour Vanessa (optionnel, modifiables ensuite) : son rôle dans ce connecteur, ce qu'elle peut faire, les questions à poser..."
+                    className="col-span-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand"
+                />
+                <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, instructions: f.instructions.trim() ? f.instructions : INSTRUCTIONS_TEMPLATE }))}
+                    disabled={!!form.instructions.trim()}
+                    className="text-xs font-semibold text-gray-500 bg-white border border-gray-200 hover:bg-gray-100 rounded-xl px-3 py-2 disabled:opacity-40"
+                >
+                    Insérer la trame à remplir
+                </button>
+                <select
+                    value={form.model}
+                    onChange={(e) => setForm({ ...form, model: e.target.value as ConnectorModel })}
+                    className="rounded-xl border border-gray-200 px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand"
+                    aria-label="Modèle de réponse"
+                >
+                    {MODEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
                 <Button size="sm" onClick={handleAdd} isLoading={saving} disabled={!form.name.trim()} className="col-span-2">
                     + Créer le connecteur
                 </Button>
@@ -403,7 +523,11 @@ export const VanessaConnectorManager = () => {
                                                 </span>
                                             )}
                                         </p>
-                                        <p className="text-xs text-gray-400 truncate">{c.description || c.slug}</p>
+                                        <p className="text-xs text-gray-400 truncate">
+                                            {c.description || c.slug}
+                                            {c.instructions ? ' · instructions ✓' : ''}
+                                            {c.model ? ` · ${c.model === 'haiku' ? 'Haiku' : 'Sonnet'}` : ''}
+                                        </p>
                                     </div>
                                     <button onClick={() => toggleActive(c)} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">
                                         {c.active ? 'Désactiver' : 'Activer'}
@@ -486,6 +610,12 @@ export const VanessaConnectorManager = () => {
                                                 {uploadingFor === c.$id ? 'Lecture en cours...' : 'Ajouter un PDF'}
                                             </button>
                                             <button
+                                                onClick={() => setInstructionsOpenId(instructionsOpenId === c.$id ? null : c.$id)}
+                                                className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1"
+                                            >
+                                                {instructionsOpenId === c.$id ? 'Masquer les instructions' : 'Instructions'}
+                                            </button>
+                                            <button
                                                 onClick={() => setSourcesOpenId(sourcesOpenId === c.$id ? null : c.$id)}
                                                 className="text-xs font-semibold text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1"
                                             >
@@ -512,6 +642,12 @@ export const VanessaConnectorManager = () => {
                                         <p className="text-xs text-green-600">{rechargeConfirmation[c.$id]}</p>
                                     )}
                                     {sourcesOpenId === c.$id && <ConnectorSourcesPanel connectorId={c.$id} />}
+                                    {instructionsOpenId === c.$id && (
+                                        <ConnectorInstructionsPanel
+                                            connector={c}
+                                            onSaved={(conn, patch) => setConnectors((prev) => prev.map((x) => (x.$id === conn.$id ? { ...x, ...patch } : x)))}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         );

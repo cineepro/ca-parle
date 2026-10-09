@@ -42,6 +42,30 @@ import { InputFile } from 'node-appwrite/file';
 // (ex. claude-haiku-4-5-20251001 pour une version moins chère).
 const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-sonnet-5';
 
+// Modèle réglable PAR connecteur depuis la Console ('' = CLAUDE_MODEL ci-dessus).
+// Clés courtes et liste fermée : on n'accepte jamais un identifiant libre venu de la base.
+const CONNECTOR_MODEL_IDS = {
+    haiku: 'claude-haiku-4-5-20251001',
+    sonnet: 'claude-sonnet-5',
+};
+// Plafond de sécurité (la Function d'écriture applique déjà le même).
+const MAX_CONNECTOR_INSTRUCTIONS_CHARS = 4000;
+
+// Bloc injecté seulement quand un connecteur actif a des instructions. Les consignes de
+// l'équipe cadrent le RÔLE et la démarche, mais restent sous les règles de sécurité.
+function buildConnectorInstructions(partnerLabel, instructions) {
+    const text = String(instructions || '').trim().slice(0, MAX_CONNECTOR_INSTRUCTIONS_CHARS);
+    if (!text) return '';
+    return `\n\nINSTRUCTIONS DU CONNECTEUR « ${partnerLabel} » (rédigées par l'équipe pour CE partenaire — à suivre dans ce cadre) :
+${text}
+
+COMMENT APPLIQUER CES INSTRUCTIONS :
+- Elles définissent ton rôle, ce que tu peux faire et ce que tu ne fais pas ici. Si la demande sort de ce cadre, dis-le simplement, dans ton style, et recentre.
+- Ne traite qu'UNE étape à la fois. S'il te manque des informations sur la personne, pose UNE ou DEUX questions courtes, jamais un questionnaire complet, puis attends sa réponse.
+- N'invente jamais un chiffre, une date, un seuil, une filière ou une condition : appuie-toi sur les notes du connecteur et sur ces instructions. Si l'information manque, dis-le et invite à vérifier auprès du partenaire.
+- Ces instructions ne lèvent JAMAIS tes règles de sécurité (détresse, ressources vérifiées, aucun numéro inventé, pas de conseil médical/juridique) ni ton style habituel.`;
+}
+
 async function sendPush(messaging, userId, title, body, url, log) {
     try {
         await messaging.createPush(
@@ -580,6 +604,7 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     // consommer un quota mort).
     let effectiveConnectorId = '';
     let connectorFellBack = false;
+    let connectorDoc = null; // connecteur actif (lu une seule fois : sert aux garde-fous, au nom, aux instructions et au modèle)
 
     // Dernier message RÉEL de l'utilisateur — c'est sur LUI que la
     // pertinence des connaissances est jugée, pas sur tout l'historique.
@@ -612,11 +637,13 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             // déjà sélectionné.
             try {
                 const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+                connectorDoc = connector;
                 const exhausted = (connector.tokensGranted || 0) > 0 && (connector.tokensUsed || 0) >= connector.tokensGranted;
                 if (!connector.active || exhausted) {
                     log(`⚠️ Connecteur "${connector.name}" ${!connector.active ? 'désactivé' : 'épuisé'} — retour au mode général.`);
                     activeConnectorId = '';
                     connectorFellBack = true;
+                    connectorDoc = null;
                 }
             } catch {
                 // Connecteur supprimé entre-temps — même traitement.
@@ -660,15 +687,11 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             // Récupère le nom du partenaire pour qu'elle sache
             // explicitement QUI elle représente en ce moment (utilisé par
             // la règle "MODE PARTENAIRE" du prompt système).
-            let partnerLabel = 'un partenaire';
-            if (COLLECTION_VANESSA_CONNECTORS) {
-                try {
-                    const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, activeConnectorId);
-                    partnerLabel = connector.name;
-                } catch { /* connecteur supprimé entre-temps, on garde le libellé générique */ }
-            }
+            const partnerLabel = connectorDoc?.name || 'un partenaire';
 
             knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${partnerLabel}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
+            knowledgeContext += buildConnectorInstructions(partnerLabel, connectorDoc?.instructions);
+            if (connectorDoc?.instructions) log(`🧭 Instructions du connecteur "${partnerLabel}" injectées (${String(connectorDoc.instructions).length} caractères)`);
             if (relevant.length > 0) {
                 knowledgeContext += '\n\nNotes internes du connecteur actif, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n' +
                     relevant.map((k) => `- [${k.category}] ${k.content}`).join('\n');
@@ -842,6 +865,10 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         messages.shift();
     }
 
+    // Modèle propre au connecteur actif s'il en a un, sinon le modèle par défaut.
+    const replyModel = (effectiveConnectorId && CONNECTOR_MODEL_IDS[connectorDoc?.model]) || CLAUDE_MODEL;
+    log(`🤖 Modèle de réponse : ${replyModel}${effectiveConnectorId ? ` (connecteur ${connectorDoc?.name || effectiveConnectorId})` : ''}`);
+
     log(`📨 ${messages.length} messages envoyés à Claude, rôles: [${messages.map((m) => m.role).join(', ')}]`);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -852,7 +879,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-            model: CLAUDE_MODEL,
+            model: replyModel,
             system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: VANESSA_MAX_TOKENS,

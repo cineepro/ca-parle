@@ -67,7 +67,14 @@ export interface VanessaConnector {
     // partenaire pour CE connecteur précis (vide = aucun accès partenaire
     // configuré).
     partnerUserId?: string;
+    // Consignes propres à ce connecteur (rôle, ce qu'il peut faire, questions à poser...),
+    // modifiables à tout moment depuis la Console. Jamais exposées au public.
+    instructions?: string;
+    // Modèle de réponse propre au connecteur : '' = modèle par défaut du serveur.
+    model?: ConnectorModel;
 }
+
+export type ConnectorModel = '' | 'haiku' | 'sonnet';
 
 // Un site surveillé pour le compte d'un connecteur — un connecteur peut en
 // avoir plusieurs (ex : "Gouvernance" = gouv.bj + assemblee-nationale.bj +

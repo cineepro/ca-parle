@@ -1,7 +1,7 @@
 // functions/manage-vanessa-knowledge/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   Notes   : { action: 'list'|'create'|'update'|'delete', id?, category?, content?, active?, connectorId? }
-//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, partnerUserId?, active? }
+//   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, partnerUserId?, instructions?, model?, active? }
 //   Sites d'un connecteur (modérateur) : { action: 'list_sources'|'add_source'|'update_source'|'remove_source', connectorId?, sourceId?, url?, listingSelector?, label? }
 //   Facturation (modérateur) : { action: 'recharge_connector_tokens', id, amount }
 //   Connecteurs (public)     : { action: 'list_active_connectors' }
@@ -33,6 +33,14 @@ const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
 // connectorId n'ont aucune valeur dessus (Appwrite ne rétro-remplit jamais
 // les documents existants), les plus récentes ont une chaîne vide — une
 // requête stricte sur '' exclurait silencieusement les premières.
+// Instructions propres à un connecteur (texte libre rédigé par l'équipe) et
+// modèle de réponse choisi pour lui. Plafonnés / validés ici (et pas seulement
+// dans le formulaire) : cette Function est la seule porte d'écriture.
+const MAX_INSTRUCTIONS_CHARS = 4000;
+const CONNECTOR_MODELS = ['', 'haiku', 'sonnet']; // '' = modèle par défaut de send-message
+const cleanInstructions = (v) => String(v ?? '').replace(/\r\n/g, '\n').trim().slice(0, MAX_INSTRUCTIONS_CHARS);
+const cleanModel = (v) => (CONNECTOR_MODELS.includes(v) ? v : '');
+
 const noConnectorFilter = () => Query.or([Query.equal('connectorId', ''), Query.isNull('connectorId')]);
 
 const generalScopeFilters = (withOr = true) => [
@@ -150,7 +158,7 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Action réservée aux modérateurs.' }, 403);
         }
 
-        const { id, category, content, active, connectorId, name, slug, icon, color, description, partnerUserId, amountFcfa, sourceId, url, listingSelector, label } = body;
+        const { id, category, content, active, connectorId, name, slug, icon, color, description, partnerUserId, instructions, model, amountFcfa, sourceId, url, listingSelector, label } = body;
 
         switch (action) {
             // --- Notes de connaissance ---
@@ -312,6 +320,8 @@ export default async ({ req, res, error }) => {
                     color: color || '#FF4757',
                     description: description || '',
                     partnerUserId: partnerUserId || '',
+                    instructions: cleanInstructions(instructions),
+                    model: cleanModel(model),
                     tokensGranted: 0, // 0 = illimité tant qu'aucune vente n'est enregistrée
                     tokensUsed: 0,
                     active: active !== undefined ? active : true,
@@ -328,6 +338,8 @@ export default async ({ req, res, error }) => {
                 if (color !== undefined) updateData.color = color;
                 if (description !== undefined) updateData.description = description;
                 if (partnerUserId !== undefined) updateData.partnerUserId = partnerUserId;
+                if (instructions !== undefined) updateData.instructions = cleanInstructions(instructions);
+                if (model !== undefined) updateData.model = cleanModel(model);
                 if (active !== undefined) updateData.active = active;
                 const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, id, updateData);
                 return res.json({ success: true, connector: doc });
