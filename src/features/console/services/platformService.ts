@@ -60,7 +60,43 @@ export interface PlatformAlert {
     acknowledgedBy: string | null;
 }
 
+export interface UserSummary {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    avatarUrl: string;
+    createdAt: string;
+    isBanned: boolean;
+    isModerator: boolean;
+}
+
+export interface UserDetail extends UserSummary {
+    bio: string;
+    balance: number;
+    followers: number;
+    following: number;
+    isVerified: boolean;
+    isCreative: boolean;
+    gossipLevel: number;
+    reputationScore: number;
+    reliabilityIndex: number;
+    storiesCount: number;
+    revelationsCount: number;
+    commentsCount: number;
+    predictionsCorrect: number;
+    predictionsTotal: number;
+    defaultAnonymous: boolean;
+    newsletterOptOut: boolean;
+    emailVerified: boolean | null;
+    accountStatus: 'actif' | 'bloqué' | null;
+    lastAccessAt: string | null;
+    tags: string[];
+}
+
 export const platformService = {
+    searchUsers: (q: string) => callFunction<{ users: UserSummary[]; source: 'comptes' | 'profils' }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'users_search', q }),
+    userDetail: (userId: string) => callFunction<{ user: UserDetail }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'user_detail', userId }),
     overview: () => callFunction<Overview>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'overview' }),
     system: () => callFunction<{ generatedAt: string; functions: FunctionHealth[] }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'system' }),
     alerts: () => callFunction<{ alerts: PlatformAlert[] }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'list' }),

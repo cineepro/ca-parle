@@ -3,6 +3,8 @@
 //   { action: 'overview' }                          -> chiffres clés, files d'attente, modérateurs
 //   { action: 'system' }                            -> santé de chaque Function sur 24 h
 //   { action: 'events', severity?: 'critical'|'warning'|'info' } -> journal d'événements
+//   { action: 'users_search', q }                   -> recherche d'utilisateurs (nom, e-mail, téléphone ou ID) : 10 résultats max
+//   { action: 'user_detail', userId }               -> fiche d'un utilisateur
 //
 // CONFIDENTIALITÉ : cette Function ne renvoie jamais le contenu des
 // messages des utilisateurs. Pour les erreurs de Functions, seul le champ
@@ -11,9 +13,56 @@
 //
 // Clé API recommandée pour CETTE Function (lecture seule) : databases.read,
 // functions.read, executions.read. Timeout conseillé : 60 s.
-import { Client, Databases, Functions, Query } from 'node-appwrite';
+import { Client, Databases, Functions, Users, Query } from 'node-appwrite';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+
+// ── Fiches utilisateurs ─────────────────────────────────────────────────
+// Rien n'est listé tant que le modérateur ne cherche pas : une recherche
+// = 1 requête + 10 lectures au plus. Le compte Appwrite (Users API, clé
+// avec users.read) donne la recherche sans index et la dernière
+// connexion ; sans cette permission, on retombe sur la base seule.
+const DAY = 24 * 60 * 60 * 1000;
+
+function toSummary(doc, auth) {
+    return {
+        id: doc.$id,
+        name: doc.name || '',
+        email: doc.email || auth?.email || '',
+        phone: doc.phone || auth?.phone || '',
+        avatarUrl: doc.avatarUrl || '',
+        createdAt: doc.createdAt || doc.$createdAt,
+        isBanned: !!doc.isBanned,
+        isModerator: !!doc.isModerator,
+    };
+}
+
+function buildTags(doc, auth) {
+    const now = Date.now();
+    const created = new Date(doc.createdAt || doc.$createdAt).getTime();
+    const lastSeen = auth?.accessedAt ? new Date(auth.accessedAt).getTime() : null;
+    const activity = (doc.storiesCount || 0) + (doc.commentsCount || 0) + (doc.revelationsCount || 0);
+    const tags = [];
+    if (now - created < 7 * DAY) tags.push('Nouveau (moins de 7 jours)');
+    if (lastSeen !== null) {
+        if (now - lastSeen > 30 * DAY) tags.push('Inactif depuis plus de 30 jours');
+        else if (now - lastSeen < 7 * DAY) tags.push('Actif cette semaine');
+    }
+    if (activity === 0) tags.push('Lecteur (n\'a rien publié)');
+    else if (activity >= 10) tags.push('Contributeur régulier');
+    if (doc.isCreative) tags.push('Créateur');
+    if (doc.isVerified) tags.push('Vérifié');
+    if (doc.isModerator) tags.push('Modérateur');
+    if (doc.isBanned) tags.push('Banni');
+    if (doc.newsletterOptOut) tags.push('Newsletter désactivée');
+    return tags;
+}
+
+async function fetchProfiles(databases, DATABASE_ID, USERS, ids) {
+    const docs = await Promise.all(ids.map((id) => databases.getDocument(DATABASE_ID, USERS, id).catch(() => null)));
+    return docs;
+}
 
 export default async ({ req, res, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
@@ -28,6 +77,7 @@ export default async ({ req, res, error }) => {
 
     const databases = new Databases(client);
     const functions = new Functions(client);
+    const usersApi = new Users(client);
     const DATABASE_ID = process.env.DATABASE_ID;
     const C = {
         USERS: process.env.COLLECTION_USERS,
@@ -187,6 +237,78 @@ export default async ({ req, res, error }) => {
                     return { id: d.$id, type: d.type, severity: d.severity, source: d.source, message: d.message, meta, createdAt: d.createdAt };
                 });
                 return res.json({ success: true, events });
+            }
+
+
+            case 'users_search': {
+                const q = String(body.q || '').trim().slice(0, 100);
+                if (q.length < 2) {
+                    return res.json({ success: false, error: 'Tape au moins 2 caractères.' });
+                }
+                let users = [];
+                let source = 'comptes';
+                try {
+                    // Recherche sur nom, e-mail, téléphone et ID, sans index à créer.
+                    const r = await usersApi.list([Query.limit(10)], q);
+                    const profiles = await fetchProfiles(databases, DATABASE_ID, C.USERS, r.users.map((u) => u.$id));
+                    users = r.users.map((u, i) => profiles[i] ? toSummary(profiles[i], u) : {
+                        id: u.$id, name: u.name || '', email: u.email || '', phone: u.phone || '',
+                        avatarUrl: '', createdAt: u.registration, isBanned: false, isModerator: false,
+                    });
+                } catch (e) {
+                    // Clé sans users.read : on cherche dans la base.
+                    source = 'profils';
+                    const seen = new Map();
+                    const add = (docs) => docs.forEach((d) => d && seen.set(d.$id, d));
+                    if (/^[A-Za-z0-9_.-]{20,36}$/.test(q)) {
+                        add([await databases.getDocument(DATABASE_ID, C.USERS, q).catch(() => null)]);
+                    }
+                    if (q.includes('@')) {
+                        add((await databases.listDocuments(DATABASE_ID, C.USERS, [Query.equal('email', q.toLowerCase()), Query.limit(10)]).catch(() => ({ documents: [] }))).documents);
+                    }
+                    add((await databases.listDocuments(DATABASE_ID, C.USERS, [Query.search('name', q), Query.limit(10)]).catch(() => ({ documents: [] }))).documents);
+                    users = [...seen.values()].slice(0, 10).map((d) => toSummary(d, null));
+                }
+                return res.json({ success: true, users, source });
+            }
+
+            case 'user_detail': {
+                const userId = String(body.userId || '').trim();
+                if (!userId) return res.json({ success: false, error: 'Utilisateur manquant.' });
+                let doc;
+                try {
+                    doc = await databases.getDocument(DATABASE_ID, C.USERS, userId);
+                } catch {
+                    return res.json({ success: false, error: 'Profil introuvable.' });
+                }
+                let auth = null;
+                try { auth = await usersApi.get(userId); } catch { /* sans users.read : pas de dernière connexion */ }
+                return res.json({
+                    success: true,
+                    user: {
+                        ...toSummary(doc, auth),
+                        bio: doc.bio || '',
+                        balance: doc.balance ?? 0,
+                        followers: doc.followers ?? 0,
+                        following: doc.following ?? 0,
+                        isVerified: !!doc.isVerified,
+                        isCreative: !!doc.isCreative,
+                        gossipLevel: doc.gossipLevel ?? 0,
+                        reputationScore: doc.reputationScore ?? 0,
+                        reliabilityIndex: doc.reliabilityIndex ?? 0,
+                        storiesCount: doc.storiesCount ?? 0,
+                        revelationsCount: doc.revelationsCount ?? 0,
+                        commentsCount: doc.commentsCount ?? 0,
+                        predictionsCorrect: doc.predictionsCorrect ?? 0,
+                        predictionsTotal: doc.predictionsTotal ?? 0,
+                        defaultAnonymous: !!doc.defaultAnonymous,
+                        newsletterOptOut: !!doc.newsletterOptOut,
+                        emailVerified: auth ? !!auth.emailVerification : null,
+                        accountStatus: auth ? (auth.status ? 'actif' : 'bloqué') : null,
+                        lastAccessAt: auth?.accessedAt || null,
+                        tags: buildTags(doc, auth),
+                    },
+                });
             }
 
             default:

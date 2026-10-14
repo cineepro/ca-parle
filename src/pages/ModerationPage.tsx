@@ -15,12 +15,13 @@ import { ConsoleOverview } from '@/features/console/components/ConsoleOverview';
 import { ConsoleJournal } from '@/features/console/components/ConsoleJournal';
 import { ConsoleSystem } from '@/features/console/components/ConsoleSystem';
 import { ConsoleAlerts } from '@/features/console/components/ConsoleAlerts';
+import { ConsoleUsers } from '@/features/console/components/ConsoleUsers';
 import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 type Section =
     | 'overview' | 'alerts' | 'journal' | 'system'
     | 'signalements' | 'ca-sert' | 'avis' | 'connaissances' | 'connecteurs'
-    | 'newsletter';
+    | 'newsletter' | 'users';
 
 interface NavEntry { id: Section; label: string; badge?: number }
 interface NavGroup { title: string; entries: NavEntry[] }
@@ -36,6 +37,7 @@ const SECTION_TITLES: Record<Section, string> = {
     connaissances: 'Connaissances',
     connecteurs: 'Connecteurs',
     newsletter: 'Newsletter',
+    users: 'Utilisateurs',
 };
 
 export default function ModerationPage() {
@@ -61,6 +63,7 @@ export default function ModerationPage() {
             { id: 'connecteurs', label: 'Connecteurs' },
         ] },
         { title: 'Communication', entries: [
+            { id: 'users', label: 'Utilisateurs' },
             { id: 'newsletter', label: 'Newsletter' },
         ] },
     ];
@@ -134,6 +137,7 @@ export default function ModerationPage() {
                         {section === 'avis' && <VanessaFeedbackReview />}
                         {section === 'connaissances' && <VanessaKnowledgeManager />}
                         {section === 'connecteurs' && <VanessaConnectorManager />}
+                        {section === 'users' && <ConsoleUsers />}
                         {section === 'newsletter' && <NewsletterComposer />}
                     </main>
                 </div>
