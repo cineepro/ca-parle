@@ -37,10 +37,10 @@
 import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 
-// Modèle Claude utilisé pour les réponses de Vanessa. Sonnet 5 = réponses les plus fidèles au personnage (Haiku 4.5 est moins cher mais plus plat).
-// Pour changer SANS toucher au code : variable d'environnement VANESSA_MODEL de la Function
-// (ex. claude-haiku-4-5-20251001 pour une version moins chère).
-const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-sonnet-5';
+// Modèle Claude utilisé par défaut pour les réponses de Vanessa : Haiku 4.5 (le moins cher).
+// Sonnet 5 reste plus fidèle au personnage mais consomme bien plus. Pour en changer SANS toucher
+// au code : variable d'environnement VANESSA_MODEL de la Function (ex. claude-sonnet-5).
+const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
 
 // Modèle réglable PAR connecteur depuis la Console ('' = CLAUDE_MODEL ci-dessus).
 // Clés courtes et liste fermée : on n'accepte jamais un identifiant libre venu de la base.
