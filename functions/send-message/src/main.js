@@ -243,6 +243,21 @@ const QUOTA_REACHED_LINES = [
     "Bon là je suis épuisée, tu m'as vidée pour aujourd'hui 😭 Reviens demain, promis je serai toute ouïe.",
 ];
 
+// Messages affichés quand Vanessa n'a PAS pu répondre (API Claude épuisée ou
+// indisponible, clé refusée, surcharge...). Sans eux, la personne envoie son
+// message et rien ne se passe : elle ne sait pas si l'app est cassée.
+// Ces textes sont écartés de l'historique envoyé à Claude (voir
+// fetchRecentHistory) pour ne pas polluer ses réponses suivantes.
+const OUTAGE_NOTICE = '⚠️ Vanessa est hors service pour le moment. Réessaie un peu plus tard, elle revient vite !';
+const REPLY_FAILED_NOTICE = "⚠️ Vanessa n'a pas pu répondre à ce message. Renvoie-le dans un instant.";
+const OUTAGE_NOTICES = [OUTAGE_NOTICE, REPLY_FAILED_NOTICE];
+// Erreurs qui viennent du service Claude lui-même (réponse HTTP d'erreur,
+// réseau, délai dépassé) → « hors service ». Toute autre erreur (base de
+// données, bug interne) reçoit le message plus neutre.
+function isClaudeServiceError(err) {
+    return /Claude a répondu|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|timeout|network/i.test(String(err?.message || ''));
+}
+
 const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es l'IA qui donne son nom à la plateforme — Vanessa héberge aussi "Ça Parle" (ragots et commérages) et "Ça sert" (bons plans locaux). Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
 
 TON STYLE :
@@ -411,7 +426,9 @@ async function fetchRecentHistory(databases, DATABASE_ID, COLLECTION_MESSAGES, c
         Query.orderDesc('createdAt'),
         Query.limit(limit),
     ]);
-    return history.documents.reverse();
+    // Les messages « hors service » ne sont pas de vraies paroles de Vanessa :
+    // on ne les renvoie pas à Claude, qui les imiterait ensuite.
+    return history.documents.reverse().filter((m) => !OUTAGE_NOTICES.includes(m.content));
 }
 
 const URGENT_RESOURCES_CATEGORY = 'ressources_urgence';
@@ -1336,6 +1353,10 @@ export default async ({ req, res, log, error }) => {
                 await incrementConnectorQuestionCount(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, conversation.vanessaConnectorId, log);
             }
 
+            // Passe à true dès qu'un message de Vanessa (réponse ou phrase de
+            // quota) est enregistré : si une étape annexe échoue ENSUITE, la
+            // personne a déjà sa réponse et ne doit pas recevoir « hors service ».
+            let vanessaMessagePosted = false;
             try {
                 // Quota quotidien de tokens (façon Claude : "reviens plus
                 // tard une fois la limite atteinte") — protège le compte
@@ -1359,6 +1380,7 @@ export default async ({ req, res, log, error }) => {
                         audioFileId: '', audioDuration: 0, imageFileId: '',
                         readBy: [VANESSA_USER_ID], createdAt: new Date().toISOString(),
                     }, permissions);
+                    vanessaMessagePosted = true;
 
                     await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
                         lastMessage: quotaLine, lastMessageAt: new Date().toISOString(), lastMessageSenderId: VANESSA_USER_ID,
@@ -1422,6 +1444,7 @@ export default async ({ req, res, log, error }) => {
                             readBy: [VANESSA_USER_ID],
                             createdAt: new Date().toISOString(),
                         }, permissions);
+                        vanessaMessagePosted = true;
 
                         const vanessaPreview = vanessaAudioFileId ? '🎤 Message vocal' : reply;
                         await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
@@ -1510,6 +1533,26 @@ export default async ({ req, res, log, error }) => {
                     at: String(vanessaErr.stack || '').split('\n').slice(1, 3).join(' | ').slice(0, 300),
                 });
                 // Non bloquant — le message humain reste envoyé normalement.
+
+                // Dire à la personne que Vanessa n'a pas répondu, au lieu du
+                // silence total (crédit Claude épuisé, surcharge, clé refusée...).
+                // Protégé à part : si même cette annonce échoue, on n'aggrave rien.
+                if (!vanessaMessagePosted) {
+                    try {
+                        const notice = isClaudeServiceError(vanessaErr) ? OUTAGE_NOTICE : REPLY_FAILED_NOTICE;
+                        await databases.createDocument(DATABASE_ID, COLLECTION_MESSAGES, ID.unique(), {
+                            conversationId, senderId: VANESSA_USER_ID, content: notice, type: 'text',
+                            audioFileId: '', audioDuration: 0, imageFileId: '',
+                            readBy: [VANESSA_USER_ID], createdAt: new Date().toISOString(),
+                        }, permissions);
+                        await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, {
+                            lastMessage: notice, lastMessageAt: new Date().toISOString(), lastMessageSenderId: VANESSA_USER_ID,
+                        });
+                        log('📣 Message « hors service » posté dans la conversation.');
+                    } catch (noticeErr) {
+                        log(`⚠️ Impossible de poster le message « hors service » : ${noticeErr.message}`);
+                    }
+                }
             }
         } else {
             log('ℹ️ Vanessa non concernée par cette conversation (ou variables manquantes).');

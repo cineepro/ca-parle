@@ -109,11 +109,43 @@ export default async ({ req, res, error }) => {
                 // collection, seul CE chiffre est indisponible (et on dit
                 // pourquoi), pas toute la page.
                 const unavailable = [];
+                // Appwrite ne compte PAS au-delà de 5000 : `total` reste figé
+                // à 5000 même si la collection en contient davantage. Quand ce
+                // plafond est atteint, on recompte par tranches de dates
+                // (chaque tranche restant sous le plafond) et on additionne.
+                const COUNT_CAP = 5000;
+                const countBand = async (collection, queries, fromIso, toIso, depth) => {
+                    const r = await databases.listDocuments(DATABASE_ID, collection, [
+                        ...queries, Query.greaterThanEqual('createdAt', fromIso), Query.lessThan('createdAt', toIso), Query.limit(1),
+                    ]);
+                    const spanMs = Date.parse(toIso) - Date.parse(fromIso);
+                    if (r.total < COUNT_CAP || depth >= 20 || spanMs <= 1000) return r.total;
+                    const mid = new Date(Date.parse(fromIso) + spanMs / 2).toISOString();
+                    const [a, b] = await Promise.all([
+                        countBand(collection, queries, fromIso, mid, depth + 1),
+                        countBand(collection, queries, mid, toIso, depth + 1),
+                    ]);
+                    return a + b;
+                };
+                const countBeyondCap = async (collection, queries) => {
+                    const first = await databases.listDocuments(DATABASE_ID, collection, [...queries, Query.orderAsc('createdAt'), Query.limit(1)]);
+                    const start = first.documents[0]?.createdAt;
+                    if (!start) return COUNT_CAP;
+                    return countBand(collection, queries, start, new Date(now + 1000).toISOString(), 0);
+                };
                 const count = async (metric, collection, queries) => {
                     if (!collection) { unavailable.push({ metric, reason: 'Variable de collection absente.' }); return null; }
                     try {
                         const r = await databases.listDocuments(DATABASE_ID, collection, [...queries, Query.limit(1)]);
-                        return r.total;
+                        if (r.total < COUNT_CAP) return r.total;
+                        try {
+                            // max() : si des anciens documents n'avaient pas de
+                            // createdAt, la somme des tranches les oublierait.
+                            return Math.max(r.total, await countBeyondCap(collection, queries));
+                        } catch (bandErr) {
+                            unavailable.push({ metric, reason: `Plafonné à ${COUNT_CAP} (recomptage impossible : ${String(bandErr.message).slice(0, 100)})` });
+                            return r.total;
+                        }
                     } catch (e) {
                         unavailable.push({ metric, reason: String(e.message).slice(0, 140) });
                         return null;
