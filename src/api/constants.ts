@@ -79,4 +79,8 @@ export const FUNCTIONS = {
     INGEST_CONNECTOR_PDF: import.meta.env.VITE_APPWRITE_FUNCTION_INGEST_CONNECTOR_PDF || '',
     GET_ROUTE: import.meta.env.VITE_APPWRITE_FUNCTION_GET_ROUTE || '',
     LIST_MESSAGE_FEEDBACK: import.meta.env.VITE_APPWRITE_FUNCTION_LIST_MESSAGE_FEEDBACK || '',
+
+    // Zem — navigateur et moteur de recherche local
+    SEARCH_ENGINE: import.meta.env.VITE_APPWRITE_FUNCTION_SEARCH_ENGINE || '',
+    MANAGE_SEARCH_SOURCES: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_SEARCH_SOURCES || '',
 } as const;

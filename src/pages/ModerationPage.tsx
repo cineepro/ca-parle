@@ -16,12 +16,13 @@ import { ConsoleJournal } from '@/features/console/components/ConsoleJournal';
 import { ConsoleSystem } from '@/features/console/components/ConsoleSystem';
 import { ConsoleAlerts } from '@/features/console/components/ConsoleAlerts';
 import { ConsoleUsers } from '@/features/console/components/ConsoleUsers';
+import { ConsoleZem } from '@/features/console/components/ConsoleZem';
 import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 type Section =
     | 'overview' | 'alerts' | 'journal' | 'system'
     | 'signalements' | 'ca-sert' | 'avis' | 'connaissances' | 'connecteurs'
-    | 'newsletter' | 'users';
+    | 'newsletter' | 'users' | 'zem';
 
 interface NavEntry { id: Section; label: string; badge?: number }
 interface NavGroup { title: string; entries: NavEntry[] }
@@ -36,6 +37,7 @@ const SECTION_TITLES: Record<Section, string> = {
     avis: 'Avis sur Vanessa',
     connaissances: 'Connaissances',
     connecteurs: 'Connecteurs',
+    zem: 'Zem — sites indexés',
     newsletter: 'Newsletter',
     users: 'Utilisateurs',
 };
@@ -61,6 +63,7 @@ export default function ModerationPage() {
             { id: 'avis', label: 'Avis sur Vanessa' },
             { id: 'connaissances', label: 'Connaissances' },
             { id: 'connecteurs', label: 'Connecteurs' },
+            { id: 'zem', label: 'Zem' },
         ] },
         { title: 'Communication', entries: [
             { id: 'users', label: 'Utilisateurs' },
@@ -137,6 +140,7 @@ export default function ModerationPage() {
                         {section === 'avis' && <VanessaFeedbackReview />}
                         {section === 'connaissances' && <VanessaKnowledgeManager />}
                         {section === 'connecteurs' && <VanessaConnectorManager />}
+                        {section === 'zem' && <ConsoleZem />}
                         {section === 'users' && <ConsoleUsers />}
                         {section === 'newsletter' && <NewsletterComposer />}
                     </main>

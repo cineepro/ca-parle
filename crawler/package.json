@@ -1,0 +1,16 @@
+{
+  "name": "zem-crawler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Robot de Zem : lit les sites choisis dans la Console et remplit l'index de recherche.",
+  "scripts": {
+    "start": "node crawl.js",
+    "test": "node test/crawler.test.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "node-appwrite": "^13.0.0",
+    "robots-parser": "^3.0.1"
+  }
+}

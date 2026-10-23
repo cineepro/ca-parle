@@ -34,6 +34,7 @@ import DocumentationPage from '@/pages/DocumentationPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import UnsubscribePage from '@/pages/UnsubscribePage';
 import SearchPage from '@/pages/SearchPage';
+import ZemPage from '@/pages/ZemPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import MyReferencesPage from '@/pages/MyReferencesPage';
@@ -219,6 +220,14 @@ export const AppRouter = () => {
 
                 {/* Défaut */}
                 <Route path="/" element={<Navigate to="/accueil" replace />} />
+                <Route
+                    path="/zem"
+                    element={
+                        <ProtectedRoute>
+                            <ZemPage />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route
                     path="/recherche"
                     element={

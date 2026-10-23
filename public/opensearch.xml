@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>Zem</ShortName>
+  <Description>Zem, il t’amène partout — la recherche béninoise de Vanessa.</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="64" height="64" type="image/png">/zem/zem-96.png</Image>
+  <!-- IMPORTANT : remplacer par l’adresse complète du site, ex. https://TON-DOMAINE/zem?q={searchTerms} -->
+  <Url type="text/html" method="get" template="https://TON-DOMAINE/zem?q={searchTerms}"/>
+</OpenSearchDescription>

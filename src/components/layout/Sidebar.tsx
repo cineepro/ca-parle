@@ -230,7 +230,10 @@ export const Sidebar = () => {
     const principal: NavItem[] = [
         { to: '/accueil', label: 'Vanessa' },
         { to: '/ca-parle', label: 'Ça Parle' },
-        { to: '/ca-sert', label: 'Ça sert' },
+        { to: '/zem', label: 'Zem' },
+        // « Ça sert » masqué pour le moment (la page /ca-sert et tout son code restent en place,
+        // seul le lien est retiré). Pour le réafficher : décommenter la ligne ci-dessous.
+        // { to: '/ca-sert', label: 'Ça sert' },
         { to: '/pour-entreprises', label: 'Pour les entreprises', badgeText: 'Bientôt' },
         { to: '/messages', label: 'Messages' },
         { to: '/recherche', label: 'Rechercher' },
