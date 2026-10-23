@@ -41,6 +41,14 @@ export interface PendingCounts {
     connectors: { $id: string; name: string; icon: string; color: string; active: boolean; pending: number }[];
 }
 
+export interface BackfillKeywordsResult {
+    scanned: number; // notes examinées dans ce lot
+    processed: number; // notes dont les mots-clés viennent d'être écrits
+    failed: number; // notes pour lesquelles Haiku n'a pas répondu (à relancer)
+    alreadyDone: number; // notes qui avaient déjà des mots-clés
+    nextCursor: string | null; // null = terminé
+}
+
 export interface VanessaConnector {
     $id: string;
     name: string;
@@ -124,6 +132,13 @@ export const vanessaKnowledgeService = {
 
     async pendingCounts(): Promise<PendingCounts> {
         return callFunction<PendingCounts>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'pending_counts' });
+    },
+
+    // Rattrapage des mots-clés de recherche d'un connecteur : un lot de 25 notes
+    // à la fois (le serveur saute celles qui en ont déjà). À rappeler avec
+    // `nextCursor` jusqu'à ce qu'il soit null.
+    async backfillKeywords(connectorId: string, cursor?: string): Promise<BackfillKeywordsResult> {
+        return callFunction<BackfillKeywordsResult>(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'backfill_keywords', connectorId, cursor });
     },
 
     async create(category: string, content: string, connectorId?: string): Promise<void> {

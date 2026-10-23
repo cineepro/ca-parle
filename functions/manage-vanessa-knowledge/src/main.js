@@ -1,6 +1,7 @@
 // functions/manage-vanessa-knowledge/src/main.js — Vanessa
 // Appel HTTP explicite depuis le client :
 //   Notes   : { action: 'list'|'create'|'update'|'delete', id?, category?, content?, active?, connectorId? }
+//   Mots-clés de recherche (modérateur) : { action: 'backfill_keywords', connectorId, cursor? } — rattrape 25 notes par appel
 //   Connecteurs (modérateur) : { action: 'list_connectors'|'create_connector'|'update_connector'|'delete_connector', id?, name?, slug?, icon?, color?, description?, partnerUserId?, instructions?, model?, active? }
 //   Sites d'un connecteur (modérateur) : { action: 'list_sources'|'add_source'|'update_source'|'remove_source', connectorId?, sourceId?, url?, listingSelector?, label? }
 //   Facturation (modérateur) : { action: 'recharge_connector_tokens', id, amount }
@@ -77,6 +78,38 @@ const notebookFirst = (list) => [
     ...list.filter((c) => c.$id !== NOTEBOOK_CONNECTOR_ID),
 ];
 
+// --- Mots-clés de recherche (méthode B) ---
+// Haiku écrit les termes clés d'une note ET les mots que les gens
+// emploieraient pour la chercher (synonymes, formes verbale/nominale). Stockés
+// dans l'attribut `keywords`, ils sont consultés par la recherche de
+// send-message. Jamais bloquant : '' en cas d'échec (ou si la clé Anthropic
+// n'est pas configurée sur cette Function) — la note est alors créée sans.
+async function generateKeywords(content, ANTHROPIC_API_KEY) {
+    if (!ANTHROPIC_API_KEY || !content) return '';
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: "Tu écris les mots-clés de recherche d'une note de connaissance. Réponds UNIQUEMENT par 6 à 12 mots ou expressions courtes, séparés par des virgules, en minuscules, en français : les termes clés de la note ET les mots que des gens emploieraient pour la chercher — synonymes, formes verbale et nominale (ex : inscription, s'inscrire, pré-inscription), sigles et leur forme développée (ex : uac, université d'abomey-calavi). Aucune phrase, aucun commentaire.",
+                messages: [{ role: 'user', content: String(content).slice(0, 2000) }],
+                max_tokens: 120,
+            }),
+        });
+        if (!response.ok) return '';
+        const data = await response.json();
+        const text = data.content?.find((b) => b.type === 'text')?.text || '';
+        return text.replace(/["«»\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 450);
+    } catch {
+        return '';
+    }
+}
+
+// Écriture tolérante : si l'attribut `keywords` n'existe pas encore dans
+// Appwrite, on réécrit sans lui plutôt que d'échouer.
+const isMissingKeywordsAttribute = (err) => /unknown attribute|invalid document structure/i.test(err?.message || '');
+
 const noConnectorFilter = () => Query.or([Query.equal('connectorId', ''), Query.isNull('connectorId')]);
 
 const generalScopeFilters = (withOr = true) => [
@@ -111,6 +144,9 @@ export default async ({ req, res, error }) => {
     const COLLECTION_VANESSA_KNOWLEDGE = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const COLLECTION_VANESSA_CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
     const COLLECTION_CONNECTOR_SOURCES = process.env.COLLECTION_CONNECTOR_SOURCES;
+    // Facultative : sans elle, les notes sont créées sans mots-clés et le
+    // rattrapage ('backfill_keywords') est refusé avec un message clair.
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
@@ -320,12 +356,21 @@ export default async ({ req, res, error }) => {
                 if (!category || !content) {
                     return res.json({ success: false, error: 'category et content requis.' }, 400);
                 }
-                const doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), {
+                const noteData = {
                     category, content,
                     connectorId: connectorId || '',
                     active: active !== undefined ? active : true,
                     createdAt: new Date().toISOString(),
-                });
+                };
+                // Mots-clés utiles seulement aux notes rattachées à un connecteur.
+                const keywords = connectorId ? await generateKeywords(content, ANTHROPIC_API_KEY) : '';
+                let doc;
+                try {
+                    doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), keywords ? { ...noteData, keywords } : noteData);
+                } catch (err) {
+                    if (!keywords || !isMissingKeywordsAttribute(err)) throw err;
+                    doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), noteData);
+                }
                 return res.json({ success: true, document: doc });
             }
             case 'update': {
@@ -335,8 +380,63 @@ export default async ({ req, res, error }) => {
                 if (content !== undefined) updateData.content = content;
                 if (active !== undefined) updateData.active = active;
                 if (connectorId !== undefined) updateData.connectorId = connectorId;
-                const doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, id, updateData);
+                // Contenu modifié -> mots-clés à refaire (sinon ils décriraient l'ancien texte).
+                let newKeywords = '';
+                if (content !== undefined) {
+                    const existing = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, id);
+                    if (existing.connectorId || connectorId) newKeywords = await generateKeywords(content, ANTHROPIC_API_KEY);
+                }
+                let doc;
+                try {
+                    doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, id, newKeywords ? { ...updateData, keywords: newKeywords } : updateData);
+                } catch (err) {
+                    if (!newKeywords || !isMissingKeywordsAttribute(err)) throw err;
+                    doc = await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, id, updateData);
+                }
                 return res.json({ success: true, document: doc });
+            }
+            // Rattrapage des mots-clés des notes d'un connecteur qui n'en ont pas
+            // encore (notes créées avant cette fonctionnalité). Appelé en boucle par
+            // la Console : un lot de 25 notes à la fois, reprise par curseur, donc
+            // jamais de dépassement de délai. Les notes qui ont déjà des mots-clés
+            // sont simplement sautées (relançable sans risque ni coût en double).
+            case 'backfill_keywords': {
+                if (!connectorId) return res.json({ success: false, error: 'connectorId requis.' }, 400);
+                if (!ANTHROPIC_API_KEY) {
+                    return res.json({ success: false, error: "ANTHROPIC_API_KEY manquante sur la Function manage-vanessa-knowledge (Appwrite → Functions → Settings → Variables)." });
+                }
+                const BATCH = 25;
+                const page = [Query.equal('connectorId', connectorId), Query.orderAsc('createdAt'), Query.limit(BATCH)];
+                if (body.cursor) page.push(Query.cursorAfter(body.cursor));
+                const batch = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, page);
+                const todo = batch.documents.filter((d) => !d.keywords);
+                let processed = 0;
+                let failed = 0;
+                let attributeMissing = false;
+                for (let i = 0; i < todo.length && !attributeMissing; i += 5) {
+                    await Promise.all(todo.slice(i, i + 5).map(async (d) => {
+                        const kw = await generateKeywords(d.content, ANTHROPIC_API_KEY);
+                        if (!kw) { failed++; return; }
+                        try {
+                            await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, d.$id, { keywords: kw });
+                            processed++;
+                        } catch (err) {
+                            if (isMissingKeywordsAttribute(err)) attributeMissing = true; else failed++;
+                        }
+                    }));
+                }
+                if (attributeMissing) {
+                    return res.json({ success: false, error: "L'attribut « keywords » n'existe pas encore sur la collection vanessa_knowledge (Appwrite → Databases → Attributes : String, taille 500, non requis)." });
+                }
+                const docs = batch.documents;
+                return res.json({
+                    success: true,
+                    scanned: docs.length,
+                    processed,
+                    failed,
+                    alreadyDone: docs.length - todo.length,
+                    nextCursor: docs.length === BATCH ? docs[docs.length - 1].$id : null,
+                });
             }
             case 'delete': {
                 if (!id) return res.json({ success: false, error: 'id requis.' }, 400);

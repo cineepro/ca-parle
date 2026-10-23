@@ -638,7 +638,9 @@ async function selectRelevantKnowledge({ candidates, userMessage, maxResults, AN
     if (candidates.length === 0) return [];
     if (candidates.length <= maxResults) return candidates; // rien à trier, tout tient déjà
 
-    const listing = candidates.map((c, i) => `${i}. ${c.content.slice(0, 220)}`).join('\n');
+    // 350 caractères (avant : 220) : une note-résumé fait 300-400 caractères,
+    // le tri la voit désormais presque en entier au lieu de sa seule introduction.
+    const listing = candidates.map((c, i) => `${i}. ${c.content.slice(0, 350)}`).join('\n');
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -669,6 +671,125 @@ async function selectRelevantKnowledge({ candidates, userMessage, maxResults, AN
         log(`⚠️ Sélection de pertinence échouée : ${err.message} — repli sur les plus récentes.`);
         return candidates.slice(0, maxResults);
     }
+}
+
+// --- Recherche dans TOUT un connecteur (méthodes A + B) ---
+// Avant : seules les 60 notes les plus RÉCENTES du connecteur étaient
+// examinées, quelle que soit la question — une note ancienne mais parfaite
+// n'était jamais vue dès que le connecteur dépassait 60 notes. Maintenant :
+//   1. on extrait les mots utiles de la question (sans mots vides) ;
+//   2. la base cherche chacun de ces mots dans `content` ET dans `keywords`
+//      (mots-clés écrits par Haiku à la création de la note) — sur l'ENSEMBLE
+//      du connecteur, sans rien charger d'autre que les résultats ;
+//   3. les notes sont classées par nombre de mots trouvés ;
+//   4. on complète avec les plus récentes (pour que l'actualité fraîche ne soit
+//      jamais ratée), puis le tri de pertinence existant choisit les 8 finales.
+// Si la recherche ne trouve rien (ou échoue : index manquant...), on retombe
+// sur le comportement d'avant — jamais pire qu'avant.
+const MAX_SEARCH_WORDS = 5;
+const SEARCH_PER_QUERY = 12; // résultats lus par mot et par attribut
+const SEARCH_CANDIDATES = 40; // meilleures notes trouvées par la recherche
+const RECENT_AFTER_SEARCH = 20; // + les plus récentes, quand la recherche a trouvé quelque chose
+const CANDIDATE_POOL = 60; // taille du lot soumis au tri de pertinence (comme avant)
+
+const SEARCH_STOP_WORDS = new Set((
+    'alors,aucun,aussi,autre,autres,avant,avec,avez,avoir,bonjour,bonsoir,cela,celle,celui,ceux,chaque,chose,choses,comme,comment,' +
+    'connais,dans,dire,dis,dites,doit,donc,donne,donner,dont,elle,elles,encore,entre,est,etes,etre,être,été,ete,étaient,était,' +
+    'faire,fait,faut,fois,hello,ici,info,infos,information,informations,juste,leur,leurs,lors,mais,merci,même,meme,moins,mon,' +
+    'notre,nous,nos,parce,pas,peu,peut,peux,please,plus,pour,pourquoi,pourrais,pourriez,pouvez,quand,quel,quelle,quelles,quels,' +
+    'quelque,quelques,question,questions,quoi,renseignement,renseignements,salut,sans,savoir,sais,sera,seulement,ses,sont,sous,' +
+    'stp,suis,sommes,svp,tes,toi,ton,tous,tout,toute,toutes,très,tres,une,vais,vanessa,vas,veux,vers,voudrais,voulais,vos,votre,' +
+    'vous,ces,cet,cette,des,deux,les,que,qui,sur,aux,par,mes,moi,ils,eux,ont,pouvoir,besoin,aller,allez,donnez,dites-moi'
+).split(','));
+
+function tokenizeForSearch(text) {
+    return String(text || '').toLowerCase().replace(/[’'`]/g, ' ').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+// Mots utiles d'un message : sans mots vides ni mots du nom du connecteur
+// (« uac » dans le connecteur UAC ne trie rien), les plus longs d'abord.
+function extractSearchWords(text, excludeText = '') {
+    const exclude = new Set(tokenizeForSearch(excludeText));
+    const seen = new Set();
+    const words = [];
+    for (const w of tokenizeForSearch(text)) {
+        if (w.length < 3 || SEARCH_STOP_WORDS.has(w) || exclude.has(w) || seen.has(w)) continue;
+        seen.add(w);
+        words.push(w);
+    }
+    return words.sort((a, b) => b.length - a.length).slice(0, MAX_SEARCH_WORDS);
+}
+
+async function findConnectorCandidates({ databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, connectorName, history, VANESSA_USER_ID, log }) {
+    const base = [
+        Query.equal('active', true),
+        Query.equal('connectorId', connectorId),
+        Query.notEqual('category', PUBLICITE_CATEGORY),
+    ];
+    const recent = (n) => databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.orderDesc('createdAt'), Query.limit(n)]);
+
+    // Mots de la question ; si elle est très courte ("et les frais ?"), on
+    // ajoute ceux du message précédent de la personne, qui porte le sujet.
+    const userMessages = history.filter((m) => m.senderId !== VANESSA_USER_ID).map((m) => m.content || '');
+    const last = userMessages[userMessages.length - 1] || '';
+    const previous = userMessages[userMessages.length - 2] || '';
+    let words = extractSearchWords(last, connectorName);
+    if (words.length < 3 && previous) {
+        words = [...new Set([...words, ...extractSearchWords(previous, connectorName)])].slice(0, MAX_SEARCH_WORDS);
+    }
+    if (words.length === 0) {
+        log('🔎 Recherche connecteur : aucun mot utile dans la question — 60 notes les plus récentes.');
+        return (await recent(CANDIDATE_POOL)).documents;
+    }
+
+    const attributes = ['content', 'keywords'];
+    const [probe, ...found] = await Promise.all([
+        databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.limit(1)]).catch(() => null),
+        ...words.flatMap((w) => attributes.map((attr) =>
+            databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.search(attr, w), Query.limit(SEARCH_PER_QUERY)])
+                .then((r) => ({ w, attr, r }))
+                .catch((err) => ({ w, attr, err })))),
+    ]);
+
+    // Un mot présent dans la moitié des notes du connecteur ne départage rien : ignoré.
+    const connectorTotal = probe?.total || 0;
+    const genericWords = new Set();
+    for (const f of found) {
+        if (f.r && connectorTotal >= 20 && f.r.total >= connectorTotal * 0.5) genericWords.add(f.w);
+    }
+
+    const scored = new Map();
+    const failedAttrs = new Map();
+    const hitsPerWord = {};
+    for (const f of found) {
+        if (f.err) { failedAttrs.set(f.attr, f.err.message || String(f.err)); continue; }
+        if (genericWords.has(f.w)) continue;
+        hitsPerWord[`${f.w}/${f.attr}`] = f.r.total;
+        for (const d of f.r.documents) {
+            const entry = scored.get(d.$id) || { doc: d, score: 0 };
+            entry.score += f.attr === 'keywords' ? 1.5 : 1; // un mot-clé écrit exprès pèse un peu plus
+            scored.set(d.$id, entry);
+        }
+    }
+    for (const [attr, msg] of failedAttrs) {
+        log(`⚠️ Recherche connecteur : échec sur « ${attr} » (${String(msg).slice(0, 140)}) — index fulltext manquant ?`);
+    }
+
+    const searched = [...scored.values()]
+        .sort((a, b) => b.score - a.score || String(b.doc.createdAt).localeCompare(String(a.doc.createdAt)))
+        .slice(0, SEARCH_CANDIDATES)
+        .map((x) => x.doc);
+
+    if (searched.length === 0) {
+        log(`🔎 Recherche connecteur : mots [${words.join(', ')}] — rien trouvé${genericWords.size ? ` (trop courants : ${[...genericWords].join(', ')})` : ''} — repli sur les 60 plus récentes.`);
+        return (await recent(CANDIDATE_POOL)).documents;
+    }
+
+    const recents = (await recent(RECENT_AFTER_SEARCH)).documents;
+    const seen = new Set(searched.map((d) => d.$id));
+    const merged = [...searched, ...recents.filter((d) => !seen.has(d.$id))].slice(0, CANDIDATE_POOL);
+    log(`🔎 Recherche connecteur : mots [${words.join(', ')}]${genericWords.size ? `, ignorés (trop courants) : ${[...genericWords].join(', ')}` : ''} → ${searched.length} note(s) trouvée(s) sur ${connectorTotal} + ${merged.length - searched.length} récente(s) = ${merged.length} candidates. Résultats par mot : ${JSON.stringify(hitsPerWord)}`);
+    return merged;
 }
 
 async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, COLLECTION_USER_NOTES, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, emissionTopic, emissionPosture, callerId, log }) {
@@ -755,15 +876,17 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             // demandé — jamais mélangé avec les notes générales, les bons
             // plans Ça sert, ni les autres connecteurs. La pertinence est
             // calculée DANS ce périmètre isolé, pas en l'élargissant.
-            const knowledge = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                Query.equal('active', true),
-                Query.equal('connectorId', activeConnectorId),
-                Query.notEqual('category', PUBLICITE_CATEGORY),
-                Query.orderDesc('createdAt'),
-                Query.limit(60), // lot large de candidats — le tri de pertinence fait le vrai choix ensuite
-            ]);
+            // Candidats : notes TROUVÉES par la recherche dans tout le connecteur
+            // (mots de la question dans `content` et `keywords`) + les plus
+            // récentes — voir findConnectorCandidates. Le tri de pertinence
+            // fait ensuite le choix final parmi ce lot.
+            const connectorCandidates = await findConnectorCandidates({
+                databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE,
+                connectorId: activeConnectorId, connectorName: connectorDoc?.name || '',
+                history, VANESSA_USER_ID, log,
+            });
             const relevant = await selectRelevantKnowledge({
-                candidates: knowledge.documents, userMessage: lastUserMessage,
+                candidates: connectorCandidates, userMessage: lastUserMessage,
                 maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
             });
 

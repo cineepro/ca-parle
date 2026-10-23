@@ -178,6 +178,7 @@ export const VanessaKnowledgeManager = () => {
 
     const selectConnector = (id: string) => {
         setMeta(null);
+        setKwMessage(null);
         setConnectorId(id);
         setStatusTab('pending');
         setSearchInput('');
@@ -250,6 +251,35 @@ export const VanessaKnowledgeManager = () => {
         setReloadKey((k) => k + 1);
         setFlash('Ajoutée — visible dans « Activées ».');
         setShowAdd(false);
+    };
+
+    // Rattrapage des mots-clés de recherche des notes déjà présentes dans ce
+    // connecteur : lots de 25 jusqu'à la fin. Peut être relancé sans risque.
+    const [kwBusy, setKwBusy] = useState(false);
+    const [kwMessage, setKwMessage] = useState<string | null>(null);
+    const handleBackfillKeywords = async () => {
+        if (scope !== 'connector' || !connectorId || kwBusy) return;
+        setKwBusy(true);
+        setKwMessage('Génération en cours…');
+        let cursor: string | undefined;
+        let scanned = 0;
+        let processed = 0;
+        let failed = 0;
+        try {
+            do {
+                const r = await vanessaKnowledgeService.backfillKeywords(connectorId, cursor);
+                scanned += r.scanned;
+                processed += r.processed;
+                failed += r.failed;
+                cursor = r.nextCursor || undefined;
+                setKwMessage(`Génération en cours… ${scanned} notes examinées, ${processed} complétées.`);
+            } while (cursor);
+            setKwMessage(`Terminé : ${scanned} notes examinées, ${processed} complétées${failed ? `, ${failed} à relancer (le service n'a pas répondu)` : ''}.`);
+        } catch (e: any) {
+            setKwMessage(`Interrompu : ${e.message || 'erreur inconnue'}${processed ? ` (${processed} déjà complétées — relance pour continuer)` : ''}`);
+        } finally {
+            setKwBusy(false);
+        }
     };
 
     const handleAddNote = async () => {
@@ -413,6 +443,16 @@ export const VanessaKnowledgeManager = () => {
                     </form>
 
                     {flash && <p className="text-xs font-semibold text-green-600">{flash}</p>}
+
+                    {/* Mots-clés de recherche : rattrapage des notes de ce connecteur qui n'en ont pas encore */}
+                    {scope === 'connector' && connectorId && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button size="sm" variant="secondary" type="button" onClick={handleBackfillKeywords} disabled={kwBusy}>
+                                {kwBusy ? 'Génération…' : '🔎 Générer les mots-clés de recherche'}
+                            </Button>
+                            {kwMessage && <span className="text-xs text-gray-500">{kwMessage}</span>}
+                        </div>
+                    )}
 
                     {/* Ajout — le formulaire correspond au type choisi */}
                     {showAdd && scope === 'lexique' && (

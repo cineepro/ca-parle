@@ -9,6 +9,30 @@
 import { Client, Databases, Storage, ID } from 'node-appwrite';
 import pdfParse from 'pdf-parse';
 
+// Mots-clés de recherche d'une note (méthode B) — voir sync-connector-sources.
+// Jamais bloquant : '' en cas d'échec, la note est alors créée sans.
+async function generateKeywords(content, ANTHROPIC_API_KEY) {
+    if (!ANTHROPIC_API_KEY || !content) return '';
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: "Tu écris les mots-clés de recherche d'une note de connaissance. Réponds UNIQUEMENT par 6 à 12 mots ou expressions courtes, séparés par des virgules, en minuscules, en français : les termes clés de la note ET les mots que des gens emploieraient pour la chercher — synonymes, formes verbale et nominale (ex : inscription, s'inscrire, pré-inscription), sigles et leur forme développée (ex : uac, université d'abomey-calavi). Aucune phrase, aucun commentaire.",
+                messages: [{ role: 'user', content: String(content).slice(0, 2000) }],
+                max_tokens: 120,
+            }),
+        });
+        if (!response.ok) return '';
+        const data = await response.json();
+        const text = data.content?.find((b) => b.type === 'text')?.text || '';
+        return text.replace(/["«»\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 450);
+    } catch {
+        return '';
+    }
+}
+
 export default async ({ req, res, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
     if (!callerId) {
@@ -79,13 +103,22 @@ export default async ({ req, res, error }) => {
             return res.json({ success: false, error: 'Aucun résumé généré.' }, 500);
         }
 
-        const doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), {
+        const noteData = {
             category: 'document',
             content: summary,
             connectorId,
             active: false, // ⚠️ à valider manuellement avant utilisation par Vanessa
             createdAt: new Date().toISOString(),
-        });
+        };
+        const keywords = await generateKeywords(summary, ANTHROPIC_API_KEY);
+        let doc;
+        try {
+            doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), keywords ? { ...noteData, keywords } : noteData);
+        } catch (err) {
+            // Attribut `keywords` pas encore créé dans Appwrite : on enregistre la note sans.
+            if (!keywords || !/unknown attribute|invalid document structure/i.test(err.message || '')) throw err;
+            doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), noteData);
+        }
 
         return res.json({ success: true, document: doc });
     } catch (err) {

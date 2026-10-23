@@ -101,14 +101,56 @@ async function summarizeForKnowledge(text, sourceName, ANTHROPIC_API_KEY) {
     return textBlock?.text?.trim() || null;
 }
 
-async function saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, content) {
-    await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), {
+// Mots-clés de recherche d'une note (méthode B) : Haiku écrit les termes clés
+// ET les mots que les gens emploieraient pour la chercher (synonymes, formes
+// verbales/nominales). Ils sont stockés dans l'attribut `keywords` et
+// consultés par la recherche de send-message. Jamais bloquant : en cas
+// d'échec on renvoie '' et la note est créée sans (rattrapable plus tard
+// depuis la Console).
+async function generateKeywords(content, ANTHROPIC_API_KEY) {
+    if (!ANTHROPIC_API_KEY || !content) return '';
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({
+                model: 'claude-haiku-4-5-20251001',
+                system: "Tu écris les mots-clés de recherche d'une note de connaissance. Réponds UNIQUEMENT par 6 à 12 mots ou expressions courtes, séparés par des virgules, en minuscules, en français : les termes clés de la note ET les mots que des gens emploieraient pour la chercher — synonymes, formes verbale et nominale (ex : inscription, s'inscrire, pré-inscription), sigles et leur forme développée (ex : uac, université d'abomey-calavi). Aucune phrase, aucun commentaire.",
+                messages: [{ role: 'user', content: String(content).slice(0, 2000) }],
+                max_tokens: 120,
+            }),
+        });
+        if (!response.ok) return '';
+        const data = await response.json();
+        const text = data.content?.find((b) => b.type === 'text')?.text || '';
+        return text.replace(/["«»\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 450);
+    } catch {
+        return '';
+    }
+}
+
+// Création tolérante : si l'attribut `keywords` n'existe pas encore dans
+// Appwrite, on recrée la note sans lui plutôt que de perdre la synchronisation.
+async function createKnowledgeDoc(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, data, keywords) {
+    if (keywords) {
+        try {
+            return await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), { ...data, keywords });
+        } catch (err) {
+            if (!/unknown attribute|invalid document structure/i.test(err.message || '')) throw err;
+        }
+    }
+    return databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), data);
+}
+
+async function saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, content, ANTHROPIC_API_KEY) {
+    const keywords = await generateKeywords(content, ANTHROPIC_API_KEY);
+    await createKnowledgeDoc(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, {
         category: 'actualite',
         content,
         connectorId,
         active: false, // ⚠️ toujours désactivé à la création — relecture humaine obligatoire
         createdAt: new Date().toISOString(),
-    });
+    }, keywords);
 }
 
 // Persiste IMMÉDIATEMENT le hash d'un item traité avec succès, au lieu
@@ -169,7 +211,7 @@ async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COL
 
             const summary = await summarizeForKnowledge(`${item.title}\n\n${text}`, sourceName, ANTHROPIC_API_KEY);
             if (summary) {
-                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary);
+                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
                 newEntries++;
             }
             // Persisté immédiatement, item par item — plus d'attente de
@@ -212,7 +254,7 @@ async function syncSinglePage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLED
     const summary = await summarizeForKnowledge(text, sourceName, ANTHROPIC_API_KEY);
     let newEntries = 0;
     if (summary) {
-        await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary);
+        await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
         newEntries = 1;
     }
     await databases.updateDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, source.$id, {
@@ -297,7 +339,7 @@ async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLE
 
             const summary = await summarizeForKnowledge(text, sourceName, ANTHROPIC_API_KEY);
             if (summary) {
-                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary);
+                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
                 newEntries++;
             }
             await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, source, hashOf(link));
