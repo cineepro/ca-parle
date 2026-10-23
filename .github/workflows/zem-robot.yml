@@ -1,0 +1,35 @@
+name: Robot Zem
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code source
+        uses: actions/checkout@v4
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests appwrite beautifulsoup4
+
+      - name: Lancer le robot d'exploration Zem
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT_ID: ${{ secrets.APPWRITE_PROJECT_ID }}
+          ZEM_APPWRITE_API_KEY: ${{ secrets.ZEM_APPWRITE_API_KEY }}
+          DATABASE_ID: ${{ secrets.DATABASE_ID }}
+          COLLECTION_SEARCH_SOURCES: ${{ secrets.COLLECTION_SEARCH_SOURCES }}
+          COLLECTION_SEARCH_DOCUMENTS: ${{ secrets.COLLECTION_SEARCH_DOCUMENTS }}
+          ZEM_USER_AGENT: ${{ vars.ZEM_USER_AGENT }}
+        run: |
+          python crawler/main.py
