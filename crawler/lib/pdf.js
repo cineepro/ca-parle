@@ -25,7 +25,9 @@ export async function extractPdf(bytes, url, linkText = '') {
     const head = Buffer.from(bytes.slice(0, 5)).toString('latin1');
     if (!head.startsWith('%PDF')) return null;
     let pdf;
-    try { pdf = await getDocumentProxy(new Uint8Array(bytes)); } catch { return null; }
+    // Un échec ici n'est PAS « pas de texte » : c'est la bibliothèque qui ne marche pas (ex. Node trop ancien).
+    // On le signale au lieu de l'avaler, pour que le journal du robot dise pourquoi aucun PDF n'est lu.
+    try { pdf = await getDocumentProxy(new Uint8Array(bytes)); } catch (e) { throw new Error(`lecture PDF impossible : ${e?.message || e}`); }
     let info = {};
     try { info = (await pdf.getMetadata())?.info || {}; } catch { /* pas de métadonnées */ }
     let text = '';

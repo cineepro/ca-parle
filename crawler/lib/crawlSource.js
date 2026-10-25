@@ -141,6 +141,7 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
 
     // 4. PDF trouvés (communiqués, avis…) : texte seulement, au plus MAX_PDFS_PER_RUN nouveaux par passage
     let pdfFetched = 0;
+    let pdfWarned = false;
     for (const [pdfUrl, linkText] of pdfQueue) {
         if (pdfFetched >= MAX_PDFS_PER_RUN || now() > deadline || !fetchText.bytes) break;
         if (!allowed(pdfUrl)) { stats.blocked += 1; continue; }
@@ -150,7 +151,14 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
         const r = await fetchText.bytes(pdfUrl);
         pdfFetched += 1;
         if (r.status !== 200 || !r.bytes) { stats.failed += 1; continue; }
-        const doc = await extractPdf(r.bytes, pdfUrl, linkText);
+        let doc;
+        try {
+            doc = await extractPdf(r.bytes, pdfUrl, linkText);
+        } catch (e) {
+            stats.failed += 1;
+            if (!pdfWarned) { log(`   ⚠️ ${e.message} (version de Node : ${process.version}, il faut la 22 ou plus)`); pdfWarned = true; }
+            continue;
+        }
         if (!doc) { stats.skipped += 1; continue; } // pas de texte (PDF scanné) ou illisible
         const hash = hashContent(doc.content);
         if (existing && existing.contentHash === hash) { await store.saveDoc(id, { crawledAt: new Date(now()).toISOString() }, true); stats.unchanged += 1; continue; }
