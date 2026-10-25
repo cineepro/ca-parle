@@ -25,6 +25,7 @@ export const ZemReader = ({ result, onClose }: { result: ZemResult; onClose: () 
     }, [onClose]);
 
     const when = freshnessLabel(result.publishedAt);
+    const hasSite = /^https?:/.test(result.url);
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/50 p-0 sm:p-4" onClick={onClose}>
             <div
@@ -48,13 +49,15 @@ export const ZemReader = ({ result, onClose }: { result: ZemResult; onClose: () 
                     {error && 'Zem n’arrive pas à ouvrir cette page ici. Va directement sur le site.'}
                     {page?.excerpt}
                 </div>
-                {page?.truncated && <p className="text-xs text-gray-400 mt-2">Extrait — la suite est sur le site d’origine.</p>}
-                <button
-                    onClick={() => openExternal(result.url)}
-                    className="mt-4 w-full rounded-full bg-brand text-ink font-bold min-h-[48px]"
-                >
-                    {OPEN_SITE} ({result.host}) ↗
-                </button>
+                {page?.truncated && hasSite && <p className="text-xs text-gray-400 mt-2">Extrait — la suite est sur le site d’origine.</p>}
+                {hasSite && (
+                    <button
+                        onClick={() => openExternal(result.url)}
+                        className="mt-4 w-full rounded-full bg-brand text-ink font-bold min-h-[48px]"
+                    >
+                        {OPEN_SITE} ({result.host}) ↗
+                    </button>
+                )}
             </div>
         </div>
     );

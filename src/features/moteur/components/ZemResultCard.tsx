@@ -1,5 +1,5 @@
 // src/features/moteur/components/ZemResultCard.tsx — Zem
-import type { ZemResult } from '../services/moteurService';
+import { moteurService, type ZemResult } from '../services/moteurService';
 import { CATEGORY_META, TRUST_META, freshnessLabel, READ_HERE } from '../lib/phrases';
 import { highlightPieces } from '../lib/highlight';
 import { openExternal } from '../lib/openExternal';
@@ -14,6 +14,12 @@ export const ZemResultCard = ({ result, words = [], onRead }: Props) => {
     const trust = TRUST_META[result.trust] || TRUST_META[1];
     const cat = CATEGORY_META[result.category] || CATEGORY_META.autre;
     const when = freshnessLabel(result.publishedAt);
+    // Fiches et notes de Vanessa n'ont pas de page web : on les ouvre dans le lecteur de Zem.
+    const internal = result.url.startsWith('zem:');
+    const open = () => {
+        moteurService.click(result.id);
+        if (internal) onRead(result); else openExternal(result.url);
+    };
     return (
         <article className="bg-white rounded-2xl border border-gray-100 p-4">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 mb-1">
@@ -24,8 +30,8 @@ export const ZemResultCard = ({ result, words = [], onRead }: Props) => {
                 {when && <span className="text-ochre font-semibold">{when}</span>}
             </div>
             <a
-                href={result.url}
-                onClick={(e) => { e.preventDefault(); openExternal(result.url); }}
+                href={internal ? '#' : result.url}
+                onClick={(e) => { e.preventDefault(); open(); }}
                 className="block text-base font-bold text-ink hover:underline break-words"
             >
                 {result.title}
@@ -38,7 +44,7 @@ export const ZemResultCard = ({ result, words = [], onRead }: Props) => {
                 </p>
             )}
             <button
-                onClick={() => onRead(result)}
+                onClick={() => { moteurService.click(result.id); onRead(result); }}
                 className="mt-2 text-sm font-semibold text-ochre min-h-[44px] -mb-2"
             >
                 {READ_HERE} →

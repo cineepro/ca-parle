@@ -33,3 +33,24 @@ assert.equal(ok.value.url,'https://www.uac.bj/news'); assert.equal(ok.value.trus
 assert.equal(cleanSource({url:'https://uac.bj', category:'bidon', trust:9}).value.category,'autre');
 assert.equal(parseBulk('# commentaire\n\nhttps://a.bj | A | etudes | Cotonou | 3\nhttps://b.bj').length, 2);
 console.log('classement + validation : OK');
+
+// ---- v2 : synonymes, accents, fautes, clics
+import { buildGroups, buildVocab, correctWords, editDistance, clicksMultiplier, scoreDocument, flattenTerms } from '../src/ranking.js';
+import { SYNONYMS } from '../src/synonyms.js';
+const vocab = buildVocab(['Inscriptions à l’Université d’Abomey-Calavi', 'Bourses d’études 2026', 'Concours de recrutement']);
+assert.ok(vocab.get('universite').spellings.has('université'));
+let g = buildGroups(['universite'], { synonyms: SYNONYMS, vocab });
+assert.ok(g[0].raw.includes('université'));                       // accent rétabli pour la base
+assert.equal(editDistance('inscriptoin', 'inscription'), 1);       // échange de lettres = 1 faute
+assert.deepEqual(correctWords(['inscriptoin'], vocab), { words: ['inscriptions'], changed: true });
+assert.deepEqual(correctWords(['bourse'], vocab).changed, false);   // pluriel connu : pas de correction
+assert.equal(correctWords(['xyzxyz'], vocab).changed, false);
+// synonymes : « recrutement » trouve une page qui dit « concours »
+const sdoc = { $id: 's', host: 'h', title: 'Concours de la police', content: '', trust: 1 };
+const gs = buildGroups(['recrutement'], { synonyms: SYNONYMS });
+assert.ok(scoreDocument(sdoc, gs, { now }) > 0);
+assert.ok(scoreDocument(sdoc, gs, { now }) < scoreDocument({ ...sdoc, title: 'Recrutement de la police' }, gs, { now }));
+// clics : plafonné
+assert.equal(clicksMultiplier(0), 1); assert.ok(clicksMultiplier(5) > 1); assert.ok(clicksMultiplier(1e9) <= 1.3 + 1e-9);
+assert.ok(flattenTerms(g).includes('universite'));
+console.log('classement v2 : OK');

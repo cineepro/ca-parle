@@ -29,6 +29,7 @@ export default function ZemPage() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [track, setTrack] = useState<TrackState>('idle');
+    const [corrected, setCorrected] = useState<{ from: string; to: string } | null>(null);
     const [error, setError] = useState(false);
     const [reading, setReading] = useState<ZemResult | null>(null);
     const [waitingLine, setWaitingLine] = useState(WAITING_LINES[0]);
@@ -52,6 +53,7 @@ export default function ZemPage() {
             if (id !== runId.current) return;
             setResults((prev) => (nextPage === 0 ? r.results : [...(prev || []), ...r.results]));
             setWords(r.words);
+            if (nextPage === 0) setCorrected(r.corrected ?? null);
             setTotal(r.total);
             setPage(nextPage);
             setHasMore(r.hasMore);
@@ -95,7 +97,7 @@ export default function ZemPage() {
         }
     };
 
-    const reset = () => { setText(''); setCategory(''); setResults(null); setError(false); setTrack('idle'); setParams({}); runId.current++; };
+    const reset = () => { setCorrected(null); setText(''); setCategory(''); setResults(null); setError(false); setTrack('idle'); setParams({}); runId.current++; };
     const searching = results !== null || track === 'loading';
 
     return (
@@ -161,6 +163,11 @@ export default function ZemPage() {
                         )}
                         {results.length > 0 && (
                             <>
+                                {corrected && (
+                                    <p className="text-sm bg-sand text-ink rounded-xl px-3 py-2 mb-2">
+                                        Zem a cherché <strong>« {corrected.to} »</strong> <span className="text-gray-500">(tu avais écrit « {corrected.from} »)</span>
+                                    </p>
+                                )}
                                 <p className="text-xs text-gray-500 mb-2">{total} page{total > 1 ? 's' : ''} trouvée{total > 1 ? 's' : ''}</p>
                                 <div className="space-y-3">
                                     {results.map((r) => <ZemResultCard key={r.id} result={r} words={words} onRead={setReading} />)}

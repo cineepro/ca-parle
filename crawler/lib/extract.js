@@ -75,3 +75,19 @@ export function extractLinks(html, pageUrl) {
     });
     return [...out];
 }
+
+// Liens vers des PDF (même site) trouvés dans une page : [{ url, text }].
+export function extractPdfLinks(html, pageUrl) {
+    const $ = cheerio.load(html);
+    const base = new URL(pageUrl);
+    const out = new Map();
+    $('a[href]').each((_, a) => {
+        try {
+            const u = new URL($(a).attr('href'), pageUrl);
+            if (!['http:', 'https:'].includes(u.protocol) || u.hostname !== base.hostname || !/\.pdf$/i.test(u.pathname)) return;
+            u.hash = '';
+            if (!out.has(u.toString())) out.set(u.toString(), clean($(a).text()));
+        } catch { /* lien invalide */ }
+    });
+    return [...out].map(([url, text]) => ({ url, text }));
+}

@@ -3,6 +3,7 @@
 //   { action: 'search', q, category?, city?, page? }  → résultats classés (10 par page)
 //   { action: 'home' }                                → rubriques (avec nombre de pages) + dernières pages ajoutées
 //   { action: 'browse', category, page? }             → dernières pages d'une rubrique (sans mot cherché)
+//   { action: 'click', id }                           → note qu'un résultat a été ouvert (aide à classer)
 //   { action: 'read', id }                            → extrait de lecture (≈1 500 caractères) d'une page indexée
 //
 // Zem ne recherche QUE dans les pages que le robot a indexées depuis les sites choisis
@@ -10,11 +11,14 @@
 // toujours vers le site d'origine. Les questions sont enregistrées SANS identifiant
 // d'utilisateur (search_queries) pour repérer ce qui manque dans l'index.
 import { Client, Databases, Query, ID } from 'node-appwrite';
-import { extractQueryWords, wordVariants, rankDocuments, buildSnippet, normalize } from './ranking.js';
+import { extractQueryWords, buildGroups, flattenTerms, correctWords, rankDocuments, buildSnippet, normalize } from './ranking.js';
+import { SYNONYMS } from './synonyms.js';
+import { getVocab } from './vocab.js';
 
 const PAGE_SIZE = 10;
 const CATEGORIES = ['actualites', 'etudes', 'administration', 'sante', 'emploi', 'marche', 'culture', 'sport', 'services', 'autre'];
-const FIELDS = ['$id', 'url', 'host', 'title', 'description', 'content', 'category', 'city', 'trust', 'publishedAt', 'sourceLabel'];
+const FIELDS = ['$id', 'url', 'host', 'title', 'description', 'content', 'category', 'city', 'trust', 'publishedAt', 'sourceLabel', 'clicks'];
+const MAX_RAW_CALLS = 36; // plafond d'appels à la base pour une seule question
 
 export default async ({ req, res, log, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
@@ -46,32 +50,58 @@ export default async ({ req, res, log, error }) => {
             const filters = [];
             if (category) filters.push(Query.equal('category', category));
 
-            // Candidats : pour chaque mot (et sa forme sans pluriel), les pages dont le titre
-            // ou le texte le contient. Un appel qui échoue (index manquant…) n'arrête pas les autres.
-            const calls = [];
-            for (const w of words) {
-                for (const v of wordVariants(w)) {
-                    calls.push(databases.listDocuments(DATABASE_ID, DOCS, [...filters, Query.search('title', v), Query.limit(30), Query.select(FIELDS)]));
-                    calls.push(databases.listDocuments(DATABASE_ID, DOCS, [...filters, Query.search('content', v), Query.limit(60), Query.select(FIELDS)]));
+            // Candidats : pour chaque mot (et ses variantes : pluriel, synonymes, accents vus dans
+            // l'index), les pages dont le titre ou le texte le contient. Un appel qui échoue
+            // (index manquant…) n'arrête pas les autres.
+            const retrieve = async (groups) => {
+                const calls = [];
+                for (const g of groups) {
+                    for (const v of g.raw) {
+                        if (calls.length >= MAX_RAW_CALLS) break;
+                        calls.push(databases.listDocuments(DATABASE_ID, DOCS, [...filters, Query.search('title', v), Query.limit(30), Query.select(FIELDS)]));
+                        calls.push(databases.listDocuments(DATABASE_ID, DOCS, [...filters, Query.search('content', v), Query.limit(60), Query.select(FIELDS)]));
+                    }
                 }
-            }
-            const settled = await Promise.allSettled(calls);
-            const okCount = settled.filter((s) => s.status === 'fulfilled').length;
-            if (okCount === 0) {
-                const why = settled[0]?.reason?.message || 'inconnue';
-                error(`Zem : toutes les requêtes de recherche ont échoué (${why}). Vérifier les index fulltext title/content sur search_documents.`);
+                const settled = await Promise.allSettled(calls);
+                const okCount = settled.filter((x) => x.status === 'fulfilled').length;
+                const byId = new Map();
+                for (const x of settled) {
+                    if (x.status !== 'fulfilled') continue;
+                    for (const d of x.value.documents) if (!byId.has(d.$id)) byId.set(d.$id, d);
+                }
+                return { okCount, why: settled.find((x) => x.status === 'rejected')?.reason?.message, docs: [...byId.values()].slice(0, 200) };
+            };
+
+            const vocab = await getVocab(databases, DATABASE_ID, DOCS);
+            let groups = buildGroups(words, { synonyms: SYNONYMS, vocab });
+            let got = await retrieve(groups);
+            if (got.okCount === 0) {
+                error(`Zem : toutes les requêtes de recherche ont échoué (${got.why || 'inconnue'}). Vérifier les index fulltext title/content sur search_documents.`);
                 return res.json({ success: false, error: 'Zem a un petit souci technique. Réessaie dans un instant.' });
             }
-            const byId = new Map();
-            for (const s of settled) {
-                if (s.status !== 'fulfilled') continue;
-                for (const d of s.value.documents) if (!byId.has(d.$id)) byId.set(d.$id, d);
+            let ranked = rankDocuments(got.docs, groups, { city });
+            let corrected = null;
+
+            // Aucun résultat : on essaie de corriger les fautes de frappe avec les mots de l'index.
+            if (ranked.length === 0) {
+                const fix = correctWords(words, vocab);
+                if (fix.changed) {
+                    const groups2 = buildGroups(fix.words, { synonyms: SYNONYMS, vocab });
+                    const got2 = await retrieve(groups2);
+                    const ranked2 = rankDocuments(got2.docs, groups2, { city });
+                    if (ranked2.length > 0) {
+                        corrected = { from: q, to: fix.words.join(' ') };
+                        groups = groups2;
+                        ranked = ranked2;
+                        got = got2;
+                    }
+                }
             }
-            const candidates = [...byId.values()].slice(0, 200);
-            const ranked = rankDocuments(candidates, words, { city });
+            const candidates = got.docs;
+            const shownWords = flattenTerms(groups);
             const total = ranked.length;
             const slice = ranked.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-            log(`🔎 Zem « ${q} » → mots [${words.join(', ')}], ${candidates.length} candidats, ${total} retenus`);
+            log(`🔎 Zem « ${q} » → mots [${words.join(', ')}]${corrected ? ` corrigés en « ${corrected.to} »` : ''}, ${candidates.length} candidats, ${total} retenus`);
 
             if (page === 0 && QUERIES) {
                 // Journal anonyme, jamais bloquant.
@@ -88,13 +118,14 @@ export default async ({ req, res, log, error }) => {
                 total,
                 page,
                 hasMore: (page + 1) * PAGE_SIZE < total,
-                words,
+                words: shownWords,
+                corrected,
                 results: slice.map(({ doc, score }) => ({
                     id: doc.$id,
                     url: doc.url,
                     host: doc.host,
                     title: doc.title,
-                    snippet: buildSnippet(doc, words),
+                    snippet: buildSnippet(doc, groups),
                     category: doc.category,
                     city: doc.city || '',
                     trust: doc.trust || 1,
@@ -128,6 +159,17 @@ export default async ({ req, res, log, error }) => {
                 } catch { /* pas de dernières pages : l'accueil s'affiche sans */ }
             }
             return res.json({ success: true, categories: Object.fromEntries(counts), latest });
+        }
+
+        if (action === 'click') {
+            const id = String(body.id || '');
+            if (!id) return res.json({ success: false, error: 'id requis.' }, 400);
+            // Jamais bloquant : si l'attribut « clicks » n'existe pas encore, on ignore.
+            try {
+                const d = await databases.getDocument(DATABASE_ID, DOCS, id);
+                await databases.updateDocument(DATABASE_ID, DOCS, id, { clicks: (Number(d.clicks) || 0) + 1 });
+            } catch { /* ignoré */ }
+            return res.json({ success: true });
         }
 
         if (action === 'browse') {

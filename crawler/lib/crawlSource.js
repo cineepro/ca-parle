@@ -2,15 +2,20 @@
 // Explore UN site : respecte robots.txt, trouve les pages (sitemap → RSS → liens), lit le
 // texte, et l'enregistre via `store`. Réseau et base sont injectés : testable sans internet.
 import robotsParser from 'robots-parser';
-import { extractPage, extractLinks, MIN_CONTENT_CHARS } from './extract.js';
+import { extractPage, extractLinks, extractPdfLinks, MIN_CONTENT_CHARS } from './extract.js';
+import { extractPdf } from './pdf.js';
 import { parseSitemap, parseFeed, sitemapsFromRobots, sortByLastmod, isWorthCrawling } from './discover.js';
 import { docIdForUrl, hashContent } from './ids.js';
 import { USER_AGENT } from './http.js';
 
 const RECRAWL_DAYS = Number(process.env.ZEM_RECRAWL_DAYS || 3);
+const PDF_RECRAWL_DAYS = 30; // un PDF change rarement : on ne le relit qu'une fois par mois
+const MAX_PDFS_PER_RUN = Number(process.env.ZEM_MAX_PDFS || 10);
+const isPdfUrl = (u) => /\.pdf($|\?)/i.test(u);
 
 export async function crawlSource({ source, fetchText, store, log = console.log, now = () => Date.now(), deadline = Infinity }) {
-    const stats = { found: 0, fetched: 0, saved: 0, unchanged: 0, skipped: 0, blocked: 0, failed: 0 };
+    const stats = { found: 0, fetched: 0, saved: 0, unchanged: 0, skipped: 0, blocked: 0, failed: 0, pdfs: 0 };
+    const pdfQueue = new Map(); // adresse du PDF → texte du lien
     const origin = new URL(source.url).origin;
     const prefix = new URL(source.url).pathname;
     const inScope = (u) => {
@@ -87,6 +92,7 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
     for (const item of ordered) {
         if (stats.fetched >= budget || now() > deadline) break;
         if (!allowed(item.url)) { stats.blocked += 1; continue; }
+        if (isPdfUrl(item.url)) { pdfQueue.set(item.url, ''); continue; } // traité plus bas, avec son propre plafond
 
         const id = docIdForUrl(item.url);
         const existing = await store.getDoc(id);
@@ -103,6 +109,7 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
             if (existing && (r.status === 404 || r.status === 410)) await store.removeDoc(id);
             continue;
         }
+        for (const l of extractPdfLinks(r.text, item.url)) if (!pdfQueue.has(l.url)) pdfQueue.set(l.url, l.text);
         const page = extractPage(r.text, item.url);
         if (page.noindex || page.content.length < MIN_CONTENT_CHARS || !page.title) { stats.skipped += 1; continue; }
 
@@ -131,5 +138,39 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
         }, !!existing);
         stats.saved += 1;
     }
-    return { ...stats, status: `ok — ${stats.saved} nouvelles/modifiées, ${stats.unchanged} inchangées, ${stats.failed} échecs` };
+
+    // 4. PDF trouvés (communiqués, avis…) : texte seulement, au plus MAX_PDFS_PER_RUN nouveaux par passage
+    let pdfFetched = 0;
+    for (const [pdfUrl, linkText] of pdfQueue) {
+        if (pdfFetched >= MAX_PDFS_PER_RUN || now() > deadline || !fetchText.bytes) break;
+        if (!allowed(pdfUrl)) { stats.blocked += 1; continue; }
+        const id = docIdForUrl(pdfUrl);
+        const existing = await store.getDoc(id);
+        if (existing?.crawledAt && now() - Date.parse(existing.crawledAt) < PDF_RECRAWL_DAYS * 86400000) { stats.skipped += 1; continue; }
+        const r = await fetchText.bytes(pdfUrl);
+        pdfFetched += 1;
+        if (r.status !== 200 || !r.bytes) { stats.failed += 1; continue; }
+        const doc = await extractPdf(r.bytes, pdfUrl, linkText);
+        if (!doc) { stats.skipped += 1; continue; } // pas de texte (PDF scanné) ou illisible
+        const hash = hashContent(doc.content);
+        if (existing && existing.contentHash === hash) { await store.saveDoc(id, { crawledAt: new Date(now()).toISOString() }, true); stats.unchanged += 1; continue; }
+        await store.saveDoc(id, {
+            url: pdfUrl,
+            host: new URL(pdfUrl).hostname.replace(/^www\./, ''),
+            sourceId: source.$id,
+            sourceLabel: source.label || '',
+            title: doc.title,
+            description: doc.description,
+            content: doc.content,
+            category: source.category || 'autre',
+            city: source.city || '',
+            trust: source.trust || 2,
+            publishedAt: doc.publishedAt,
+            crawledAt: new Date(now()).toISOString(),
+            contentHash: hash,
+            lang: 'fr',
+        }, !!existing);
+        stats.pdfs += 1;
+    }
+    return { ...stats, status: `ok — ${stats.saved} pages et ${stats.pdfs} PDF nouveaux/modifiés, ${stats.unchanged} inchangés, ${stats.failed} échecs` };
 }

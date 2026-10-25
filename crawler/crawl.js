@@ -31,7 +31,8 @@ const fetchText = makeFetcher({ delayMs: Number(process.env.ZEM_DELAY_MS || 1000
 
 const queries = [Query.equal('active', true), Query.orderAsc('lastCrawledAt'), Query.limit(100)];
 const list = await databases.listDocuments(DB, SOURCES, queries);
-const sources = list.documents.filter((s) => !process.env.ZEM_ONLY_SOURCE || s.$id === process.env.ZEM_ONLY_SOURCE);
+// Les lignes « vanessa-connector:… » ne sont pas des sites : elles sont traitées par la fonction manage-search-sources.
+const sources = list.documents.filter((s) => /^https?:/.test(s.url) && (!process.env.ZEM_ONLY_SOURCE || s.$id === process.env.ZEM_ONLY_SOURCE));
 console.log(`🛵 Zem démarre : ${sources.length} site(s) à explorer (le moins récemment visité d'abord).`);
 
 for (const source of sources) {
