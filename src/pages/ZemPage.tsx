@@ -8,7 +8,7 @@ import { moteurService, browseCategory, type ZemCategory, type ZemHome, type Zem
 import { ZemRider } from '@/features/moteur/components/ZemRider';
 import { ZemTrack, type TrackState } from '@/features/moteur/components/ZemTrack';
 import { ZemSearchBar } from '@/features/moteur/components/ZemSearchBar';
-import { ZemResultCard } from '@/features/moteur/components/ZemResultCard';
+import { ZemMosaic } from '@/features/moteur/components/ZemMosaic';
 import { ZemReader } from '@/features/moteur/components/ZemReader';
 import {
     ZEM_TAGLINE, ZEM_SUBTITLE, WAITING_LINES, ARRIVED, NOTHING_FOUND_TITLE, NOTHING_FOUND_HELP, ERROR_LINE,
@@ -169,9 +169,7 @@ export default function ZemPage() {
                                     </p>
                                 )}
                                 <p className="text-xs text-gray-500 mb-2">{total} page{total > 1 ? 's' : ''} trouvée{total > 1 ? 's' : ''}</p>
-                                <div className="space-y-3">
-                                    {results.map((r) => <ZemResultCard key={r.id} result={r} words={words} onRead={setReading} />)}
-                                </div>
+                                <ZemMosaic results={results} words={words} onRead={setReading} />
                                 {hasMore && (
                                     <button
                                         onClick={() => run(text, category, page + 1)}
@@ -192,9 +190,7 @@ export default function ZemPage() {
                         {home.latest.length > 0 ? (
                             <>
                                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">{LATEST_TITLE}</h2>
-                                <div className="space-y-3">
-                                    {home.latest.map((r) => <ZemResultCard key={r.id} result={r} onRead={setReading} />)}
-                                </div>
+                                <ZemMosaic results={home.latest} onRead={setReading} />
                             </>
                         ) : (
                             <div className="text-center bg-white rounded-3xl border border-gray-100 p-6">

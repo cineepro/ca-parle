@@ -65,3 +65,17 @@ export function freshnessLabel(iso: string, now = Date.now()): string {
     if (days < 365) return `Il y a ${Math.floor(days / 30)} mois`;
     return new Date(t).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
 }
+
+// Une couleur douce par rubrique (pastille, bandeau de carte). Texte toujours sombre sur ces fonds.
+export const CATEGORY_TONE: Record<ZemCategory, { soft: string; strong: string; text: string }> = {
+    actualites: { soft: 'bg-amber-100', strong: 'bg-amber-400', text: 'text-amber-900' },
+    etudes: { soft: 'bg-sky-100', strong: 'bg-sky-400', text: 'text-sky-900' },
+    administration: { soft: 'bg-slate-200', strong: 'bg-slate-400', text: 'text-slate-900' },
+    sante: { soft: 'bg-emerald-100', strong: 'bg-emerald-400', text: 'text-emerald-900' },
+    emploi: { soft: 'bg-violet-100', strong: 'bg-violet-400', text: 'text-violet-900' },
+    marche: { soft: 'bg-orange-100', strong: 'bg-orange-400', text: 'text-orange-900' },
+    culture: { soft: 'bg-rose-100', strong: 'bg-rose-400', text: 'text-rose-900' },
+    sport: { soft: 'bg-lime-100', strong: 'bg-lime-400', text: 'text-lime-900' },
+    services: { soft: 'bg-teal-100', strong: 'bg-teal-400', text: 'text-teal-900' },
+    autre: { soft: 'bg-stone-200', strong: 'bg-stone-400', text: 'text-stone-900' },
+};
