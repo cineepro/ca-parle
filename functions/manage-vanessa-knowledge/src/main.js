@@ -96,6 +96,10 @@ async function generateKeywords(content, ANTHROPIC_API_KEY) {
                 messages: [{ role: 'user', content: String(content).slice(0, 2000) }],
                 max_tokens: 120,
             }),
+            // Sans délai limite, une API Claude qui ne répond pas bloquait toute la Function
+            // jusqu'aux 30 s maximum d'Appwrite (erreur 408). 8 s : au-delà, la note est
+            // enregistrée sans mots-clés (rattrapables plus tard).
+            signal: AbortSignal.timeout(8000),
         });
         if (!response.ok) return '';
         const data = await response.json();
@@ -413,7 +417,12 @@ export default async ({ req, res, error }) => {
                 let processed = 0;
                 let failed = 0;
                 let attributeMissing = false;
+                // Les appels sont limités à 30 s par Appwrite : on s'arrête à ~20 s et on renvoie
+                // le curseur de la dernière note traitée — le client rappelle pour la suite.
+                const startedAt = Date.now();
+                let stoppedAt = null; // index (dans todo) de la première note NON traitée si on s'arrête tôt
                 for (let i = 0; i < todo.length && !attributeMissing; i += 5) {
+                    if (Date.now() - startedAt > 20000) { stoppedAt = i; break; }
                     await Promise.all(todo.slice(i, i + 5).map(async (d) => {
                         const kw = await generateKeywords(d.content, ANTHROPIC_API_KEY);
                         if (!kw) { failed++; return; }
@@ -428,14 +437,22 @@ export default async ({ req, res, error }) => {
                 if (attributeMissing) {
                     return res.json({ success: false, error: "L'attribut « keywords » n'existe pas encore sur la collection vanessa_knowledge (Appwrite → Databases → Attributes : String, taille 500, non requis)." });
                 }
-                const docs = batch.documents;
+                let docs = batch.documents;
+                let nextCursor = docs.length === BATCH ? docs[docs.length - 1].$id : null;
+                if (stoppedAt !== null) {
+                    // Arrêt anticipé (temps) : on reprendra juste avant la première note non traitée.
+                    const idx = docs.findIndex((d) => d.$id === todo[stoppedAt].$id);
+                    docs = docs.slice(0, idx);
+                    nextCursor = docs[docs.length - 1].$id;
+                }
+                const doneInThisBatch = todo.filter((d) => docs.some((x) => x.$id === d.$id)).length;
                 return res.json({
                     success: true,
                     scanned: docs.length,
                     processed,
                     failed,
-                    alreadyDone: docs.length - todo.length,
-                    nextCursor: docs.length === BATCH ? docs[docs.length - 1].$id : null,
+                    alreadyDone: docs.length - doneInThisBatch,
+                    nextCursor,
                 });
             }
             case 'delete': {

@@ -47,10 +47,17 @@ export default async ({ req, res, error }) => {
 
         const updateData = {};
         if (connectorId !== undefined) updateData.vanessaConnectorId = connectorId || '';
-        if (title !== undefined) updateData.title = title.trim().slice(0, 100);
+        if (typeof title === 'string') updateData.title = title.trim().slice(0, 100);
         if (hide === true) {
             const hiddenFor = conversation.hiddenFor || [];
             if (!hiddenFor.includes(callerId)) updateData.hiddenFor = [...hiddenFor, callerId];
+        }
+
+        // Rien à changer : typiquement « masquer » une conversation déjà masquée (double clic, ou
+        // nouvel essai après un délai dépassé). Appwrite refuse une mise à jour vide
+        // (« document data and permissions are missing ») : on répond simplement « c'est fait ».
+        if (Object.keys(updateData).length === 0) {
+            return res.json({ success: true, conversation, unchanged: true });
         }
 
         const updated = await databases.updateDocument(DATABASE_ID, COLLECTION_CONVERSATIONS, conversationId, updateData);
