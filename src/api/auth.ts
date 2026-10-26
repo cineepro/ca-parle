@@ -43,6 +43,7 @@ export interface UserProfile extends Models.User<Models.Preferences> {
     defaultAnonymous?: boolean;
     isModerator?: boolean;
     isBanned?: boolean;
+    isCertified?: boolean;
 }
 
 export const authService = {

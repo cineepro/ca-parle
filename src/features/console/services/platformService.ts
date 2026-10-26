@@ -69,6 +69,7 @@ export interface UserSummary {
     createdAt: string;
     isBanned: boolean;
     isModerator: boolean;
+    isCertified?: boolean;
 }
 
 export interface UserDetail extends UserSummary {
@@ -103,6 +104,8 @@ export const platformService = {
     alertSummary: () => callFunction<{ open: number; critical: number }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'summary' }),
     acknowledgeAlert: (alertId: string) => callFunction(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'acknowledge', alertId }),
     runCheck: () => callFunction<{ findings: number; created: number; resolved: number }>(FUNCTIONS.PLATFORM_WATCHDOG, { action: 'run' }),
+    setCertified: (userId: string, certified: boolean) =>
+        callFunction<{ isCertified: boolean }>(FUNCTIONS.MANAGE_PROFILE, { action: 'set_certified', userId, certified }),
     events: (severity?: Severity) =>
         callFunction<{ events: PlatformEvent[]; notConfigured?: boolean }>(FUNCTIONS.PLATFORM_OVERVIEW, { action: 'events', severity }),
 };

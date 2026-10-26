@@ -7,6 +7,7 @@ import { ShareButton } from './ShareButton';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { getStoryImageUrl } from '../services/storyService';
 import { Eye, EyeOff, Flame, MessageCircle, Pin, Sparkles } from 'lucide-react';
+import { UserName } from '@/features/profile/components/UserName';
 
 const timeAgo = (dateStr: string): string => {
     const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -48,7 +49,7 @@ export const StoryCard = ({ story }: { story: Story }) => {
             <div className="flex items-center justify-between text-sm text-gray-600">
                 <div className="flex items-center gap-3">
                     <span>
-                        {story.isAnonymous ? <><EyeOff className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1 shrink-0" aria-hidden="true" />Anonyme</> : story.authorName || 'Utilisateur'}
+                        {story.isAnonymous ? <><EyeOff className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1 shrink-0" aria-hidden="true" />Anonyme</> : <UserName name={story.authorName || 'Utilisateur'} userId={story.authorId} />}
                         {story.authorId === VANESSA_USER_ID && <span className="ml-1 text-ochre"><Sparkles className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> IA</span>}
                     </span>
                     <span>·</span>

@@ -22,6 +22,7 @@ import { ShareButton } from '@/features/stories/components/ShareButton';
 import { conversationService } from '@/features/messaging/services/conversationService';
 import { Eye, Sparkles } from 'lucide-react';
 import { claimView } from '@/features/stories/utils/feedRanking';
+import { UserName } from '@/features/profile/components/UserName';
 
 export default function StoryDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -117,7 +118,7 @@ export default function StoryDetailPage() {
                     <h1 className="text-2xl font-bold text-gray-800 mb-2 leading-snug">{story.title}</h1>
 
                     <p className="text-sm text-gray-400 mb-4 flex items-center gap-2">
-                        {story.isAnonymous ? 'Publié anonymement' : `Par ${story.authorName || 'Utilisateur'}`}
+                        {story.isAnonymous ? 'Publié anonymement' : <span>Par <UserName name={story.authorName || 'Utilisateur'} userId={story.authorId} /></span>}
                         {canMessageAuthor && (
                             <button
                                 type="button"

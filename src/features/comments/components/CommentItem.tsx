@@ -4,6 +4,7 @@ import type { Comment } from '../services/commentService';
 import { commentService } from '../services/commentService';
 import { ReportButton } from '@/features/moderation/components/ReportButton';
 import { Flag, MessageCircle, MessageSquare, ThumbsUp, Zap, type LucideIcon } from 'lucide-react';
+import { UserName } from '@/features/profile/components/UserName';
 
 const TYPE_LABEL: Record<string, { Icon: LucideIcon; className: string }> = {
     commentaire: { Icon: MessageCircle, className: 'text-gray-500' },
@@ -50,7 +51,7 @@ export const CommentItem = ({ comment, onReply, isReply = false }: Props) => {
                 <div className="flex items-center gap-2 text-xs text-gray-400">
                     <span className={`font-medium ${typeInfo.className}`}><typeInfo.Icon className="w-4 h-4" aria-hidden="true" /></span>
                     <span className="font-medium text-gray-600">
-                        {comment.isAnonymous ? 'Anonyme' : comment.authorName || 'Utilisateur'}
+                        {comment.isAnonymous ? 'Anonyme' : <UserName name={comment.authorName || 'Utilisateur'} userId={comment.authorId} />}
                     </span>
                     <span>·</span>
                     <span>{timeAgo(comment.$createdAt)}</span>

@@ -3,6 +3,7 @@
 // la recherche ne part qu'à la validation (Entrée ou bouton), ce qui limite
 // les lectures même avec des milliers de comptes.
 import { useState } from 'react';
+import { VerifiedBadge } from '@/features/profile/components/VerifiedBadge';
 import { platformService, timeAgo, type UserSummary, type UserDetail } from '../services/platformService';
 
 const fmtDate = (iso?: string | null) =>
@@ -30,6 +31,24 @@ export const ConsoleUsers = () => {
     const [error, setError] = useState<string | null>(null);
     const [detail, setDetail] = useState<UserDetail | null>(null);
     const [loadingId, setLoadingId] = useState<string | null>(null);
+    const [certifying, setCertifying] = useState(false);
+
+    const toggleCertified = async () => {
+        if (!detail || certifying) return;
+        const next = !detail.isCertified;
+        if (!window.confirm(next ? `Certifier le compte de ${detail.name || 'cette personne'} ?` : `Retirer la certification de ${detail.name || 'cette personne'} ?`)) return;
+        setCertifying(true);
+        setError(null);
+        try {
+            const r = await platformService.setCertified(detail.id, next);
+            setDetail({ ...detail, isCertified: r.isCertified });
+            setResults((list) => list && list.map((u) => (u.id === detail.id ? { ...u, isCertified: r.isCertified } : u)));
+        } catch (err: any) {
+            setError(err.message || 'Action impossible.');
+        } finally {
+            setCertifying(false);
+        }
+    };
 
     const search = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -108,6 +127,7 @@ export const ConsoleUsers = () => {
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold text-gray-800 truncate">
                                         {u.name || 'Sans nom'}
+                                        {u.isCertified && <> <VerifiedBadge /></>}
                                         {u.isModerator && <span className="ml-2 text-xs text-ochre">Modérateur</span>}
                                         {u.isBanned && <span className="ml-2 text-xs text-red-600">Banni</span>}
                                     </p>
@@ -132,9 +152,21 @@ export const ConsoleUsers = () => {
                                 ? <img src={detail.avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
                                 : <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-400">{(detail.name || '?')[0]}</div>}
                             <div className="min-w-0">
-                                <p className="font-bold text-gray-800 truncate">{detail.name || 'Sans nom'}</p>
+                                <p className="font-bold text-gray-800 truncate">{detail.name || 'Sans nom'}{detail.isCertified && <> <VerifiedBadge /></>}</p>
                                 <p className="text-xs text-gray-400 break-all">{detail.id}</p>
                             </div>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-gray-50 p-3">
+                            <p className="text-sm text-gray-600">
+                                {detail.isCertified ? 'Compte certifié (badge bleu affiché partout).' : 'Compte non certifié.'}
+                            </p>
+                            <button
+                                onClick={toggleCertified}
+                                disabled={certifying}
+                                className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold disabled:opacity-50 ${detail.isCertified ? 'bg-white border border-gray-200 text-gray-700' : 'bg-brand text-ink'}`}
+                            >
+                                {certifying ? '...' : detail.isCertified ? 'Retirer le badge' : 'Certifier'}
+                            </button>
                         </div>
                         {detail.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-3">

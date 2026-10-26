@@ -28,6 +28,8 @@ export interface UserProfile extends Models.Document {
     defaultAnonymous: boolean;
     isModerator: boolean;
     isBanned: boolean;
+    // Compte certifié (badge bleu), posé uniquement depuis la Console.
+    isCertified?: boolean;
     // ➕ AJOUT : préférence de désabonnement à la newsletter
     newsletterOptOut?: boolean;
     createdAt: string;

@@ -16,6 +16,7 @@ import { getMessagePreview } from '@/features/messaging/utils/messagePreview';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { VOICE_MESSAGES_ENABLED, LIVE_CALL_ENABLED } from '@/config/features';
 import { Camera, Sparkles } from 'lucide-react';
+import { UserName } from '@/features/profile/components/UserName';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -253,7 +254,7 @@ export default function ConversationPage() {
                             </form>
                         ) : (
                             <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5 truncate">
-                                {isVanessaConversation && displayTitle ? displayTitle : otherName}
+                                {isVanessaConversation && displayTitle ? displayTitle : <UserName name={otherName} userId={otherId} />}
                                 {isVanessaConversation && (
                                     <button onClick={startRenameTitle} aria-label="Renommer cette conversation" className="text-gray-300 hover:text-gray-500 shrink-0">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,4 +1,5 @@
 // src/features/messaging/components/NewConversationModal.tsx — Vanessa
+import { Avatar } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserSearch } from '../hooks/useUserSearch';
@@ -6,6 +7,7 @@ import { conversationService } from '../services/conversationService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Modal } from '@/components/ui/modal';
 import { inputClasses } from '@/components/ui/input';
+import { UserName } from '@/features/profile/components/UserName';
 
 export const NewConversationModal = ({ onClose }: { onClose: () => void }) => {
     const { user } = useAuth();
@@ -52,10 +54,8 @@ export const NewConversationModal = ({ onClose }: { onClose: () => void }) => {
                             disabled={starting === result.$id}
                             className="w-full flex items-center gap-3 px-2 py-2 min-h-[48px] rounded-xl hover:bg-sand text-left disabled:opacity-50"
                         >
-                            <div className="w-9 h-9 rounded-full bg-brand-tint text-ochre flex items-center justify-center font-display font-bold text-sm shrink-0">
-                                {result.name.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="text-base text-ink">{result.name}</span>
+                            <Avatar name={result.name} userId={result.$id} sizeClass="w-9 h-9" />
+                            <span className="text-base text-ink"><UserName name={result.name} userId={result.$id} /></span>
                             {starting === result.$id && <span className="ml-auto text-sm text-gray-600">Ouverture...</span>}
                         </button>
                     ))}

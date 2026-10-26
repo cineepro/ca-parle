@@ -6,6 +6,7 @@ import { ReputationCard } from '@/features/reputation/components/ReputationCard'
 import { BadgeGrid } from '@/features/reputation/components/BadgeGrid';
 import { PhoneReminderBanner } from '@/features/auth/components/PhoneReminderBanner';
 import { InviteButton } from '@/features/stories/components/InviteButton';
+import { ProfileHeaderCard } from '@/features/profile/components/ProfileHeaderCard';
 
 export default function ProfilePage() {
     const { user } = useAuth();
@@ -30,6 +31,8 @@ export default function ProfilePage() {
                     <h1 className="text-xl font-bold text-gray-800">Mon profil</h1>
                     <span className="ml-auto"><InviteButton /></span>
                 </div>
+
+                {user && <ProfileHeaderCard user={user} />}
 
                 <PhoneReminderBanner />
 

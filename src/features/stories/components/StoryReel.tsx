@@ -12,6 +12,7 @@ import { StoryStatusBadge } from './StoryStatusBadge';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { useReactions } from '@/features/reactions/hooks/useReactions';
 import { recordSignal } from '../utils/feedRanking';
+import { UserName } from '@/features/profile/components/UserName';
 
 const timeAgo = (dateStr: string): string => {
     const minutes = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
@@ -158,7 +159,7 @@ export const StoryReel = ({ story, near }: Props) => {
                         {story.isAnonymous ? (
                             <><EyeOff className="w-4 h-4" aria-hidden="true" /> Anonyme</>
                         ) : (
-                            story.authorName || 'Utilisateur'
+                            <UserName name={story.authorName || 'Utilisateur'} userId={story.authorId} />
                         )}
                         {story.authorId === VANESSA_USER_ID && (
                             <span className="inline-flex items-center gap-1 text-ochre">

@@ -35,6 +35,7 @@ function toSummary(doc, auth) {
         createdAt: doc.createdAt || doc.$createdAt,
         isBanned: !!doc.isBanned,
         isModerator: !!doc.isModerator,
+        isCertified: doc.isCertified === true,
     };
 }
 
@@ -285,7 +286,7 @@ export default async ({ req, res, error }) => {
                     const profiles = await fetchProfiles(databases, DATABASE_ID, C.USERS, r.users.map((u) => u.$id));
                     users = r.users.map((u, i) => profiles[i] ? toSummary(profiles[i], u) : {
                         id: u.$id, name: u.name || '', email: u.email || '', phone: u.phone || '',
-                        avatarUrl: '', createdAt: u.registration, isBanned: false, isModerator: false,
+                        avatarUrl: '', createdAt: u.registration, isBanned: false, isModerator: false, isCertified: false,
                     });
                 } catch (e) {
                     // Clé sans users.read : on cherche dans la base.

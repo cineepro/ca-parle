@@ -1,9 +1,11 @@
 // src/pages/SearchPage.tsx — Vanessa
+import { Avatar } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { globalSearchService, type GlobalSearchResults } from '@/features/search/services/globalSearchService';
 import { StoryCard } from '@/features/stories/components/StoryCard';
 import { Search } from 'lucide-react';
+import { UserName } from '@/features/profile/components/UserName';
 
 export default function SearchPage() {
     const [query, setQuery] = useState('');
@@ -83,10 +85,8 @@ export default function SearchPage() {
                         <div className="bg-white rounded-2xl divide-y divide-gray-50 overflow-hidden">
                             {results.users.map((u) => (
                                 <div key={u.$id} className="flex items-center gap-3 px-4 py-3">
-                                    <div className="w-8 h-8 rounded-full bg-brand-tint text-ochre flex items-center justify-center font-bold text-xs">
-                                        {u.name?.charAt(0).toUpperCase() || '?'}
-                                    </div>
-                                    <span className="text-sm text-gray-700">{u.name}</span>
+                                    <Avatar name={u.name || '?'} userId={u.$id} avatarUrl={u.avatarUrl} sizeClass="w-8 h-8" />
+                                    <span className="text-sm text-gray-700"><UserName name={u.name} userId={u.$id} certified={u.isCertified === true} /></span>
                                 </div>
                             ))}
                         </div>

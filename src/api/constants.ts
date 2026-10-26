@@ -43,6 +43,8 @@ export const BUCKETS = {
     // Documents joints à un message (PDF, Word, Excel...). Vide = l'envoi de
     // documents est simplement masqué, seules les photos restent proposées.
     MESSAGE_FILES: import.meta.env.VITE_APPWRITE_BUCKET_MESSAGE_FILES || '',
+    // Photos de profil (lecture publique par adresse, écriture par le propriétaire).
+    AVATARS: import.meta.env.VITE_APPWRITE_BUCKET_AVATARS || '',
 } as const;
 
 // Compte utilisateur de Vanessa (l'IA de Ça Parle) — un vrai compte
@@ -82,5 +84,6 @@ export const FUNCTIONS = {
 
     // Zem — navigateur et moteur de recherche local
     SEARCH_ENGINE: import.meta.env.VITE_APPWRITE_FUNCTION_SEARCH_ENGINE || '',
+    MANAGE_PROFILE: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_PROFILE || '',
     MANAGE_SEARCH_SOURCES: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_SEARCH_SOURCES || '',
 } as const;

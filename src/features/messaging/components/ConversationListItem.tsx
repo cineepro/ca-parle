@@ -6,6 +6,7 @@ import { conversationService } from '../services/conversationService';
 import { Avatar } from '@/components/ui/avatar';
 import { StatusTicks } from './StatusTicks';
 import { hasUnread, statusAt, isVanessaConversation } from '../utils/receipts';
+import { UserName } from '@/features/profile/components/UserName';
 
 const timeAgo = (dateStr?: string): string => {
     if (!dateStr) return '';
@@ -33,7 +34,7 @@ export const ConversationListItem = ({ conversation, otherName }: ConversationWi
         >
             <Avatar name={otherName} userId={otherId} sizeClass="w-11 h-11" />
             <div className="flex-1 min-w-0">
-                <p className={`text-sm text-gray-800 truncate ${unread ? 'font-extrabold' : 'font-semibold'}`}>{otherName}</p>
+                <p className={`text-sm text-gray-800 truncate ${unread ? 'font-extrabold' : 'font-semibold'}`}><UserName name={otherName} userId={otherId} /></p>
                 <p className={`text-xs truncate flex items-center gap-1 ${unread ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
                     {lastStatus && conversation.lastMessage && <StatusTicks status={lastStatus} onLight />}
                     <span className="truncate">
