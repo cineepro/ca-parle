@@ -17,6 +17,36 @@ export function makeRef() {
     return `HV-${s}`;
 }
 
+// Message vocal : 2 minutes au plus. Le type du fichier est reconnu d'après son CONTENU, jamais d'après ce que dit le client.
+export const AUDIO = { maxBytes: 1_500_000, maxSeconds: 125, maxPerAlert: 5 };
+
+/** Reconnaît un fichier audio par ses premiers octets. Renvoie { ext, mime } ou null (alors : refusé). */
+export function sniffAudio(buf) {
+    if (!buf || buf.length < 12) return null;
+    const ascii = (a, b) => buf.subarray(a, b).toString('latin1');
+    if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return { ext: 'webm', mime: 'audio/webm' };
+    if (ascii(0, 4) === 'OggS') return { ext: 'ogg', mime: 'audio/ogg' };
+    if (ascii(4, 8) === 'ftyp') return { ext: 'm4a', mime: 'audio/mp4' };
+    if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE') return { ext: 'wav', mime: 'audio/wav' };
+    if (ascii(0, 3) === 'ID3' || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)) return { ext: 'mp3', mime: 'audio/mpeg' };
+    return null;
+}
+
+/** { data: base64, seconds } envoyé par la page → { buffer, ext, mime, seconds } ou { error }. Absent → { none: true }. */
+export function cleanAudio(raw) {
+    if (!raw || typeof raw !== 'object' || !raw.data) return { none: true };
+    const data = String(raw.data).replace(/^data:[^,]*,/, '');
+    if (data.length > Math.ceil((AUDIO.maxBytes * 4) / 3) + 8) return { error: 'Le message vocal est trop long. Réessaie avec un message plus court.' };
+    const buffer = Buffer.from(data, 'base64');
+    if (!buffer.length || buffer.length > AUDIO.maxBytes) return { error: 'Le message vocal est trop long. Réessaie avec un message plus court.' };
+    const kind = sniffAudio(buffer);
+    if (!kind) return { error: "Ce message vocal n'a pas pu être lu. Réessaie, ou écris quelques mots." };
+    const seconds = Math.max(0, Math.min(AUDIO.maxSeconds, Math.round(Number(raw.seconds) || 0)));
+    return { buffer, ext: kind.ext, mime: kind.mime, seconds };
+}
+
+export const audioIdsOf = (doc) => String(doc?.audioIds || '').split(',').filter(Boolean);
+
 export const cut = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 /** Numéro tel que saisi → chiffres et « + » seulement (sert à repérer un même numéro). */
@@ -54,8 +84,11 @@ export function cleanSubmission(body) {
         honeypot: cut(body.website, 50),
         fillMs: Number.isFinite(Number(body.fillMs)) ? Number(body.fillMs) : null,
     };
-    if (!out.phone && !out.place && !out.geo && !out.message) {
-        return { error: 'Dis-nous au moins où tu es, ou comment te joindre, ou écris quelques mots.' };
+    const audio = cleanAudio(body.audio);
+    if (audio.error) return { error: audio.error };
+    out.audio = audio.none ? null : audio;
+    if (!out.phone && !out.place && !out.geo && !out.message && !out.audio) {
+        return { error: 'Dis-nous au moins où tu es, ou comment te joindre, ou écris quelques mots, ou parle dans le micro.' };
     }
     return { value: out };
 }
@@ -71,7 +104,8 @@ export function triage(sub, ctx = {}) {
     const flags = [];
     if (sub.honeypot) return { priority: 'basse', flags: ['robot'], merge: null, drop: true };
     if (sub.fillMs !== null && sub.fillMs < 1500) flags.push('rapide');
-    if (!sub.phone && !sub.callOk) flags.push('sans_contact');
+    if (sub.audio) flags.push('vocal'); // le numéro et le lieu sont peut-être dits à voix haute : à écouter
+    if (!sub.phone && !sub.callOk && !sub.audio) flags.push('sans_contact');
     if (sub.danger) return { priority: 'urgent', flags, merge: null, drop: false };
 
     if (ctx.samePhoneOpen) return { priority: 'normale', flags: [...flags, 'doublon'], merge: ctx.samePhoneOpen, drop: false };

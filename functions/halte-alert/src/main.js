@@ -2,21 +2,23 @@
 // Réception des alertes de violences, et espace de la cellule d'écoute.
 //
 //   PUBLIC (sans compte) :
-//     { action: 'submit', forWho, danger, place, geo, phone, callOk, bestTime, message, posterCode, fillMs, website }
+//     { action: 'submit', forWho, danger, place, geo, phone, callOk, bestTime, message, audio?: { data: base64, seconds }, posterCode, fillMs, website }
 //     { action: 'sms_inbound', secret, from, text }        ← appelé par la passerelle SMS (secret partagé)
 //   CELLULE D'ÉCOUTE (compte avec isResponder) :
 //     { action: 'list', status?, offset? } · { action: 'get', id } · { action: 'update', id, status?, note?, assignToMe? }
+//     { action: 'audio', id, index? }  ← écoute d'un message vocal (consultation enregistrée)
 //   CELLULE ou MODÉRATEUR (chiffres seulement, aucune donnée personnelle) :
 //     { action: 'stats' }
 //   PLANIFIÉ (facultatif) : supprime les alertes closes de plus de HALTE_RETENTION_DAYS jours.
 //
 // Les e-mails et notifications ne contiennent JAMAIS le détail d'une alerte : seulement sa référence et son urgence.
-import { Client, Databases, Query, ID } from 'node-appwrite';
+import { Client, Databases, Storage, Query, ID } from 'node-appwrite';
+import { InputFile } from 'node-appwrite/file';
 import { Resend } from 'resend';
 import { timingSafeEqual } from 'node:crypto';
 import {
     STATUSES, OPEN_STATUSES, makeRef, cleanSubmission, triage, deviceHash, phoneKey, normalizePhone,
-    parseSms, smsLooksUrgent, appendNote, buildStats, cut,
+    parseSms, smsLooksUrgent, appendNote, buildStats, cut, sniffAudio, audioIdsOf, AUDIO,
 } from './logic.js';
 
 const SAME_PHONE_WINDOW_H = 72;
@@ -35,6 +37,8 @@ export default async ({ req, res, log, error }) => {
         .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
         .setKey(process.env.APPWRITE_API_KEY);
     const databases = new Databases(client);
+    const storage = new Storage(client);
+    const BUCKET = process.env.BUCKET_HALTE_AUDIO; // messages vocaux : bucket PRIVÉ (aucune permission)
     const DB = process.env.DATABASE_ID;
     const USERS = process.env.COLLECTION_USERS;
     const ALERTS = process.env.COLLECTION_HALTE_ALERTS;
@@ -45,6 +49,13 @@ export default async ({ req, res, log, error }) => {
     const resend = process.env.RESEND_API_KEY && FROM ? new Resend(process.env.RESEND_API_KEY) : null;
     const nowIso = () => new Date().toISOString();
     const hoursAgo = (h) => new Date(Date.now() - h * 3600000).toISOString();
+
+    /** Range un message vocal dans le bucket privé. Lève une erreur si le stockage n'est pas prêt. */
+    const storeAudio = async (ref, audio) => {
+        if (!BUCKET) throw new Error('BUCKET_HALTE_AUDIO non défini');
+        const f = await storage.createFile(BUCKET, ID.unique(), InputFile.fromBuffer(audio.buffer, `${ref}-${Date.now()}.${audio.ext}`));
+        return f.$id;
+    };
 
     const notifyResponders = async (alert) => {
         try {
@@ -81,7 +92,10 @@ export default async ({ req, res, log, error }) => {
                 Query.equal('status', ['traitee', 'sans_suite', 'test']),
                 Query.lessThan('updatedAt', hoursAgo(days * 24)), Query.limit(100),
             ]);
-            for (const d of old.documents) await databases.deleteDocument(DB, ALERTS, d.$id).catch(() => {});
+            for (const d of old.documents) {
+                for (const fid of audioIdsOf(d)) await storage.deleteFile(BUCKET, fid).catch(() => {});
+                await databases.deleteDocument(DB, ALERTS, d.$id).catch(() => {});
+            }
             log(`🧹 HALTE : ${old.documents.length} alerte(s) close(s) supprimée(s) (plus de ${days} jours)`);
             return res.json({ success: true, purged: old.documents.length });
         }
@@ -144,10 +158,28 @@ export default async ({ req, res, log, error }) => {
             if (t.drop) { // robot évident : on répond comme si de rien n'était, sans rien enregistrer
                 return res.json({ success: true, ref: makeRef() });
             }
+            // Message vocal : rangé d'abord. S'il n'y a RIEN d'autre que la voix et que le rangement échoue, on le dit à la
+            // personne (elle peut réessayer, écrire ou appeler) ; sinon l'alerte est enregistrée quand même et la perte est signalée.
+            let audioId = '';
+            let audioLost = false;
+            if (sub.audio) {
+                try { audioId = await storeAudio('HV', sub.audio); } catch (e) {
+                    error(`halte : message vocal non rangé (${e.message})`);
+                    audioLost = true;
+                    if (!sub.phone && !sub.place && !sub.geo && !sub.message) {
+                        return res.json({ success: false, error: "Le message vocal n'a pas pu être envoyé. Réessaie, écris quelques mots, ou appelle le 138." });
+                    }
+                }
+            }
+            const audioNote = audioId ? ` Message vocal reçu (${sub.audio.seconds || '?'} s).` : audioLost ? ' ⚠️ Un message vocal a été envoyé mais n’a pas pu être enregistré.' : '';
+            if (audioLost) t.flags.push('audio_perdu');
+
             if (t.merge && existing && !sub.danger) {
+                const ids = [...audioIdsOf(existing), ...(audioId ? [audioId] : [])].slice(-AUDIO.maxPerAlert);
                 await databases.updateDocument(DB, ALERTS, existing.$id, {
                     message: cut(`${existing.message || ''} | ${sub.message}`, 1000),
-                    notes: appendNote(existing.notes, { at: nowIso(), by: 'système', text: `Nouveau message du même numéro (${sub.channel}) : ${cut(sub.message, 300) || '(sans texte)'}` }),
+                    audioIds: ids.join(','),
+                    notes: appendNote(existing.notes, { at: nowIso(), by: 'système', text: `Nouveau message du même numéro (${sub.channel}) : ${cut(sub.message, 300) || '(sans texte)'}${audioNote}` }),
                     updatedAt: nowIso(),
                 });
                 return res.json({ success: true, ref: existing.ref, merged: true, reply: `Message reçu, réf ${existing.ref}.` });
@@ -157,7 +189,8 @@ export default async ({ req, res, log, error }) => {
             const doc = await databases.createDocument(DB, ALERTS, ID.unique(), {
                 ref, status: 'nouvelle', priority: t.priority, danger: sub.danger, forWho: sub.forWho, channel: sub.channel,
                 posterCode: sub.posterCode, place: sub.place, geo: sub.geo, phone: sub.phone, phoneKey: key, callOk: sub.callOk,
-                bestTime: sub.bestTime, message: sub.message, flags: t.flags.join(','), notes: '[]', assignedTo: '', firstActionAt: '',
+                bestTime: sub.bestTime, message: sub.message, flags: t.flags.join(','), audioIds: audioId,
+                notes: audioNote ? appendNote('[]', { at: nowIso(), by: 'système', text: audioNote.trim() }) : '[]', assignedTo: '', firstActionAt: '',
                 deviceHash: hash, createdAt: nowIso(), updatedAt: nowIso(),
             });
             if (t.priority !== 'basse') await notifyResponders({ ref, priority: t.priority });
@@ -194,11 +227,24 @@ export default async ({ req, res, log, error }) => {
             const alerts = r.documents
                 .map((d) => ({
                     id: d.$id, ref: d.ref, status: d.status, priority: d.priority, danger: !!d.danger, channel: d.channel,
-                    place: d.place, hasPhone: !!d.phone, flags: d.flags ? d.flags.split(',') : [], assignedTo: d.assignedTo || '',
+                    place: d.place, hasPhone: !!d.phone, hasAudio: audioIdsOf(d).length > 0, flags: d.flags ? d.flags.split(',') : [], assignedTo: d.assignedTo || '',
                     posterCode: d.posterCode || '', createdAt: d.createdAt,
                 }))
                 .sort((a, b) => (rank[a.priority] ?? 1) - (rank[b.priority] ?? 1) || String(b.createdAt).localeCompare(String(a.createdAt)));
             return res.json({ success: true, total: r.total, alerts });
+        }
+
+        if (action === 'audio') {
+            const d = await databases.getDocument(DB, ALERTS, String(body.id || '')).catch(() => null);
+            const ids = d ? audioIdsOf(d) : [];
+            const index = Math.max(0, Math.min(ids.length - 1, Number(body.index) || 0));
+            if (!d || !ids.length || !BUCKET) return res.json({ success: false, error: 'Aucun message vocal.' });
+            const bytes = Buffer.from(await storage.getFileDownload(BUCKET, ids[index]));
+            const kind = sniffAudio(bytes);
+            await databases.updateDocument(DB, ALERTS, d.$id, {
+                notes: appendNote(d.notes, { at: nowIso(), by: caller.name || callerId, byId: callerId, action: 'écoute', text: `message vocal ${index + 1}/${ids.length}` }),
+            }).catch(() => {});
+            return res.json({ success: true, mime: kind?.mime || 'audio/webm', count: ids.length, index, data: bytes.toString('base64') });
         }
 
         if (action === 'get' || action === 'update') {
@@ -243,7 +289,7 @@ export default async ({ req, res, log, error }) => {
                     id: fresh.$id, ref: fresh.ref, status: fresh.status, priority: fresh.priority, danger: !!fresh.danger,
                     forWho: fresh.forWho, channel: fresh.channel, posterCode: fresh.posterCode || '', place: fresh.place, geo: fresh.geo,
                     phone: fresh.phone, callOk: !!fresh.callOk, bestTime: fresh.bestTime, message: fresh.message,
-                    flags: fresh.flags ? fresh.flags.split(',') : [], assignedTo: fresh.assignedTo || '', createdAt: fresh.createdAt,
+                    flags: fresh.flags ? fresh.flags.split(',') : [], audioCount: audioIdsOf(fresh).length, assignedTo: fresh.assignedTo || '', createdAt: fresh.createdAt,
                     updatedAt: fresh.updatedAt, timeline,
                 },
             });

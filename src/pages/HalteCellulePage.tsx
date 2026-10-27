@@ -3,7 +3,7 @@
 // chaque consultation est enregistrée (qui a lu quoi) côté serveur.
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, MapPin, MessageSquare } from 'lucide-react';
+import { Phone, MapPin, MessageSquare, Mic } from 'lucide-react';
 import { halteCellule, type AlertDetail, type AlertRow, type AlertStatus } from '@/features/halte/services/halteService';
 import { timeAgo } from '@/features/console/services/platformService';
 
@@ -13,7 +13,7 @@ const PRIORITY = {
     basse: { label: 'Basse', className: 'bg-gray-200 text-gray-700' },
 } as const;
 const STATUS_LABEL: Record<AlertStatus, string> = { nouvelle: 'Nouvelle', en_cours: 'En cours', traitee: 'Traitée', sans_suite: 'Sans suite', test: 'Test' };
-const FLAG_LABEL: Record<string, string> = { rafale: 'Plusieurs envois du même téléphone', doublon: 'Même numéro qu’une alerte déjà ouverte', rapide: 'Formulaire rempli très vite', sans_contact: 'Aucun moyen de rappeler' };
+const FLAG_LABEL: Record<string, string> = { rafale: 'Plusieurs envois du même téléphone', doublon: 'Même numéro qu’une alerte déjà ouverte', rapide: 'Formulaire rempli très vite', sans_contact: 'Aucun moyen de rappeler', vocal: 'Message vocal : écoute-le, le numéro et le lieu y sont peut-être dits', audio_perdu: 'Un message vocal a été envoyé mais n’a pas pu être enregistré : rappelle vite' };
 const TABS: Array<{ id: 'open' | AlertStatus; label: string }> = [{ id: 'open', label: 'À traiter' }, { id: 'traitee', label: 'Traitées' }, { id: 'sans_suite', label: 'Sans suite' }];
 
 export default function HalteCellulePage() {
@@ -23,6 +23,18 @@ export default function HalteCellulePage() {
     const [note, setNote] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [audioUrl, setAudioUrl] = useState<{ index: number; url: string } | null>(null);
+    useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl.url); }, [audioUrl]);
+
+    const listen = async (index: number) => {
+        if (!detail || busy) return;
+        setBusy(true);
+        try {
+            const a = await halteCellule.audio(detail.id, index);
+            const bytes = Uint8Array.from(atob(a.data), (c) => c.charCodeAt(0));
+            setAudioUrl({ index, url: URL.createObjectURL(new Blob([bytes], { type: a.mime })) });
+        } catch (e: any) { setError(e.message || 'Écoute impossible.'); } finally { setBusy(false); }
+    };
 
     const load = useCallback(async () => {
         try {
@@ -53,7 +65,7 @@ export default function HalteCellulePage() {
             setNote('');
         } catch (e: any) { setError(e.message || 'Action impossible.'); } finally { setBusy(false); }
     };
-    const back = () => { setDetail(null); load(); };
+    const back = () => { setDetail(null); setAudioUrl(null); load(); };
 
     return (
         <div className="min-h-screen bg-gray-50 px-4 py-6">
@@ -86,7 +98,7 @@ export default function HalteCellulePage() {
                                     </div>
                                     <p className="text-sm text-gray-700 mt-1 break-words">{r.place || 'Lieu non précisé'}</p>
                                     <p className="text-xs text-gray-400 mt-1">
-                                        {timeAgo(r.createdAt)} · {STATUS_LABEL[r.status]} · {r.channel.toUpperCase()}{r.hasPhone ? ' · numéro donné' : ' · sans numéro'}{r.posterCode ? ` · affiche ${r.posterCode}` : ''}
+                                        {timeAgo(r.createdAt)} · {STATUS_LABEL[r.status]} · {r.channel.toUpperCase()}{r.hasPhone ? ' · numéro donné' : ' · sans numéro'}{r.hasAudio ? ' · 🎤 vocal' : ''}{r.posterCode ? ` · affiche ${r.posterCode}` : ''}
                                     </p>
                                     {r.flags.length > 0 && <p className="text-xs text-amber-700 mt-1">{r.flags.map((f) => FLAG_LABEL[f] || f).join(' · ')}</p>}
                                 </button>
@@ -110,6 +122,17 @@ export default function HalteCellulePage() {
                                 <div><dt className="inline text-gray-500">Lieu : </dt><dd className="inline font-semibold break-words">{detail.place || '—'}</dd></div>
                                 <div><dt className="inline text-gray-500">Rappel : </dt><dd className="inline font-semibold">{detail.callOk ? `OK${detail.bestTime ? ` (${detail.bestTime})` : ''}` : 'La personne n’a pas demandé à être rappelée'}</dd></div>
                             </dl>
+                            {detail.audioCount > 0 && (
+                                <div className="rounded-xl bg-sand p-3 space-y-2">
+                                    <p className="text-sm font-bold flex items-center gap-2"><Mic size={16} aria-hidden />Message vocal{detail.audioCount > 1 ? ` (${detail.audioCount})` : ''} — l’écoute est enregistrée</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Array.from({ length: detail.audioCount }, (_, i) => (
+                                            <button key={i} disabled={busy} onClick={() => listen(i)} className="rounded-full bg-ink text-white font-bold px-4 min-h-[44px]">{audioUrl?.index === i ? 'Recharger' : 'Écouter'}{detail.audioCount > 1 ? ` n° ${i + 1}` : ''}</button>
+                                        ))}
+                                    </div>
+                                    {audioUrl && <audio src={audioUrl.url} controls autoPlay className="w-full" />}
+                                </div>
+                            )}
                             {detail.message && <p className="text-sm whitespace-pre-line break-words rounded-xl bg-sand p-3">{detail.message}</p>}
                             <div className="flex flex-wrap gap-2">
                                 {detail.phone && <a href={`tel:${detail.phone}`} className="inline-flex items-center gap-2 rounded-full bg-ink text-white font-bold px-4 min-h-[44px]"><Phone size={16} aria-hidden />Appeler {detail.phone}</a>}
@@ -132,7 +155,7 @@ export default function HalteCellulePage() {
                             </div>
                             <ul className="text-xs text-gray-600 space-y-1.5">
                                 {[...detail.timeline].reverse().map((t, i) => (
-                                    <li key={i}><span className="text-gray-400">{new Date(t.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <strong>{t.by}</strong> · {t.action === 'consultation' ? 'a consulté la fiche' : t.action === 'statut' ? `statut → ${STATUS_LABEL[t.text as AlertStatus] || t.text}` : t.action === 'prise en charge' ? 'a pris en charge' : t.text}</li>
+                                    <li key={i}><span className="text-gray-400">{new Date(t.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span> · <strong>{t.by}</strong> · {t.action === 'consultation' ? 'a consulté la fiche' : t.action === 'statut' ? `statut → ${STATUS_LABEL[t.text as AlertStatus] || t.text}` : t.action === 'écoute' ? `a écouté le ${t.text}` : t.action === 'prise en charge' ? 'a pris en charge' : t.text}</li>
                                 ))}
                             </ul>
                         </div>

@@ -7,13 +7,14 @@
 //   - rien n'est enregistré sur l'appareil à part ce message en attente.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MapPin, WifiOff } from 'lucide-react';
+import { MapPin, Mic, Pencil, WifiOff } from 'lucide-react';
 import { QuickExit, EmergencyNumbers, Choice } from '@/features/halte/components/HalteParts';
+import VoiceRecorder, { blobToBase64, type Voice } from '@/features/halte/components/VoiceRecorder';
 import { sendAlert, type AlertPayload } from '@/features/halte/services/halteService';
 import { flushQueue, pendingAlerts, queueAlert } from '@/features/halte/lib/offlineQueue';
 import { SMS_NUMBER, NUMBERS_VERIFIED_ON } from '@/features/halte/config';
 
-type Screen = 'home' | 'form' | 'info' | 'done';
+type Screen = 'home' | 'form' | 'voice' | 'info' | 'done';
 const TIMES = [['', 'À n’importe quel moment'], ['matin', 'Le matin'], ['apres-midi', 'L’après-midi'], ['soir', 'Le soir']] as const;
 
 function useRegisterOffline() {
@@ -47,6 +48,7 @@ export default function HaltePage() {
     const [bestTime, setBestTime] = useState('');
     const [message, setMessage] = useState('');
     const [website, setWebsite] = useState('');
+    const [voice, setVoice] = useState<Voice | null>(null);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<{ ref?: string; queued: boolean } | null>(null);
@@ -97,11 +99,46 @@ export default function HaltePage() {
                 setError(err.message);
             } else {
                 // Pas de réseau ou service injoignable : on garde le message sur le téléphone.
-                queueAlert(payload as unknown as Record<string, unknown>);
-                setWaiting(pendingAlerts().length);
-                setResult({ queued: true });
-                setScreen('done');
+                if (queueAlert(payload as unknown as Record<string, unknown>)) {
+                    setWaiting(pendingAlerts().length);
+                    setResult({ queued: true });
+                    setScreen('done');
+                } else {
+                    setError('Pas de réseau, et ce téléphone ne peut pas garder ton message. Appelle le 138 ou le 117.');
+                }
             }
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // Envoi du message vocal : la voix peut contenir le lieu et le numéro, le numéro écrit est facultatif.
+    const submitVoice = async () => {
+        if (sending || !voice) return;
+        setError(null);
+        setSending(true);
+        try {
+            const data = await blobToBase64(voice.blob);
+            const payload: AlertPayload = {
+                forWho: 'unknown', danger: danger === true, place: '', geo: '', phone: phone.trim(), callOk: !!phone.trim(),
+                bestTime: '', message: '', audio: { data, seconds: voice.seconds }, posterCode, fillMs: Date.now() - openedAt.current, website,
+            };
+            try {
+                const ref = await sendAlert(payload as unknown as Record<string, unknown>);
+                setResult({ ref, queued: false });
+                setScreen('done');
+            } catch (err: any) {
+                if (err?.permanent) { setError(err.message); return; }
+                if (queueAlert(payload as unknown as Record<string, unknown>)) {
+                    setWaiting(pendingAlerts().length);
+                    setResult({ queued: true });
+                    setScreen('done');
+                } else {
+                    setError('Pas de réseau, et ce téléphone n’a plus de place pour garder ton message. Appelle le 138 ou le 117, ou réessaie quand le réseau revient.');
+                }
+            }
+        } catch {
+            setError('Ton message vocal n’a pas pu être préparé. Réessaie, ou écris quelques mots.');
         } finally {
             setSending(false);
         }
@@ -121,12 +158,18 @@ export default function HaltePage() {
                             <h1 className="text-3xl font-extrabold leading-tight">Tu peux parler.<br />Tu n’as rien fait de mal.</h1>
                             <p className="text-base text-gray-700">
                                 Si quelqu’un te touche, te force ou te fait peur, ou si tu sais que ça arrive à quelqu’un, tu as le droit de le dire.
-                                Ce que tu écris ici est lu par de vraies personnes formées, pas par une machine.
+                                Ce que tu dis ou écris ici est écouté et lu par de vraies personnes formées, pas par une machine.
                             </p>
                         </header>
                         <EmergencyNumbers />
-                        <button onClick={() => setScreen('form')} className="w-full rounded-full bg-brand text-ink font-extrabold text-lg min-h-[60px] shadow">
-                            Envoyer un message en sécurité
+                        <p className="text-base font-bold pt-1">Comment veux-tu nous le dire ?</p>
+                        <button onClick={() => setScreen('voice')} className="w-full rounded-3xl bg-brand text-ink font-extrabold text-xl min-h-[84px] shadow flex items-center justify-center gap-3 px-4">
+                            <Mic size={36} aria-hidden />
+                            <span className="text-left leading-tight">Parler<span className="block text-sm font-semibold">Pas besoin d’écrire : tu dis tout avec ta voix</span></span>
+                        </button>
+                        <button onClick={() => setScreen('form')} className="w-full rounded-3xl bg-white border-2 border-ink text-ink font-extrabold text-lg min-h-[64px] flex items-center justify-center gap-3 px-4">
+                            <Pencil size={24} aria-hidden />
+                            Écrire un message
                         </button>
                         <button onClick={() => setScreen('info')} className="w-full rounded-full bg-white border-2 border-gray-200 font-bold min-h-[52px]">
                             Je veux d’abord comprendre ce qui va se passer
@@ -143,7 +186,7 @@ export default function HaltePage() {
                         <h1 className="text-2xl font-extrabold">Ce qui va se passer</h1>
                         <ol className="space-y-3 text-base">
                             {[
-                                'Tu écris quelques lignes, ou juste où tu es et ton numéro. Tu n’es pas obligé(e) de raconter ce qui s’est passé.',
+                                'Tu parles dans le téléphone (message vocal) ou tu écris quelques lignes. Tu n’es pas obligé(e) de tout raconter.',
                                 'Ton message arrive à une équipe d’écoute formée. Elle te rappelle, doucement, seulement si tu es d’accord.',
                                 'On t’aide à être en sécurité et on t’oriente vers les services qui protègent : médecin, aide sociale, police si tu le souhaites. Rien ne se fait sans t’expliquer.',
                                 'Tu peux envoyer ton message sans donner ton nom. Il n’est lu que par l’équipe d’écoute.',
@@ -158,6 +201,38 @@ export default function HaltePage() {
                         <button onClick={() => setScreen('form')} className="w-full rounded-full bg-brand font-extrabold text-lg min-h-[60px]">Envoyer un message en sécurité</button>
                         <button onClick={() => setScreen('home')} className="w-full text-sm font-bold underline min-h-[44px]">Retour</button>
                     </>
+                )}
+
+                {screen === 'voice' && (
+                    <div className="space-y-5">
+                        <h1 className="text-2xl font-extrabold">Parle, on t’écoute</h1>
+                        <p className="text-base text-gray-700">
+                            Appuie sur le bouton et dis ce que tu veux : <strong>où tu es</strong>, <strong>ce qui se passe</strong>, et <strong>ton numéro de téléphone</strong> si tu veux qu’on te rappelle.
+                            Tu n’as pas besoin de tout dire. Tu peux parler 2 minutes au plus.
+                        </p>
+                        <VoiceRecorder onChange={setVoice} />
+
+                        <fieldset>
+                            <legend className="block text-sm font-bold text-ink mb-1.5">Est-ce un danger tout de suite ?</legend>
+                            <div className="flex gap-2"><Choice selected={danger === true} onClick={() => setDanger(true)}>Oui, maintenant</Choice><Choice selected={danger === false} onClick={() => setDanger(false)}>Non</Choice></div>
+                            {danger === true && <div className="mt-3"><EmergencyNumbers title="Appelle aussi, c’est le plus rapide" /></div>}
+                        </fieldset>
+
+                        <div>
+                            <label htmlFor="halte-voice-phone" className="block text-sm font-bold text-ink mb-1.5">Ton numéro (si tu peux l’écrire, sinon dis-le dans ton message)</label>
+                            <input id="halte-voice-phone" value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="tel" maxLength={30} placeholder="Ex. 01 97 00 00 00" className={input} autoComplete="off" />
+                        </div>
+
+                        <div aria-hidden className="absolute -left-[9999px] h-0 overflow-hidden">
+                            <label>Site web<input tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} /></label>
+                        </div>
+
+                        {error && <p role="alert" className="rounded-2xl bg-red-50 text-red-800 p-3 font-semibold">{error}</p>}
+                        <button type="button" onClick={submitVoice} disabled={sending || !voice} className="w-full rounded-full bg-brand text-ink font-extrabold text-lg min-h-[60px] shadow disabled:opacity-50">
+                            {sending ? 'Envoi…' : voice ? 'Envoyer mon message' : 'Enregistre d’abord ton message'}
+                        </button>
+                        <button type="button" onClick={() => setScreen('home')} className="w-full text-sm font-bold underline min-h-[44px]">Retour</button>
+                    </div>
                 )}
 
                 {screen === 'form' && (
@@ -229,7 +304,7 @@ export default function HaltePage() {
                         ) : (
                             <>
                                 <h1 className="text-2xl font-extrabold">Merci, c’est envoyé.</h1>
-                                <p className="text-base">Tu as bien fait. Une personne formée va lire ton message{callOk && phone ? ' et te rappeler' : ''}.</p>
+                                <p className="text-base">Tu as bien fait. Une personne formée va lire ton message{(callOk && phone) || voice ? ' et te rappeler si tu as laissé un moyen de te joindre' : ''}.</p>
                                 {result.ref && <p className="rounded-2xl bg-white border border-gray-100 p-4 text-center">Ta référence : <strong className="text-xl tracking-wider">{result.ref}</strong><span className="block text-sm text-gray-600">Garde-la si tu veux la donner par téléphone.</span></p>}
                             </>
                         )}

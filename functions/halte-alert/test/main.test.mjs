@@ -29,19 +29,27 @@ class FakeDatabases {
         return { total: docs.length, documents: docs.slice(offset, offset + limit) };
     }
 }
+const files = new Map();
+class FakeStorage {
+    async createFile(bucket, id, file) { if (process.env.FAIL_STORAGE) throw new Error('disque plein'); const key = `f${files.size + 1}`; files.set(key, file.buffer); return { $id: key }; }
+    async getFileDownload(bucket, id) { return files.get(id); }
+    async deleteFile(bucket, id) { files.delete(id); }
+}
 const q = (method) => (attribute, values) => JSON.stringify({ method, attribute, values: [].concat(values ?? attribute ?? []) });
 mock.module('node-appwrite', {
     namedExports: {
         Client: class { setEndpoint() { return this; } setProject() { return this; } setKey() { return this; } },
         Databases: FakeDatabases,
+        Storage: FakeStorage,
         Query: new Proxy({}, { get: (_, method) => (a, b) => JSON.stringify({ method, attribute: typeof a === 'string' ? a : undefined, values: b !== undefined ? [].concat(b) : (typeof a === 'string' ? [] : [].concat(a)) }) }),
         ID: { unique: () => 'unique()' },
     },
 });
+mock.module('node-appwrite/file', { namedExports: { InputFile: { fromBuffer: (buffer, name) => ({ buffer, name }) } } });
 mock.module('resend', { namedExports: { Resend: class { constructor() { this.emails = { send: async (m) => { sentMails.push(m); } }; } } } });
 Object.assign(process.env, {
     DATABASE_ID: 'db', COLLECTION_USERS: 'U', COLLECTION_HALTE_ALERTS: 'A', COLLECTION_NOTIFICATIONS: 'N',
-    HALTE_SALT: 'sel', HALTE_SMS_SECRET: 'secret-sms', RESEND_API_KEY: 'x', FROM_EMAIL: 'a@b.c', SITE_URL: 'https://site.bj',
+    HALTE_SALT: 'sel', BUCKET_HALTE_AUDIO: 'B', HALTE_SMS_SECRET: 'secret-sms', RESEND_API_KEY: 'x', FROM_EMAIL: 'a@b.c', SITE_URL: 'https://site.bj',
 });
 const { default: handler } = await import('../src/main.js');
 
@@ -50,7 +58,7 @@ const call = async (body, { user, ip = '10.0.0.1', trigger } = {}) => {
     await handler({
         req: { headers: { ...(user ? { 'x-appwrite-user-id': user } : {}), 'x-forwarded-for': ip, 'user-agent': 'ua', ...(trigger ? { 'x-appwrite-trigger': trigger } : {}) }, bodyJson: body },
         res: { json: (o, status) => { out = { ...o, _status: status }; return out; } },
-        log: () => {}, error: (m) => { throw new Error(m); },
+        log: () => {}, error: (m) => { if (!/message vocal non rangé/.test(m)) throw new Error(m); },
     });
     return out;
 };
@@ -182,4 +190,58 @@ test('conservation limitée : purge planifiée des alertes closes', async () => 
     assert.equal(r.purged, 1);
     assert.equal(tables.A.has(old.$id), false);
     assert.equal(tables.A.has(open.$id), true, 'une alerte encore ouverte n’est jamais supprimée');
+});
+
+// ---------- Message vocal ----------
+const webm = (n = 2000) => Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(n, 7)]).toString('base64');
+
+test('message vocal seul : rangé en privé, alerte créée, cellule peut l’écouter (écoute tracée)', async () => {
+    const r = await call({ action: 'submit', audio: { data: webm(), seconds: 42 }, posterCode: 'EKPE-03', fillMs: 9000 }, { ip: '7.7.7.7' });
+    assert.equal(r.success, true);
+    const d = [...tables.A.values()].find((x) => x.audioIds);
+    assert.ok(d.flags.includes('vocal'));
+    assert.ok(!d.flags.includes('sans_contact'), 'le numéro est peut-être dans le vocal');
+    assert.equal(d.priority, 'normale');
+    const list = await call({ action: 'list' }, { user: 'rep' });
+    assert.equal(list.alerts.find((a) => a.id === d.$id).hasAudio, true);
+    assert.equal((await call({ action: 'audio', id: d.$id }, { user: 'lambda' }))._status, 403, 'réservé à la cellule');
+    const a = await call({ action: 'audio', id: d.$id }, { user: 'rep' });
+    assert.equal(a.success, true);
+    assert.equal(a.mime, 'audio/webm');
+    assert.equal(Buffer.from(a.data, 'base64').length, 2004);
+    assert.ok(JSON.parse(d.notes).some((n) => n.action === 'écoute' && n.byId === 'rep'));
+});
+
+test('message vocal : fichier qui n’est pas un son, ou trop gros, refusé', async () => {
+    const n = alertsCount();
+    const fake = await call({ action: 'submit', audio: { data: Buffer.from('<?php echo 1; ?> pas un son du tout').toString('base64'), seconds: 3 } }, { ip: '8.8.8.1' });
+    assert.equal(fake.success, false);
+    const big = await call({ action: 'submit', audio: { data: Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(1_600_000)]).toString('base64'), seconds: 100 } }, { ip: '8.8.8.2' });
+    assert.equal(big.success, false);
+    assert.equal(alertsCount(), n);
+});
+
+test('message vocal : stockage en panne → vocal seul = erreur claire ; avec numéro = alerte gardée et perte signalée', async () => {
+    process.env.FAIL_STORAGE = '1';
+    const n = alertsCount();
+    const only = await call({ action: 'submit', audio: { data: webm(), seconds: 10 } }, { ip: '8.8.8.3' });
+    assert.equal(only.success, false);
+    assert.match(only.error, /138/);
+    assert.equal(alertsCount(), n);
+    const withPhone = await call({ action: 'submit', phone: '95 00 00 77', callOk: true, audio: { data: webm(), seconds: 10 } }, { ip: '8.8.8.4' });
+    assert.equal(withPhone.success, true);
+    const d = [...tables.A.values()].find((x) => x.phone === '95000077');
+    assert.ok(d.flags.includes('audio_perdu'));
+    delete process.env.FAIL_STORAGE;
+});
+
+test('suppression planifiée : les fichiers audio partent avec l’alerte', async () => {
+    const d = [...tables.A.values()].find((x) => x.audioIds && x.audioIds.length);
+    const fid = d.audioIds.split(',')[0];
+    assert.ok(files.has(fid));
+    Object.assign(d, { status: 'traitee', updatedAt: '2000-01-01T00:00:00.000Z' });
+    process.env.HALTE_RETENTION_DAYS = '30';
+    await call({}, { trigger: 'schedule' });
+    assert.equal(files.has(fid), false);
+    assert.equal(tables.A.has(d.$id), false);
 });

@@ -6,14 +6,14 @@ const KEY = 'halte:file';
 const read = (): QueuedAlert[] => {
     try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
 };
-const write = (list: QueuedAlert[]) => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* stockage plein : on ne bloque rien */ } };
+const write = (list: QueuedAlert[]): boolean => { try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; /* stockage plein */ } };
 
 export const pendingAlerts = (): QueuedAlert[] => read();
 
-export function queueAlert(payload: Record<string, unknown>): QueuedAlert {
+/** Garde l'alerte sur l'appareil. Renvoie null si le téléphone n'a plus de place (un message vocal est plus lourd). */
+export function queueAlert(payload: Record<string, unknown>): QueuedAlert | null {
     const item = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, payload, at: Date.now() };
-    write([...read(), item]);
-    return item;
+    return write([...read(), item]) ? item : null;
 }
 
 /** Envoie ce qui attend. `send` lève une erreur « réseau » (on s'arrête, on réessaiera) ou renvoie la référence. */

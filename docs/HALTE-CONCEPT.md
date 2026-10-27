@@ -21,6 +21,7 @@ Un QR code affiché partout permet à une personne, en moins d'une minute et san
 | Téléphone sans internet | QR « SMS » → un SMS « HALTE EKPE-03 » est prêt, il suffit d'envoyer. QR « Appel » → compose le 138. Les deux fonctionnent sans connexion de données. |
 | Connexion qui coupe en plein envoi | Le message est gardé sur le téléphone et part tout seul au retour du réseau |
 | Page déjà ouverte une fois | Elle se rouvre sans connexion (copie gardée) |
+| Ne sait pas écrire ou n'ose pas | Gros bouton « Parler » : message vocal de 2 minutes au plus (lieu, histoire, numéro dits à voix haute). Le fichier est rangé dans un espace privé, écouté seulement par la cellule, chaque écoute est enregistrée, supprimé avec la fiche. |
 | Pas de téléphone | Affiche avec les numéros écrits en clair ; relais humains (scouts, U-Reporters formés) qui peuvent déposer un message pour quelqu'un |
 | Danger immédiat | La page met d'abord les boutons d'appel (138, 117) : un formulaire ne remplace jamais un appel |
 

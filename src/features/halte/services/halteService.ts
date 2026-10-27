@@ -11,6 +11,7 @@ export interface AlertPayload {
     callOk: boolean;
     bestTime: string;
     message: string;
+    audio?: { data: string; seconds: number }; // message vocal (base64), 2 min au plus
     posterCode: string;
     fillMs: number;
     website: string; // champ piège, toujours vide pour une vraie personne
@@ -36,12 +37,12 @@ export async function sendAlert(payload: Record<string, unknown>): Promise<strin
 export type AlertStatus = 'nouvelle' | 'en_cours' | 'traitee' | 'sans_suite' | 'test';
 export interface AlertRow {
     id: string; ref: string; status: AlertStatus; priority: 'urgent' | 'normale' | 'basse'; danger: boolean; channel: string;
-    place: string; hasPhone: boolean; flags: string[]; assignedTo: string; posterCode: string; createdAt: string;
+    place: string; hasPhone: boolean; hasAudio: boolean; flags: string[]; assignedTo: string; posterCode: string; createdAt: string;
 }
 export interface TimelineEntry { at: string; by: string; action?: string; text?: string }
 export interface AlertDetail {
     id: string; ref: string; status: AlertStatus; priority: 'urgent' | 'normale' | 'basse'; danger: boolean; forWho: string; channel: string;
-    posterCode: string; place: string; geo: string; phone: string; callOk: boolean; bestTime: string; message: string; flags: string[];
+    posterCode: string; place: string; geo: string; phone: string; callOk: boolean; bestTime: string; message: string; flags: string[]; audioCount: number;
     assignedTo: string; createdAt: string; updatedAt: string; timeline: TimelineEntry[];
 }
 export interface HalteStats {
@@ -55,5 +56,6 @@ export const halteCellule = {
     get: async (id: string) => (await callFunction<{ alert: AlertDetail }>(FUNCTIONS.HALTE_ALERT, { action: 'get', id })).alert,
     update: async (id: string, data: { status?: AlertStatus; note?: string; assignToMe?: boolean }) =>
         (await callFunction<{ alert: AlertDetail }>(FUNCTIONS.HALTE_ALERT, { action: 'update', id, ...data })).alert,
+    audio: (id: string, index = 0) => callFunction<{ mime: string; data: string; count: number; index: number }>(FUNCTIONS.HALTE_ALERT, { action: 'audio', id, index }),
     stats: () => callFunction<HalteStats>(FUNCTIONS.HALTE_ALERT, { action: 'stats' }),
 };

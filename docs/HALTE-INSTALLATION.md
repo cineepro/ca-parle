@@ -27,10 +27,17 @@ Attributs (type String sauf mention) :
 | `deviceHash` | 64 | non | – | |
 | `createdAt` | 40 | oui | – | |
 | `updatedAt` | 40 | non | – | |
+| `audioIds` | 200 | non | – | |
 \* « Encrypt » si l'option existe sur ton projet (les attributs chiffrés ne peuvent pas être indexés : aucun de ceux-là ne l'est).
 
 Index (type Key, ordre ASC) : `ref_idx` (**Unique**) sur `ref` · `status_idx` · `createdAt_idx` · `updatedAt_idx` · `phoneKey_idx` · `deviceHash_idx`.
 Permissions : **aucune** sur la collection, Document security désactivée (tout passe par la Function).
+
+## 1 bis. Bucket PRIVÉ pour les messages vocaux
+Appwrite → **Storage** → **Create bucket** : ID `halte_audio`, nom « HALTE messages vocaux ».
+Settings du bucket : **aucune permission** (liste vide), **File security désactivée**, taille maximale **2 Mo**, extensions autorisées `webm, ogg, m4a, mp4, mp3, wav`, **Encryption** activée, **Antivirus** activé si proposé. Compression : aucune.
+La clé API de la Function doit aussi avoir les droits **files.read** et **files.write**.
+Variable de la Function : `BUCKET_HALTE_AUDIO` = `halte_audio`. Sans elle, le vocal est refusé avec un message clair (l'alerte avec numéro ou texte passe quand même).
 
 ## 2. Collection `users`
 Attribut `isResponder` : Boolean, non requis, défaut `false`, + index `isResponder_idx`. Pour nommer un membre de la cellule d'écoute : mettre `isResponder` à `true` sur son compte.
@@ -46,6 +53,7 @@ Attribut `isResponder` : Boolean, non requis, défaut `false`, + index `isRespon
 | `APPWRITE_API_KEY` | la clé ci-dessus |
 | `DATABASE_ID`, `COLLECTION_USERS` | comme les autres Functions |
 | `COLLECTION_HALTE_ALERTS` | ID de `halte_alerts` |
+| `BUCKET_HALTE_AUDIO` | `halte_audio` |
 | `COLLECTION_NOTIFICATIONS` | ID de la collection des notifications (existante) |
 | `HALTE_SALT` | texte aléatoire long (32 caractères ou plus), secret, jamais modifié ensuite |
 | `HALTE_ENABLED` | `false` pendant les tests, `true` à l'ouverture |
@@ -71,6 +79,7 @@ Puis dans `src/features/halte/config.ts` : appeler chaque numéro, puis renseign
 ## 6. Tester fermé, puis ouvrir
 1. `HALTE_ENABLED=false` : ouvrir `/halte` → l'envoi répond « service pas encore ouvert » et rappelle les numéros.
 2. Passer à `true` ; envoyer une alerte test depuis un téléphone : elle apparaît sur `/halte/cellule` (compte `isResponder`) ; la notification et l'e-mail ne contiennent pas le texte.
+3 bis. Message vocal : sur `/halte`, bouton « Parler » → enregistrer → envoyer ; sur `/halte/cellule`, ouvrir la fiche → « Écouter ». Vérifier que le fichier est dans le bucket et que l'écoute apparaît dans l'historique de la fiche.
 3. Couper le réseau du téléphone, envoyer : message « gardé sur ce téléphone » ; rallumer : l'alerte arrive.
 4. Envoyer 4 alertes sans danger depuis le même téléphone : les dernières sont en priorité « basse », aucune n'est perdue.
 5. Scanner chaque QR (web, SMS, appel) avec un Android ET un iPhone.
