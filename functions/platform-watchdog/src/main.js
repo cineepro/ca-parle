@@ -37,7 +37,7 @@ const EVENT_HINTS = {
 const CHECK_LABELS = {
     vanessa_silent: 'les réponses de Vanessa', fn_failing: 'la santé des Functions', event: 'le journal des incidents',
     connector_quota: 'les quotas des connecteurs', signup_burst: 'les inscriptions', abuse: "l'activité des comptes",
-    moderators: 'les comptes modérateurs',
+    moderators: 'les comptes modérateurs', zem: 'les sites de Zem',
 };
 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -64,6 +64,8 @@ export default async ({ req, res, log, error }) => {
         EVENTS: process.env.COLLECTION_APP_EVENTS,
         ALERTS: process.env.COLLECTION_PLATFORM_ALERTS,
         CONNECTORS: process.env.COLLECTION_VANESSA_CONNECTORS,
+        // Facultative : sans elle, le veilleur ne surveille pas les sites de Zem.
+        SEARCH_SOURCES: process.env.COLLECTION_SEARCH_SOURCES,
     };
     const SITE_URL = process.env.SITE_URL || 'https://kinemaplus.com';
     const ALERTS_URL = '/moderation?section=alerts';
@@ -206,7 +208,7 @@ export default async ({ req, res, log, error }) => {
                     ]);
                     const groups = {};
                     for (const d of docs) {
-                        if (d.type === 'alert_acknowledged') continue;
+                        if (d.type === 'alert_acknowledged' || d.type === 'zem_report') continue;
                         const g = groups[d.type] || (groups[d.type] = { count: 0, max: 'info', last: d.message });
                         g.count++;
                         if ((RANK[d.severity] || 0) > RANK[g.max]) g.max = d.severity;
@@ -219,6 +221,38 @@ export default async ({ req, res, log, error }) => {
                             title: EVENT_TITLES[type] || `Incidents répétés : ${type}`,
                             details: `${g.count} occurrences en 30 min. Dernière erreur : ${String(g.last).slice(0, 180)}. ${EVENT_HINTS[type] || ''}`.trim(),
                         }));
+                },
+            },
+            {
+                // Sites de Zem : le robot écrit « ⛔ panne » ou « ⚠️ attention » au début de l'état du site
+                // quand il est tombé ou que sa structure a changé ; et le robot lui-même doit passer régulièrement.
+                prefix: 'zem',
+                async run() {
+                    if (!C.SEARCH_SOURCES) return [];
+                    const sites = (await listDocs(C.SEARCH_SOURCES, [Query.equal('active', true), Query.limit(100)]))
+                        .filter((x) => /^https?:/.test(x.url));
+                    const out = [];
+                    for (const site of sites) {
+                        const st = String(site.lastStatus || '');
+                        const down = st.startsWith('⛔');
+                        if (!down && !st.startsWith('⚠️')) continue;
+                        out.push({
+                            key: `zem:site:${site.$id}`,
+                            severity: 'warning',
+                            title: `Zem : « ${site.label || site.url} » ${down ? 'est en panne' : 'demande ton attention'}`,
+                            details: `${st.replace(/^(⛔ panne|⚠️ attention) — /, '')}. Détail dans Console → Zem → Sites.`,
+                        });
+                    }
+                    const times = sites.map((x) => Date.parse(x.lastCrawledAt)).filter((t) => Number.isFinite(t));
+                    if (times.length && Date.now() - Math.max(...times) > 36 * 60 * MIN) {
+                        out.push({
+                            key: 'zem:robot',
+                            severity: 'warning',
+                            title: 'Le robot de Zem ne tourne plus',
+                            details: "Aucun site n'a été exploré depuis plus de 36 h. Regarde l'onglet Actions de GitHub (« Robot Zem ») : clé API expirée ou exécution échouée.",
+                        });
+                    }
+                    return out;
                 },
             },
             {

@@ -9,6 +9,7 @@
 import { Client, Databases, Query } from 'node-appwrite';
 import { makeFetcher } from './lib/http.js';
 import { crawlSource } from './lib/crawlSource.js';
+import { siteHealth, statusLine } from './lib/health.js';
 
 const need = (k) => { if (!process.env[k]) { console.error(`Variable manquante : ${k}`); process.exit(1); } return process.env[k]; };
 const client = new Client().setEndpoint(need('APPWRITE_ENDPOINT')).setProject(need('APPWRITE_PROJECT_ID')).setKey(need('APPWRITE_API_KEY'));
@@ -50,9 +51,12 @@ for (const source of sources) {
         const c = await databases.listDocuments(DB, DOCS, [Query.equal('sourceId', source.$id), Query.limit(1), Query.select(['$id'])]);
         pagesCount = c.total;
     } catch { /* garde l'ancien total */ }
+    // Santé du site : « ok », « ⚠️ attention » ou « ⛔ panne » — le veilleur de la Console lit ce début.
+    const health = siteHealth(result, { previousPages: source.pagesCount || 0, pagesNow: pagesCount });
+    if (health.level !== 'ok') console.log(`   ${health.level === 'panne' ? '⛔' : '⚠️'} ${health.reason}`);
     await databases.updateDocument(DB, SOURCES, source.$id, {
         lastCrawledAt: new Date().toISOString(),
-        lastStatus: String(result.status).slice(0, 200),
+        lastStatus: statusLine(result, health),
         pagesCount,
     }).catch((e) => console.error('   (état du site non enregistré)', e.message));
 }

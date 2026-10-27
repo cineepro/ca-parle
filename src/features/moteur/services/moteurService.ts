@@ -26,7 +26,27 @@ export interface ZemSearchResponse {
     hasMore: boolean;
     words: string[];
     results: ZemResult[];
+    answer?: ZemAnswer | null;
 }
+
+// « Réponse rapide » : phrases recopiées des meilleures pages, chacune avec sa source (aucune IA).
+export interface ZemAnswerPoint {
+    text: string;
+    source: { id: string; title: string; host: string; url: string; sourceLabel: string };
+}
+export interface ZemAnswer { points: ZemAnswerPoint[] }
+
+export type ZemReportReason = 'faux' | 'depasse' | 'inapproprie' | 'autre';
+
+export interface ZemPublicStats {
+    pages: number;
+    lastUpdateAt: string;
+    searches7d: number | null;
+    answered7d: number | null;
+    sources: { label: string; host: string; category: ZemCategory }[];
+}
+
+export interface ZemReport { id: string; message: string; url: string; docId: string; reason: string; note: string; createdAt: string }
 
 export interface ZemHome {
     categories: Partial<Record<ZemCategory, number>>;
@@ -116,6 +136,10 @@ export const moteurService = {
     click: (id: string) => { callFunction(FUNCTIONS.SEARCH_ENGINE, { action: 'click', id }).catch(() => {}); },
     read: async (id: string) => (await callFunction<{ page: ZemReadPage }>(FUNCTIONS.SEARCH_ENGINE, { action: 'read', id })).page,
 
+    // Signale un résultat à l'équipe (faux, dépassé, inapproprié).
+    report: (id: string, reason: ZemReportReason, note = '') => callFunction(FUNCTIONS.SEARCH_ENGINE, { action: 'report', id, reason, note }),
+    publicStats: () => callFunction<ZemPublicStats>(FUNCTIONS.SEARCH_ENGINE, { action: 'public_stats' }),
+
     // Console (modérateurs)
     listSources: async () => (await callFunction<{ sources: ZemSource[] }>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'list' })).sources,
     addSource: (input: ZemSourceInput) => callFunction(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'add', ...input }),
@@ -156,6 +180,7 @@ export const moteurService = {
     topClicked: async () => (await callFunction<{ items: ZemClicked[] }>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'top_clicked' })).items,
     topQueries: async () => (await callFunction<{ queries: ZemQueryStat[]; total: number }>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'top_queries' })),
 
+    reports: async () => (await callFunction<{ reports: ZemReport[] }>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'reports' })).reports,
     stats: () => callFunction<ZemStats>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'stats' }),
     missed: async () => (await callFunction<{ missed: ZemMissed[] }>(FUNCTIONS.MANAGE_SEARCH_SOURCES, { action: 'missed' })).missed,
 };

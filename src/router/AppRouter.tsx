@@ -37,6 +37,7 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import UnsubscribePage from '@/pages/UnsubscribePage';
 import SearchPage from '@/pages/SearchPage';
 import ZemPage from '@/pages/ZemPage';
+import ZemAboutPage from '@/pages/ZemAboutPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import MyReferencesPage from '@/pages/MyReferencesPage';
@@ -235,6 +236,14 @@ export const AppRouter = () => {
                     element={
                         <ProtectedRoute>
                             <ZemPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/zem/a-propos"
+                    element={
+                        <ProtectedRoute>
+                            <ZemAboutPage />
                         </ProtectedRoute>
                     }
                 />

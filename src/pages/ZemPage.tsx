@@ -4,12 +4,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { moteurService, browseCategory, type ZemCategory, type ZemHome, type ZemResult } from '@/features/moteur/services/moteurService';
+import { moteurService, browseCategory, type ZemAnswer, type ZemCategory, type ZemHome, type ZemResult } from '@/features/moteur/services/moteurService';
 import { ZemRider } from '@/features/moteur/components/ZemRider';
 import { ZemTrack, type TrackState } from '@/features/moteur/components/ZemTrack';
 import { ZemSearchBar } from '@/features/moteur/components/ZemSearchBar';
 import { ZemMosaic } from '@/features/moteur/components/ZemMosaic';
 import { ZemReader } from '@/features/moteur/components/ZemReader';
+import { ZemAnswerCard } from '@/features/moteur/components/ZemAnswerCard';
+import { savedReads } from '@/features/moteur/lib/offlineStore';
 import {
     ZEM_TAGLINE, ZEM_SUBTITLE, WAITING_LINES, ARRIVED, NOTHING_FOUND_TITLE, NOTHING_FOUND_HELP, ERROR_LINE,
     HOME_EMPTY, LATEST_TITLE, RUBRICS_TITLE, ASK_VANESSA, CATEGORY_META, CATEGORY_ORDER,
@@ -29,10 +31,12 @@ export default function ZemPage() {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(false);
     const [track, setTrack] = useState<TrackState>('idle');
+    const [answer, setAnswer] = useState<ZemAnswer | null>(null);
     const [corrected, setCorrected] = useState<{ from: string; to: string } | null>(null);
     const [error, setError] = useState(false);
     const [reading, setReading] = useState<ZemResult | null>(null);
     const [waitingLine, setWaitingLine] = useState(WAITING_LINES[0]);
+    const [recent] = useState<ZemResult[]>(() => savedReads().slice(0, 6).map((x) => x.result));
     const runId = useRef(0); // ignore les réponses d'une recherche déjà remplacée
 
     useEffect(() => { moteurService.home().then(setHome).catch(() => setHome({ categories: {}, latest: [] })); }, []);
@@ -53,7 +57,7 @@ export default function ZemPage() {
             if (id !== runId.current) return;
             setResults((prev) => (nextPage === 0 ? r.results : [...(prev || []), ...r.results]));
             setWords(r.words);
-            if (nextPage === 0) setCorrected(r.corrected ?? null);
+            if (nextPage === 0) { setCorrected(r.corrected ?? null); setAnswer(r.answer ?? null); }
             setTotal(r.total);
             setPage(nextPage);
             setHasMore(r.hasMore);
@@ -97,7 +101,7 @@ export default function ZemPage() {
         }
     };
 
-    const reset = () => { setCorrected(null); setText(''); setCategory(''); setResults(null); setError(false); setTrack('idle'); setParams({}); runId.current++; };
+    const reset = () => { setCorrected(null); setAnswer(null); setText(''); setCategory(''); setResults(null); setError(false); setTrack('idle'); setParams({}); runId.current++; };
     const searching = results !== null || track === 'loading';
 
     return (
@@ -169,6 +173,7 @@ export default function ZemPage() {
                                     </p>
                                 )}
                                 <p className="text-xs text-gray-500 mb-2">{total} page{total > 1 ? 's' : ''} trouvée{total > 1 ? 's' : ''}</p>
+                                {answer && <ZemAnswerCard answer={answer} />}
                                 <ZemMosaic results={results} words={words} onRead={setReading} />
                                 {hasMore && (
                                     <button
@@ -202,6 +207,18 @@ export default function ZemPage() {
                         )}
                     </section>
                 )}
+
+                {/* Lus récemment : relisibles sans connexion */}
+                {results === null && recent.length > 0 && (
+                    <section className="mt-6">
+                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Lus récemment (relisibles sans connexion)</h2>
+                        <ZemMosaic results={recent} onRead={setReading} />
+                    </section>
+                )}
+
+                <p className="mt-8 text-center text-xs text-gray-500">
+                    <Link to="/zem/a-propos" className="font-semibold text-ochre underline">Comment Zem fonctionne et d’où viennent les résultats</Link>
+                </p>
             </div>
             {reading && <ZemReader result={reading} onClose={() => setReading(null)} />}
         </div>

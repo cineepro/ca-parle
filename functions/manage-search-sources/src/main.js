@@ -9,7 +9,7 @@
 //   { action: 'missed' }                      — questions qui n'ont donné aucun résultat (les plus fréquentes)
 //   Fiches manuelles :  { action: 'list_cards' } · { action: 'save_card', id?, title, text, link?, category, city?, trust?, publishedAt? } · { action: 'delete_card', id }
 //   Connecteurs dans Zem : { action: 'list_connector_index' } · { action: 'set_connector_index', connectorId, enabled, category?, trust? } · { action: 'sync_connectors' }
-//   Statistiques : { action: 'top_clicked' } · { action: 'top_queries' }
+//   Statistiques : { action: 'top_clicked' } · { action: 'top_queries' } · { action: 'reports' } (signalements des utilisateurs)
 //   Planifié (Appwrite → Function → Settings → Schedule, ex. « 0 * * * * » = chaque heure) : lance sync_connectors tout seul.
 import { Client, Databases, Query, ID } from 'node-appwrite';
 import { cleanSource, parseBulk } from './validate.js';
@@ -37,6 +37,7 @@ export default async ({ req, res, log, error }) => {
     const QUERIES = process.env.COLLECTION_SEARCH_QUERIES;
     const KNOW = process.env.COLLECTION_VANESSA_KNOWLEDGE;
     const CONNECTORS = process.env.COLLECTION_VANESSA_CONNECTORS;
+    const EVENTS = process.env.COLLECTION_APP_EVENTS; // facultative : signalements des utilisateurs
     const runSync = (opts = {}) => syncConnectors({ databases, DB: DATABASE_ID, SOURCES, DOCS, KNOW, CONNECTORS, deadline: Date.now() + 40000, ...opts });
 
     try {
@@ -255,6 +256,19 @@ export default async ({ req, res, log, error }) => {
                 agg.set(d.q, e);
             }
             return res.json({ success: true, total: r.documents.length, queries: [...agg.values()].sort((a, b) => b.count - a.count).slice(0, 30) });
+        }
+
+        if (action === 'reports') {
+            if (!EVENTS) return res.json({ success: true, reports: [], notConfigured: true });
+            const r = await databases.listDocuments(DATABASE_ID, EVENTS, [Query.equal('type', 'zem_report'), Query.orderDesc('createdAt'), Query.limit(50)]);
+            return res.json({
+                success: true,
+                reports: r.documents.map((d) => {
+                    let meta = {};
+                    try { meta = JSON.parse(d.meta || '{}'); } catch { /* meta illisible */ }
+                    return { id: d.$id, message: d.message, url: meta.url || '', docId: meta.docId || '', reason: meta.reason || '', note: meta.note || '', createdAt: d.createdAt };
+                }),
+            });
         }
 
         return res.json({ success: false, error: `Action inconnue : ${action}` }, 400);

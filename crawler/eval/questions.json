@@ -1,0 +1,737 @@
+[
+ {
+  "q": "comment obtenir un acte de naissance",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "acte de naissance"
+  ]
+ },
+ {
+  "q": "acte de naissance",
+  "kind": "mot seul",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "acte de naissance"
+  ]
+ },
+ {
+  "q": "demande de casier judiciaire",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "casier"
+  ]
+ },
+ {
+  "q": "comment faire un passeport",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "passeport"
+  ]
+ },
+ {
+  "q": "passeport béninois renouvellement",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "passeport"
+  ]
+ },
+ {
+  "q": "carte d'identité CIP",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "carte d'identité",
+   "cip"
+  ]
+ },
+ {
+  "q": "numéro ANIP",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "anip"
+  ]
+ },
+ {
+  "q": "permis de conduire",
+  "kind": "mot seul",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "permis de conduire"
+  ]
+ },
+ {
+  "q": "créer une entreprise au Bénin",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "entreprise",
+   "apiex"
+  ]
+ },
+ {
+  "q": "visa pour le Bénin",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "visa"
+  ]
+ },
+ {
+  "q": "e-visa Bénin",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "visa"
+  ]
+ },
+ {
+  "q": "certificat de nationalité",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "nationalité",
+   "nationalite"
+  ]
+ },
+ {
+  "q": "légalisation de documents",
+  "kind": "démarche",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "légalisation",
+   "legalisation"
+  ]
+ },
+ {
+  "q": "journal officiel",
+  "kind": "mot seul",
+  "hosts": [
+   "sgg.gouv.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "journal officiel"
+  ]
+ },
+ {
+  "q": "décret du conseil des ministres",
+  "kind": "document",
+  "hosts": [
+   "sgg.gouv.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "décret",
+   "decret"
+  ]
+ },
+ {
+  "q": "compte rendu du conseil des ministres",
+  "kind": "document",
+  "hosts": [
+   "gouv.bj",
+   "sgg.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "conseil des ministres"
+  ]
+ },
+ {
+  "q": "déclaration d'impôts en ligne",
+  "kind": "démarche",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "déclaration",
+   "declaration",
+   "impôt"
+  ]
+ },
+ {
+  "q": "IFU identifiant fiscal unique",
+  "kind": "démarche",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "ifu",
+   "identifiant fiscal"
+  ]
+ },
+ {
+  "q": "calendrier fiscal",
+  "kind": "document",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "calendrier fiscal"
+  ]
+ },
+ {
+  "q": "taxe foncière",
+  "kind": "mot seul",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "foncière",
+   "fonciere"
+  ]
+ },
+ {
+  "q": "TVA déclaration",
+  "kind": "démarche",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "tva"
+  ]
+ },
+ {
+  "q": "résultats du bac",
+  "kind": "actualité",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "bac",
+   "baccalauréat",
+   "baccalaureat"
+  ]
+ },
+ {
+  "q": "résultats BEPC",
+  "kind": "actualité",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "bepc"
+  ]
+ },
+ {
+  "q": "inscription université d'Abomey-Calavi",
+  "kind": "démarche",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "inscription",
+   "uac",
+   "abomey"
+  ]
+ },
+ {
+  "q": "bourse d'études",
+  "kind": "démarche",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "bourse"
+  ]
+ },
+ {
+  "q": "calendrier scolaire",
+  "kind": "document",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "calendrier"
+  ]
+ },
+ {
+  "q": "concours de recrutement",
+  "kind": "actualité",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "service-public.bj",
+   "gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "concours",
+   "recrutement"
+  ]
+ },
+ {
+  "q": "date du CEP",
+  "kind": "actualité",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "cep"
+  ]
+ },
+ {
+  "q": "inscription en licence",
+  "kind": "démarche",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj"
+  ],
+  "titleAny": [
+   "licence",
+   "inscription"
+  ]
+ },
+ {
+  "q": "vaccination enfants",
+  "kind": "santé",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "vaccin"
+  ]
+ },
+ {
+  "q": "paludisme prévention",
+  "kind": "santé",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "paludisme"
+  ]
+ },
+ {
+  "q": "campagne de vaccination covid",
+  "kind": "santé",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "vaccin",
+   "covid"
+  ]
+ },
+ {
+  "q": "hôpital de Cotonou",
+  "kind": "santé",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "hôpital",
+   "hopital",
+   "chu"
+  ]
+ },
+ {
+  "q": "assurance maladie ARCH",
+  "kind": "santé",
+  "hosts": [
+   "sante.gouv.bj",
+   "gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "arch",
+   "assurance"
+  ]
+ },
+ {
+  "q": "actualité Cotonou aujourd'hui",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": []
+ },
+ {
+  "q": "élections au Bénin",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "élection",
+   "election"
+  ]
+ },
+ {
+  "q": "budget de l'État 2026",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj",
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "budget"
+  ]
+ },
+ {
+  "q": "loi de finances",
+  "kind": "document",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj",
+   "service-public.bj",
+   "gouv.bj",
+   "sgg.gouv.bj"
+  ],
+  "titleAny": [
+   "loi de finances"
+  ]
+ },
+ {
+  "q": "football Écureuils du Bénin",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "écureuils",
+   "ecureuils"
+  ]
+ },
+ {
+  "q": "prix du carburant au Bénin",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "carburant",
+   "essence"
+  ]
+ },
+ {
+  "q": "électricité SBEE coupure",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "sbee",
+   "électricité",
+   "electricite"
+  ]
+ },
+ {
+  "q": "grève des enseignants",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "grève",
+   "greve"
+  ]
+ },
+ {
+  "q": "marché de Dantokpa",
+  "kind": "actualité",
+  "hosts": [
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "dantokpa"
+  ]
+ },
+ {
+  "q": "acte de naisance",
+  "kind": "faute de frappe",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "acte de naissance"
+  ]
+ },
+ {
+  "q": "passeport benin",
+  "kind": "sans accent",
+  "hosts": [
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "passeport"
+  ]
+ },
+ {
+  "q": "resultat du baccalaureat",
+  "kind": "sans accent",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "bac",
+   "baccalauréat",
+   "baccalaureat"
+  ]
+ },
+ {
+  "q": "inscripsion universite",
+  "kind": "faute de frappe",
+  "hosts": [
+   "eduactions.bj",
+   "officedubacbenin.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "inscription",
+   "universit"
+  ]
+ },
+ {
+  "q": "declaration impots",
+  "kind": "sans accent",
+  "hosts": [
+   "impots.bj"
+  ],
+  "titleAny": [
+   "déclaration",
+   "declaration",
+   "impôt"
+  ]
+ },
+ {
+  "q": "vacination",
+  "kind": "faute de frappe",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj"
+  ],
+  "titleAny": [
+   "vaccin"
+  ]
+ },
+ {
+  "q": "ministre de la santé",
+  "kind": "actualité",
+  "hosts": [
+   "sante.gouv.bj",
+   "beninwebtv.com",
+   "24haubenin.info",
+   "lanouvelletribune.info",
+   "banouto.bj",
+   "lebeninoislibere.bj",
+   "lematinal.bj",
+   "beninrevele.bj",
+   "service-public.bj",
+   "gouv.bj"
+  ],
+  "titleAny": [
+   "santé",
+   "sante"
+  ]
+ }
+]

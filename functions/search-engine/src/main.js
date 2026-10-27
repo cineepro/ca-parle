@@ -5,6 +5,8 @@
 //   { action: 'browse', category, page? }             → dernières pages d'une rubrique (sans mot cherché)
 //   { action: 'click', id }                           → note qu'un résultat a été ouvert (aide à classer)
 //   { action: 'read', id }                            → extrait de lecture (≈1 500 caractères) d'une page indexée
+//   { action: 'report', id, reason, note? }           → signale un résultat (faux, dépassé, inapproprié…) à l'équipe
+//   { action: 'public_stats' }                        → chiffres publics (pages, sites, dernière mise à jour, recherches)
 //
 // Zem ne recherche QUE dans les pages que le robot a indexées depuis les sites choisis
 // dans la Console (collection search_documents). Il ne montre que des extraits et renvoie
@@ -14,6 +16,7 @@ import { Client, Databases, Query, ID } from 'node-appwrite';
 import { extractQueryWords, buildGroups, flattenTerms, correctWords, rankDocuments, buildSnippet, normalize } from './ranking.js';
 import { SYNONYMS } from './synonyms.js';
 import { getVocab } from './vocab.js';
+import { buildAnswer } from './answer.js';
 
 const PAGE_SIZE = 10;
 const CATEGORIES = ['actualites', 'etudes', 'administration', 'sante', 'emploi', 'marche', 'culture', 'sport', 'services', 'autre'];
@@ -32,6 +35,8 @@ export default async ({ req, res, log, error }) => {
     const DATABASE_ID = process.env.DATABASE_ID;
     const DOCS = process.env.COLLECTION_SEARCH_DOCUMENTS;
     const QUERIES = process.env.COLLECTION_SEARCH_QUERIES;
+    const SOURCES = process.env.COLLECTION_SEARCH_SOURCES; // facultative : liste publique des sites
+    const EVENTS = process.env.COLLECTION_APP_EVENTS; // facultative : reçoit les signalements
 
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
@@ -120,6 +125,8 @@ export default async ({ req, res, log, error }) => {
                 hasMore: (page + 1) * PAGE_SIZE < total,
                 words: shownWords,
                 corrected,
+                // Phrases recopiées des meilleures pages, avec leurs sources — première page seulement.
+                answer: page === 0 ? buildAnswer(ranked, groups) : null,
                 results: slice.map(({ doc, score }) => ({
                     id: doc.$id,
                     url: doc.url,
@@ -207,6 +214,46 @@ export default async ({ req, res, log, error }) => {
                     truncated: text.length > 1500,
                 },
             });
+        }
+
+        if (action === 'report') {
+            const id = String(body.id || '');
+            const REASONS = { faux: 'information fausse', depasse: 'information dépassée', inapproprie: 'contenu inapproprié', autre: 'autre problème' };
+            const reason = REASONS[body.reason] ? body.reason : 'autre';
+            if (!id) return res.json({ success: false, error: 'id requis.' }, 400);
+            if (!EVENTS) return res.json({ success: false, error: 'Les signalements ne sont pas encore activés.' });
+            const d = await databases.getDocument(DATABASE_ID, DOCS, id).catch(() => null);
+            if (!d) return res.json({ success: false, error: 'Page introuvable.' });
+            await databases.createDocument(DATABASE_ID, EVENTS, ID.unique(), {
+                type: 'zem_report', severity: 'info', source: 'search-engine',
+                message: `${REASONS[reason]} : ${String(d.title).slice(0, 200)}`,
+                meta: JSON.stringify({ docId: id, url: d.url, reason, note: String(body.note || '').slice(0, 300) }),
+                createdAt: new Date().toISOString(),
+            });
+            return res.json({ success: true });
+        }
+
+        if (action === 'public_stats') {
+            const since = new Date(Date.now() - 7 * 86400000).toISOString();
+            const safe = async (fn, fallback) => { try { return await fn(); } catch { return fallback; } };
+            const [pages, last, searches, answered, sources] = await Promise.all([
+                safe(async () => (await databases.listDocuments(DATABASE_ID, DOCS, [Query.limit(1), Query.select(['$id'])])).total, 0),
+                safe(async () => {
+                    try {
+                        return (await databases.listDocuments(DATABASE_ID, DOCS, [Query.orderDesc('crawledAt'), Query.limit(1), Query.select(['crawledAt'])])).documents[0]?.crawledAt || '';
+                    } catch {
+                        return (await databases.listDocuments(DATABASE_ID, DOCS, [Query.orderDesc('$updatedAt'), Query.limit(1), Query.select(['$updatedAt'])])).documents[0]?.$updatedAt || '';
+                    }
+                }, ''),
+                safe(async () => (QUERIES ? (await databases.listDocuments(DATABASE_ID, QUERIES, [Query.greaterThan('createdAt', since), Query.limit(1), Query.select(['$id'])])).total : null), null),
+                safe(async () => (QUERIES ? (await databases.listDocuments(DATABASE_ID, QUERIES, [Query.greaterThan('createdAt', since), Query.greaterThan('resultsCount', 0), Query.limit(1), Query.select(['$id'])])).total : null), null),
+                safe(async () => {
+                    if (!SOURCES) return [];
+                    const r = await databases.listDocuments(DATABASE_ID, SOURCES, [Query.equal('active', true), Query.limit(100), Query.select(['label', 'url', 'category'])]);
+                    return r.documents.filter((x) => /^https?:/.test(x.url)).map((x) => ({ label: x.label || new URL(x.url).hostname, host: new URL(x.url).hostname.replace(/^www\./, ''), category: x.category || 'autre' }));
+                }, []),
+            ]);
+            return res.json({ success: true, pages, lastUpdateAt: last, searches7d: searches, answered7d: answered, sources });
         }
 
         return res.json({ success: false, error: `Action inconnue : ${action}` }, 400);
