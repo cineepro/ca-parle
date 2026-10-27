@@ -84,6 +84,7 @@ export const FUNCTIONS = {
 
     // Zem — navigateur et moteur de recherche local
     SEARCH_ENGINE: import.meta.env.VITE_APPWRITE_FUNCTION_SEARCH_ENGINE || '',
+    MANAGE_COMMUNITY: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_COMMUNITY || '',
     MANAGE_PROFILE: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_PROFILE || '',
     MANAGE_SEARCH_SOURCES: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_SEARCH_SOURCES || '',
 } as const;

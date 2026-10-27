@@ -30,6 +30,8 @@ export interface UserProfile extends Models.Document {
     isBanned: boolean;
     // Compte certifié (badge bleu), posé uniquement depuis la Console.
     isCertified?: boolean;
+    // Agent commercial (#construisonsVanessa), nommé depuis la collection users.
+    isAgent?: boolean;
     // ➕ AJOUT : préférence de désabonnement à la newsletter
     newsletterOptOut?: boolean;
     createdAt: string;

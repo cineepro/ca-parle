@@ -147,7 +147,7 @@ export const vanessaKnowledgeService = {
 
     // --- Lexique communautaire (n'importe quel utilisateur peut proposer) ---
     async suggestExpression(content: string): Promise<void> {
-        await callFunction(FUNCTIONS.MANAGE_VANESSA_KNOWLEDGE, { action: 'suggest_expression', content });
+        await callFunction(FUNCTIONS.MANAGE_COMMUNITY, { action: 'submit_suggestion', content });
     },
 
     async update(id: string, data: Partial<Pick<VanessaKnowledge, 'category' | 'content' | 'active' | 'connectorId'>>): Promise<void> {

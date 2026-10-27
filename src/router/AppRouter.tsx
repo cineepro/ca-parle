@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ModeratorRoute } from './ModeratorRoute';
+import { AgentRoute } from './AgentRoute';
 
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -13,6 +14,7 @@ import VanessaHomePage from '@/pages/VanessaHomePage';
 import CreateStoryPage from '@/pages/CreateStoryPage';
 import StoryDetailPage from '@/pages/StoryDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
+import AgentPage from '@/pages/AgentPage';
 import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
@@ -111,6 +113,14 @@ export const AppRouter = () => {
                         <ProtectedRoute>
                             <ReferencePage />
                         </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/agent"
+                    element={
+                        <AgentRoute>
+                            <AgentPage />
+                        </AgentRoute>
                     }
                 />
                 <Route

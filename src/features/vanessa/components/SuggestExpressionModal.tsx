@@ -36,8 +36,7 @@ export const SuggestExpressionModal = ({ onClose }: Props) => {
                         
                         <p className="text-sm font-semibold text-gray-800">Merci, c'est transmis !</p>
                         <p className="text-xs text-gray-500">
-                            On vérifie vite fait avant que Vanessa commence à l'utiliser — ça évite les doublons et
-                            les trucs hors-sujet.
+                            Toute l'équipe de Vanessa lira ta proposition et en tiendra compte.
                         </p>
                         <Button onClick={onClose} className="w-full">Fermer</Button>
                     </div>
@@ -46,19 +45,19 @@ export const SuggestExpressionModal = ({ onClose }: Props) => {
                         <div>
                             <h2 className="text-base font-bold text-gray-800">Proposer une expression à Vanessa</h2>
                             <p className="text-xs text-gray-400 mt-1">
-                                Une expression, un mot, un ton qu'elle devrait utiliser — dans ton style, comme tu lui
-                                apprendrais toi-même.
+                                Une expression, une idée, un domaine où elle devrait évoluer, ce que tu attends d'elle…
+                                dis-nous tout, librement.
                             </p>
                         </div>
                         <textarea
                             value={content}
                             onChange={(e) => setContent(e.target.value)}
-                            placeholder='Ex : "Ça va aller" — pour rassurer quelqu\u2019un après une mauvaise nouvelle.'
-                            maxLength={300}
-                            rows={4}
+                            placeholder="Ex : « Ça va aller » pour rassurer quelqu'un… ou : j'aimerais que Vanessa m'aide pour les démarches administratives."
+                            maxLength={2000}
+                            rows={8}
                             className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                         />
-                        <p className="text-xs text-gray-300 text-right">{content.length}/300</p>
+                        <p className="text-xs text-gray-300 text-right">{content.length}/2000</p>
                         {error && <p className="text-xs text-red-500">{error}</p>}
                         <div className="flex gap-2">
                             <Button type="submit" isLoading={saving} disabled={content.trim().length < 5} className="flex-1">

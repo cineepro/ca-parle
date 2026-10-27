@@ -467,6 +467,15 @@ export const Sidebar = () => {
                         ))}
                     </div>
 
+                    {user?.isAgent && (
+                        <>
+                            <SectionLabel>Campagne</SectionLabel>
+                            <div className="space-y-0.5">
+                                <NavLink item={{ to: '/agent', label: 'Mon suivi #construisonsVanessa' }} onNavigate={close} />
+                            </div>
+                        </>
+                    )}
+
                     {user?.isModerator && (
                         <>
                             <SectionLabel>Équipe</SectionLabel>

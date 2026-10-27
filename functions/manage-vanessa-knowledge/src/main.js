@@ -169,19 +169,11 @@ export default async ({ req, res, error }) => {
         // n'est utilisable par Vanessa qu'après validation d'un modérateur
         // depuis /moderation (le bouton "Activer" déjà existant).
         if (action === 'suggest_expression') {
-            const { content } = body;
-            if (!content || content.trim().length < 5) {
-                return res.json({ success: false, error: 'Décris un peu plus ton expression.' }, 400);
-            }
-            const doc = await databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), {
-                category: 'lexique',
-                content: content.trim().slice(0, 300),
-                connectorId: '',
-                submittedBy: callerId,
-                active: false, // ⚠️ jamais utilisable avant validation — même principe que Ça sert
-                createdAt: new Date().toISOString(),
-            });
-            return res.json({ success: true, document: doc });
+            // Les propositions des utilisateurs ne vont plus dans le lexique :
+            // elles arrivent dans une collection à part (fonction manage-community)
+            // que Vanessa ne lit pas. Une ancienne version de l'application encore
+            // ouverte reçoit donc ce message au lieu de polluer le lexique.
+            return res.json({ success: false, error: 'Recharge la page pour envoyer ta proposition (nouvelle version).' });
         }
 
         // Accessible à tout utilisateur authentifié — alimente les

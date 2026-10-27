@@ -44,6 +44,7 @@ export interface UserProfile extends Models.User<Models.Preferences> {
     isModerator?: boolean;
     isBanned?: boolean;
     isCertified?: boolean;
+    isAgent?: boolean;
 }
 
 export const authService = {
