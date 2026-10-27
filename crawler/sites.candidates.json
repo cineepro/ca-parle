@@ -1,16 +1,114 @@
 [
-  { "url": "https://www.gouv.bj", "label": "Gouvernement du Bénin", "category": "administration", "city": "", "trust": 3 },
-  { "url": "https://service-public.bj", "label": "Service-Public.bj", "category": "administration", "city": "", "trust": 3 },
-  { "url": "https://sgg.gouv.bj", "label": "Secrétariat général du Gouvernement", "category": "administration", "city": "", "trust": 3 },
-  { "url": "https://www.impots.bj", "label": "Direction générale des impôts", "category": "administration", "city": "", "trust": 3 },
-  { "url": "https://sante.gouv.bj", "label": "Ministère de la Santé", "category": "sante", "city": "", "trust": 3 },
-  { "url": "https://eduactions.bj", "label": "Eduactions", "category": "etudes", "city": "", "trust": 2 },
-  { "url": "https://officedubacbenin.bj", "label": "Office du Bac", "category": "etudes", "city": "", "trust": 3 },
-  { "url": "https://beninwebtv.com", "label": "Bénin Web TV", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://www.24haubenin.info", "label": "24 Heures au Bénin", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://lanouvelletribune.info", "label": "La Nouvelle Tribune", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://www.banouto.bj", "label": "Banouto", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://lebeninoislibere.bj", "label": "Le Béninois Libéré", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://lematinal.bj", "label": "Le Matinal", "category": "actualites", "city": "", "trust": 2 },
-  { "url": "https://beninrevele.bj", "label": "Bénin Révélé", "category": "actualites", "city": "", "trust": 2 }
+  {
+    "url": "https://www.gouv.bj",
+    "label": "Gouvernement du Bénin",
+    "category": "administration",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://service-public.bj",
+    "label": "Service-Public.bj",
+    "category": "administration",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://sgg.gouv.bj",
+    "label": "Secrétariat général du Gouvernement",
+    "category": "administration",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://www.impots.bj",
+    "label": "Direction générale des impôts",
+    "category": "administration",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://sante.gouv.bj",
+    "label": "Ministère de la Santé",
+    "category": "sante",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://eduactions.bj",
+    "label": "Eduactions",
+    "category": "etudes",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://officedubacbenin.bj",
+    "label": "Office du Bac",
+    "category": "etudes",
+    "city": "",
+    "trust": 3
+  },
+  {
+    "url": "https://beninwebtv.com",
+    "label": "Bénin Web TV",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://www.24haubenin.info",
+    "label": "24 Heures au Bénin",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://lanouvelletribune.info",
+    "label": "La Nouvelle Tribune",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://www.banouto.bj",
+    "label": "Banouto",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://lebeninoislibere.bj",
+    "label": "Le Béninois Libéré",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://lematinal.bj",
+    "label": "Le Matinal",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://beninrevele.bj",
+    "label": "Bénin Révélé",
+    "category": "actualites",
+    "city": "",
+    "trust": 2
+  },
+  {
+    "url": "https://bipradio.com",
+    "label": "BIP Radio (Bénin Info Première)",
+    "category": "actualites",
+    "city": "Cotonou",
+    "trust": 2
+  },
+  {
+    "url": "https://lepotentiel.bj",
+    "label": "Le Potentiel",
+    "category": "actualites",
+    "city": "Cotonou",
+    "trust": 2
+  }
 ]
