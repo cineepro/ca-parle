@@ -18,13 +18,14 @@ import { ConsoleAlerts } from '@/features/console/components/ConsoleAlerts';
 import { ConsoleUsers } from '@/features/console/components/ConsoleUsers';
 import { ConsoleSuggestions } from '@/features/console/components/ConsoleSuggestions';
 import { ConsoleAgents } from '@/features/console/components/ConsoleAgents';
+import { ConsoleHalte } from '@/features/console/components/ConsoleHalte';
 import { ConsoleZem } from '@/features/console/components/ConsoleZem';
 import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 type Section =
     | 'overview' | 'alerts' | 'journal' | 'system'
     | 'signalements' | 'ca-sert' | 'avis' | 'connaissances' | 'connecteurs'
-    | 'newsletter' | 'users' | 'zem' | 'suggestions' | 'agents';
+    | 'newsletter' | 'users' | 'zem' | 'suggestions' | 'agents' | 'halte';
 
 interface NavEntry { id: Section; label: string; badge?: number }
 interface NavGroup { title: string; entries: NavEntry[] }
@@ -44,6 +45,7 @@ const SECTION_TITLES: Record<Section, string> = {
     users: 'Utilisateurs',
     suggestions: 'Propositions des utilisateurs',
     agents: 'Agents commerciaux',
+    halte: 'HALTE — alertes et affiches',
 };
 
 export default function ModerationPage() {
@@ -73,6 +75,7 @@ export default function ModerationPage() {
         { title: 'Communication', entries: [
             { id: 'users', label: 'Utilisateurs' },
             { id: 'agents', label: 'Agents' },
+            { id: 'halte', label: 'HALTE' },
             { id: 'newsletter', label: 'Newsletter' },
         ] },
     ];
@@ -149,6 +152,7 @@ export default function ModerationPage() {
                         {section === 'zem' && <ConsoleZem />}
                         {section === 'suggestions' && <ConsoleSuggestions />}
                         {section === 'agents' && <ConsoleAgents />}
+                        {section === 'halte' && <ConsoleHalte />}
                         {section === 'users' && <ConsoleUsers />}
                         {section === 'newsletter' && <NewsletterComposer />}
                     </main>

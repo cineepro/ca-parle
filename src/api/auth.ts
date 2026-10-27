@@ -45,6 +45,8 @@ export interface UserProfile extends Models.User<Models.Preferences> {
     isBanned?: boolean;
     isCertified?: boolean;
     isAgent?: boolean;
+    // Cellule d'écoute HALTE : peut lire et traiter les alertes de violences.
+    isResponder?: boolean;
 }
 
 export const authService = {

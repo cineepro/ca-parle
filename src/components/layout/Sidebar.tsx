@@ -467,6 +467,15 @@ export const Sidebar = () => {
                         ))}
                     </div>
 
+                    {user?.isResponder && (
+                        <>
+                            <SectionLabel>HALTE</SectionLabel>
+                            <div className="space-y-0.5">
+                                <NavLink item={{ to: '/halte/cellule', label: 'Cellule d’écoute' }} onNavigate={close} />
+                            </div>
+                        </>
+                    )}
+
                     {user?.isAgent && (
                         <>
                             <SectionLabel>Campagne</SectionLabel>

@@ -32,6 +32,7 @@ export interface UserProfile extends Models.Document {
     isCertified?: boolean;
     // Agent commercial (#construisonsVanessa), nommé depuis la collection users.
     isAgent?: boolean;
+    isResponder?: boolean;
     // ➕ AJOUT : préférence de désabonnement à la newsletter
     newsletterOptOut?: boolean;
     createdAt: string;

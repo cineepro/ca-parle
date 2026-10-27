@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ModeratorRoute } from './ModeratorRoute';
 import { AgentRoute } from './AgentRoute';
+import { ResponderRoute } from './ResponderRoute';
 
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
@@ -15,6 +16,8 @@ import CreateStoryPage from '@/pages/CreateStoryPage';
 import StoryDetailPage from '@/pages/StoryDetailPage';
 import ProfilePage from '@/pages/ProfilePage';
 import AgentPage from '@/pages/AgentPage';
+import HaltePage from '@/pages/HaltePage';
+import HalteCellulePage from '@/pages/HalteCellulePage';
 import MemoryPage from '@/pages/MemoryPage';
 import ReferencePage from '@/pages/ReferencePage';
 import ModerationPage from '@/pages/ModerationPage';
@@ -51,6 +54,8 @@ export const AppRouter = () => {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                {/* HALTE : ouverte par le QR code, sans compte */}
+                <Route path="/halte" element={<HaltePage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
                 <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
                 <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
@@ -114,6 +119,14 @@ export const AppRouter = () => {
                         <ProtectedRoute>
                             <ReferencePage />
                         </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/halte/cellule"
+                    element={
+                        <ResponderRoute>
+                            <HalteCellulePage />
+                        </ResponderRoute>
                     }
                 />
                 <Route
