@@ -1,11 +1,43 @@
 {
-  "_aide": "Règles par site (clé = nom de domaine sans www). entryUrls : pages qui LISTENT les articles (catégories) ; linkSelector : sélecteur CSS des liens d'articles dans ces pages. Ces pages-listes ne sont pas indexées, seuls les articles le sont. Pour un site qui a un plan (sitemap) ou un flux RSS, n'ajoute rien ici.",
+  "_aide": "Règles par site (clé = nom de domaine sans www). entryUrls : pages qui LISTENT les articles (catégories) ; linkSelector : sélecteur CSS des liens d'articles dans ces pages. Ces pages-listes ne sont pas indexées, seuls les articles le sont. Pour un site qui a un plan (sitemap) ou un flux RSS, n'ajoute rien ici. L'adresse du site dans la Console doit être la page d'accueil (sans chemin après le nom de domaine).",
   "lepotentiel.bj": {
     "entryUrls": [
       "https://lepotentiel.bj/?cat=34",
       "https://lepotentiel.bj/?cat=41",
-      "https://lepotentiel.bj/?cat=42"
+      "https://lepotentiel.bj/?cat=42",
+      "https://lepotentiel.bj/?cat=22970",
+      "https://lepotentiel.bj/?cat=1358",
+      "https://lepotentiel.bj/?cat=77",
+      "https://lepotentiel.bj/?cat=23",
+      "https://lepotentiel.bj/?cat=11"
     ],
     "linkSelector": "div.ak-module-details a[href*=\"?p=\"]"
+  },
+  "bourses.enseignementsuperieur.gouv.bj": {
+    "entryUrls": [
+      "https://bourses.enseignementsuperieur.gouv.bj/actualites/",
+      "https://bourses.enseignementsuperieur.gouv.bj/actualites/page/2/",
+      "https://bourses.enseignementsuperieur.gouv.bj/communiques/",
+      "https://bourses.enseignementsuperieur.gouv.bj/communiques/page/2/"
+    ],
+    "linkSelector": "article.et_pb_post h2.entry-title a"
+  },
+  "enseignementsuperieur.gouv.bj": {
+    "entryUrls": [
+      "https://enseignementsuperieur.gouv.bj/actualites/TYPE_ACTUALITE_ACTUALITE",
+      "https://enseignementsuperieur.gouv.bj/actualites/TYPE_ACTUALITE_COMMUNIQUE",
+      "https://enseignementsuperieur.gouv.bj/actualites/TYPE_ACTUALITE_APPEL_OFFRE",
+      "https://enseignementsuperieur.gouv.bj/documents/TYPE_DOCUMENT_TEXTS_LOIS",
+      "https://enseignementsuperieur.gouv.bj/documents",
+      "https://enseignementsuperieur.gouv.bj/actualites/TYPE_ACTUALITE_ACTUALITE?page=2"
+    ],
+    "linkSelector": "div.card.shadow-sm a[href^=\"/actualite/show/\"]"
+  },
+  "_inactif_service-public.bj": {
+    "_pourquoi": "Inactif : ce site charge sa liste par JavaScript, le robot ne voit qu'une page vide. Renommer la clé en « service-public.bj » seulement quand le robot saura lire ce type de site.",
+    "entryUrls": [
+      "https://service-public.bj/public/services/e-services"
+    ],
+    "linkSelector": "div.card a[href*=\"/public/services/service/\"]"
   }
 }
