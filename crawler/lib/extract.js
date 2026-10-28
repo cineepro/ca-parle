@@ -60,11 +60,20 @@ export function extractPage(html, pageUrl) {
 }
 
 // Liens internes d'une page (même site), sans ancres ni fichiers lourds.
-export function extractLinks(html, pageUrl) {
+// `selector` (facultatif, sélecteur CSS) : ne garde que les liens situés dans ces blocs, ou ces liens eux-mêmes
+// (ex. « div.ak-module-details a[href*="?p="] »). Un sélecteur illisible lève une erreur : on ne le cache pas.
+export function extractLinks(html, pageUrl, selector = '') {
     const $ = cheerio.load(html);
     const base = new URL(pageUrl);
     const out = new Set();
-    $('a[href]').each((_, a) => {
+    let anchors;
+    if (selector) {
+        const hit = $(selector);
+        anchors = hit.filter('a[href]').add(hit.find('a[href]'));
+    } else {
+        anchors = $('a[href]');
+    }
+    anchors.each((_, a) => {
         try {
             const u = new URL($(a).attr('href'), pageUrl);
             if (!['http:', 'https:'].includes(u.protocol) || u.hostname !== base.hostname) return;

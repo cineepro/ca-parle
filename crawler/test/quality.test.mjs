@@ -14,6 +14,13 @@ assert.equal(siteHealth({ status: 'ok — 0', fetched: 1, found: 1, saved: 0 }).
 assert.equal(siteHealth({ status: 'ok — 0', fetched: 6, failed: 4, saved: 2, found: 30 }).level, 'attention');
 assert.match(siteHealth({ status: 'ok — 0', fetched: 5, failed: 0, saved: 0, unchanged: 0, found: 30 }).reason, /structure/);
 assert.equal(siteHealth({ status: 'ok — 3', fetched: 3, saved: 3, found: 30 }, { previousPages: 40, pagesNow: 12 }).level, 'attention');
+{ // la Console dit POURQUOI les pages échouent
+    const h = siteHealth({ status: 'ok — 0', fetched: 2, failed: 2, found: 9, failures: { 'HTTP 403': 2 } });
+    assert.equal(h.level, 'panne'); assert.match(h.reason, /HTTP 403 ×2/); assert.match(h.reason, /refuse/);
+    assert.match(siteHealth({ status: 'ok — 0', fetched: 2, failed: 2, found: 9, failures: { 'délai dépassé': 2 } }).reason, /délai dépassé ×2/);
+    assert.match(siteHealth({ status: 'ok — 0', entryPages: 3, entryLinks: 0, found: 1, fetched: 0 }).reason, /sélecteur/);
+    assert.equal(siteHealth({ status: 'ok — 0', entryPages: 0, fetched: 0, found: 1, failures: { 'HTTP 403': 1 } }).level, 'panne');
+}
 assert.equal(siteHealth({ status: 'ok — 3', fetched: 3, saved: 3, found: 30 }, { previousPages: 8, pagesNow: 2 }).level, 'ok', 'petit site : pas d’alerte sur la baisse');
 assert.ok(statusLine({ status: 'ok — fine' }, { level: 'ok' }).startsWith('ok'));
 assert.ok(statusLine({ status: 'x' }, { level: 'panne', reason: 'rien' }).startsWith('⛔ panne'));

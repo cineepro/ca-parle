@@ -1,0 +1,11 @@
+{
+  "_aide": "Règles par site (clé = nom de domaine sans www). entryUrls : pages qui LISTENT les articles (catégories) ; linkSelector : sélecteur CSS des liens d'articles dans ces pages. Ces pages-listes ne sont pas indexées, seuls les articles le sont. Pour un site qui a un plan (sitemap) ou un flux RSS, n'ajoute rien ici.",
+  "lepotentiel.bj": {
+    "entryUrls": [
+      "https://lepotentiel.bj/?cat=34",
+      "https://lepotentiel.bj/?cat=41",
+      "https://lepotentiel.bj/?cat=42"
+    ],
+    "linkSelector": "div.ak-module-details a[href*=\"?p=\"]"
+  }
+}

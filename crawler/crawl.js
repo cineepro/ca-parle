@@ -6,6 +6,7 @@
 //   DATABASE_ID, COLLECTION_SEARCH_SOURCES, COLLECTION_SEARCH_DOCUMENTS
 //   ZEM_MAX_MINUTES (facultatif, 20 par défaut), ZEM_DELAY_MS (facultatif, 1000), ZEM_ONLY_SOURCE (facultatif : id d'un site)
 //   ZEM_USER_AGENT (facultatif — mettez-y un moyen de vous joindre, ex. « ZemBot/1.0 (+https://votre-site/zem-bot) »)
+import { readFileSync } from 'node:fs';
 import { Client, Databases, Query } from 'node-appwrite';
 import { makeFetcher } from './lib/http.js';
 import { crawlSource } from './lib/crawlSource.js';
@@ -27,6 +28,15 @@ const store = {
     async removeDoc(id) { try { await databases.deleteDocument(DB, DOCS, id); } catch { /* déjà absent */ } },
 };
 
+// Règles propres à certains sites (pages d'entrée, sélecteur de liens) : crawler/site-rules.json, clé = nom de domaine.
+const RULES = (() => { try { return JSON.parse(readFileSync(new URL('./site-rules.json', import.meta.url), 'utf8')); } catch { return {}; } })();
+const rulesFor = (s) => {
+    try {
+        const r = RULES[new URL(s.url).hostname.replace(/^www\./, '')];
+        return r && typeof r === 'object' ? { entryUrls: r.entryUrls, linkSelector: r.linkSelector } : {};
+    } catch { return {}; }
+};
+
 const deadline = Date.now() + Number(process.env.ZEM_MAX_MINUTES || 20) * 60000;
 const fetchText = makeFetcher({ delayMs: Number(process.env.ZEM_DELAY_MS || 1000) });
 
@@ -41,7 +51,7 @@ for (const source of sources) {
     console.log(`\n→ ${source.label || source.url}`);
     let result;
     try {
-        result = await crawlSource({ source, fetchText, store, deadline });
+        result = await crawlSource({ source: { ...source, ...rulesFor(source) }, fetchText, store, deadline });
     } catch (e) {
         result = { status: `erreur : ${e?.message || e}` };
     }

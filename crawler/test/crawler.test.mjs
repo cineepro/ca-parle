@@ -75,5 +75,38 @@ assert.match(dead.status, /ignoré/);
 db.clear();
 r = await crawlSource({ source: { ...source, maxPages: 1 }, fetchText, store, log: () => {} });
 assert.equal(r.fetched, 1);
+
+// --- pages d'entrée + sélecteur de liens (journal sans plan de site ni flux RSS)
+const art = (n) => page(`Article ${n}`, long(`Texte de l'article numéro ${n} sur l'actualité locale`));
+const server2 = http.createServer((req, res) => {
+    const send = (code, type, text) => { res.writeHead(code, { 'content-type': type }); res.end(text); };
+    if (req.url === '/robots.txt') return send(404, 'text/plain', 'Not Found');
+    if (req.url === '/?cat=1') return send(200, 'text/html', `<html><body><nav><a href="/?cat=2">Politique</a><a href="/?author=9">Auteur</a></nav>
+      <div class="ak-module-details"><a href="/?cat=1">Actualité</a><h3><a href="/?p=11">T11</a></h3><a href="/?author=9">Moi</a></div>
+      <div class="ak-module-details"><h3><a href="/?p=12">T12</a></h3><a href="/?p=12">12 octobre</a></div>
+      <aside><a href="/?p=99">Pub</a></aside></body></html>`);
+    if (req.url === '/?cat=403') return send(403, 'text/plain', 'refusé');
+    if (req.url === '/?p=11') return send(200, 'text/html', art(11));
+    if (req.url === '/?p=12') return send(200, 'text/html', art(12));
+    if (req.url === '/?p=99') return send(200, 'text/html', art(99));
+    return send(404, 'text/plain', 'non');
+});
+await new Promise((r2) => server2.listen(0, '127.0.0.1', r2));
+const base2 = `http://127.0.0.1:${server2.address().port}`;
+db.clear();
+const rules = { $id: 'S2', url: base2, label: 'Journal', maxPages: 40, entryUrls: [`${base2}/?cat=1`, `${base2}/?cat=403`], linkSelector: 'div.ak-module-details a[href*="?p="]' };
+r = await crawlSource({ source: rules, fetchText, store, log: () => {} });
+assert.equal(r.saved, 2, JSON.stringify(r));                                 // seulement les articles dans les blocs choisis
+assert.ok(db.has(docIdForUrl(`${base2}/?p=11`)) && db.has(docIdForUrl(`${base2}/?p=12`)));
+assert.ok(!db.has(docIdForUrl(`${base2}/?p=99`)), 'lien hors du bloc : ignoré');
+assert.ok(!db.has(docIdForUrl(`${base2}/?cat=1`)), 'la page-liste n’est pas indexée');
+assert.equal(r.entryPages, 1); assert.equal(r.failures['HTTP 403'], 1);       // la cause de l'échec est connue
+// --- sélecteur qui ne trouve rien → alerte « attention » explicite
+const noneRes = await crawlSource({ source: { ...rules, entryUrls: [`${base2}/?cat=1`], linkSelector: 'div.inexistant a' }, fetchText, store, log: () => {} });
+assert.equal(noneRes.entryLinks, 0);
+// --- sélecteur illisible → erreur claire, rien d'indexé
+const bad = await crawlSource({ source: { ...rules, linkSelector: 'div[' }, fetchText, store, log: () => {} });
+assert.match(bad.status, /sélecteur illisible/);
+server2.close();
 server.close();
 console.log('robot : OK');

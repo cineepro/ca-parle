@@ -14,7 +14,9 @@ const MAX_PDFS_PER_RUN = Number(process.env.ZEM_MAX_PDFS || 10);
 const isPdfUrl = (u) => /\.pdf($|\?)/i.test(u);
 
 export async function crawlSource({ source, fetchText, store, log = console.log, now = () => Date.now(), deadline = Infinity }) {
-    const stats = { found: 0, fetched: 0, saved: 0, unchanged: 0, skipped: 0, blocked: 0, failed: 0, pdfs: 0 };
+    const stats = { found: 0, fetched: 0, saved: 0, unchanged: 0, skipped: 0, blocked: 0, failed: 0, pdfs: 0, entryPages: 0, entryLinks: 0, failures: {} };
+    // Pourquoi les pages échouent : « HTTP 403 » (le site nous refuse), « délai dépassé »… (affiché dans la Console)
+    const noteFailure = (r) => { const k = r.status ? `HTTP ${r.status}` : (r.error || 'erreur réseau'); stats.failures[k] = (stats.failures[k] || 0) + 1; };
     const pdfQueue = new Map(); // adresse du PDF → texte du lien
     const origin = new URL(source.url).origin;
     const prefix = new URL(source.url).pathname;
@@ -73,14 +75,33 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
         }
     }
 
+    // Pages d'entrée choisies à la main (ex. les catégories d'un journal) : on y lit seulement les LIENS d'articles
+    // (filtrés par `linkSelector`), jamais ces pages-listes elles-mêmes. Règles dans crawler/site-rules.json.
+    const entryUrls = (Array.isArray(source.entryUrls) ? source.entryUrls : []).filter(inScope).slice(0, 20);
+    try {
+        for (const e of entryUrls) {
+            if (!allowed(e)) { stats.blocked += 1; continue; }
+            const r = await fetchText(e);
+            if (r.status !== 200) { noteFailure(r); continue; }
+            stats.entryPages += 1;
+            const links = extractLinks(r.text, e, source.linkSelector);
+            stats.entryLinks += links.length;
+            links.forEach((l) => add(l));
+        }
+    } catch (err) {
+        return { ...stats, status: `sélecteur illisible (${err.message}) — corrige-le dans crawler/site-rules.json` };
+    }
+
     let firstPageHtml = null;
     if (found.size <= 1) {
         // Dernier recours : les liens de la page d'entrée.
         const r = await fetchText(source.url);
         if (r.status === 200) {
             firstPageHtml = r.text;
-            extractLinks(r.text, source.url).forEach((l) => add(l));
-        }
+            try { extractLinks(r.text, source.url, source.linkSelector).forEach((l) => add(l)); } catch (err) {
+                return { ...stats, status: `sélecteur illisible (${err.message}) — corrige-le dans crawler/site-rules.json` };
+            }
+        } else noteFailure(r);
     }
 
     stats.found = found.size;
@@ -106,6 +127,7 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
         stats.fetched += 1;
         if (r.status !== 200 || !/html|xml/i.test(r.contentType || 'text/html')) {
             stats.failed += 1;
+            noteFailure(r);
             if (existing && (r.status === 404 || r.status === 410)) await store.removeDoc(id);
             continue;
         }
@@ -150,7 +172,7 @@ export async function crawlSource({ source, fetchText, store, log = console.log,
         if (existing?.crawledAt && now() - Date.parse(existing.crawledAt) < PDF_RECRAWL_DAYS * 86400000) { stats.skipped += 1; continue; }
         const r = await fetchText.bytes(pdfUrl);
         pdfFetched += 1;
-        if (r.status !== 200 || !r.bytes) { stats.failed += 1; continue; }
+        if (r.status !== 200 || !r.bytes) { stats.failed += 1; noteFailure(r); continue; }
         let doc;
         try {
             doc = await extractPdf(r.bytes, pdfUrl, linkText);
