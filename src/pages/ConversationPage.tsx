@@ -6,7 +6,6 @@ import { MessageBubble } from '@/features/messaging/components/MessageBubble';
 import { MessageComposer } from '@/features/messaging/components/MessageComposer';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Avatar } from '@/components/ui/avatar';
-import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
 import { conversationService } from '@/features/messaging/services/conversationService';
 import { useVoiceConversation } from '@/features/messaging/hooks/useVoiceConversation';
 import { VoiceCallBar } from '@/features/messaging/components/VoiceCallBar';
@@ -33,8 +32,6 @@ export default function ConversationPage() {
     const [showScrollToBottom, setShowScrollToBottom] = useState(false);
     // Connecteurs de partenaires — chargés une seule fois, réutilisés à la
     // fois pour les pastilles du composeur et le badge d'en-tête.
-    const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
-    const [activeConnectorId, setActiveConnectorId] = useState('');
     const [writingPrefill, setWritingPrefill] = useState<string | undefined>(undefined);
     const [renamingTitle, setRenamingTitle] = useState(false);
     const [titleInput, setTitleInput] = useState('');
@@ -134,19 +131,6 @@ export default function ConversationPage() {
             navigate('/accueil');
         } catch { /* rien de cassé si ça échoue, on reste simplement sur la page */ }
     };
-
-    useEffect(() => {
-        if (!isVanessaConversation) return;
-        vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
-    }, [isVanessaConversation]);
-
-    // Synchronise l'état local avec le connecteur déjà actif sur cette
-    // conversation (persisté en base), une fois qu'elle a fini de charger.
-    useEffect(() => {
-        if (conversation) setActiveConnectorId(conversation.vanessaConnectorId || '');
-    }, [conversation?.$id]);
-
-    const activeConnector = connectors.find((c) => c.$id === activeConnectorId);
 
     // Défilement automatique vers le bas UNIQUEMENT quand un nouveau
     // message arrive à la FIN (envoi, réponse, temps réel) — jamais quand
@@ -261,17 +245,6 @@ export default function ConversationPage() {
                                             <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
                                         </svg>
                                     </button>
-                                )}
-                            </p>
-                        )}
-                        {activeConnector && (
-                            <p className="text-xs font-medium" style={{ color: activeConnector.color }}>
-                                {activeConnector.icon} {activeConnector.description || activeConnector.name}
-                                {activeConnector.$id === 'mon-cahier' && (
-                                    <>
-                                        {' · '}
-                                        <Link to="/cahier" className="underline">Ouvrir mon cahier</Link>
-                                    </>
                                 )}
                             </p>
                         )}

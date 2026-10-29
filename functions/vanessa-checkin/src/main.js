@@ -21,9 +21,16 @@ const CLAUDE_MODEL = process.env.VANESSA_MODEL || 'claude-haiku-4-5-20251001';
 const SOFT_TIME_BUDGET_MS = 40_000;
 const INACTIVITY_DAYS = 4;
 
-const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne), l'IA qui donne son nom à la plateforme (qui héberge aussi "Ça Parle" et "Ça sert"). Tu parles en français de rue, à l'africaine, jamais littéraire. Expressions du Bénin/Côte d'Ivoire/Togo/Cameroun/Sénégal, 1-2 emojis max, phrases courtes.
+const VANESSA_IDENTITY = `Tu es Vanessa, l'IA des Béninois (19 ans, triple nationalité béninoise, camerounaise, ivoirienne). La plateforme porte ton nom et héberge aussi "Ça Parle" (ragots) et "Ça sert" (bons plans). Tu parles en français de rue, à l'africaine, jamais littéraire. Expressions du Bénin/Côte d'Ivoire/Togo/Cameroun/Sénégal, 1-2 emojis max, phrases courtes. Tu es une IA et tu l'assumes.`;
 
-Un utilisateur ne t'a pas parlé depuis quelques jours. Relance-le avec UNE question "gbaraï" (confession, curieuse, un peu coquine mais jamais vulgaire) pour lui donner envie de raconter quelque chose. Une seule question, courte, dans ton style. Réponds uniquement avec cette question, rien d'autre.`;
+// Deux façons de relancer : le plus souvent en invitant à poser une question sur le Bénin (ta mission première),
+// plus rarement avec une question « gbaraï » (le côté ragot reste une facette de Vanessa).
+const BENIN_SHARE = 0.7;
+const RELAUNCH = {
+    benin: `Un utilisateur ne t'a pas parlé depuis quelques jours. Relance-le en l'invitant à te poser une question sur le Bénin (études et concours, démarches administratives, santé, argent et emploi, culture, bons plans…). Donne UN exemple concret de question qu'il pourrait te poser, pour lui donner envie. Une seule phrase ou deux, dans ton style. Réponds uniquement avec ce message, rien d'autre.`,
+    gbarai: `Un utilisateur ne t'a pas parlé depuis quelques jours. Relance-le avec UNE question "gbaraï" (confession, curieuse, un peu coquine mais jamais vulgaire) pour lui donner envie de raconter quelque chose. Une seule question, courte, dans ton style. Réponds uniquement avec cette question, rien d'autre.`,
+};
+const pickRelaunch = () => (Math.random() < BENIN_SHARE ? 'benin' : 'gbarai');
 
 async function sendPush(messaging, userId, title, body, url, log) {
     try {
@@ -77,6 +84,7 @@ export default async ({ req, res, log, error }) => {
             if (!humanId) continue;
 
             try {
+                const relaunchKind = pickRelaunch();
                 const response = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: {
@@ -86,8 +94,8 @@ export default async ({ req, res, log, error }) => {
                     },
                     body: JSON.stringify({
                         model: CLAUDE_MODEL,
-                        system: VANESSA_SYSTEM_PROMPT,
-                        messages: [{ role: 'user', content: 'Relance-moi avec ta question gbaraï.' }],
+                        system: `${VANESSA_IDENTITY}\n\n${RELAUNCH[relaunchKind]}`,
+                        messages: [{ role: 'user', content: relaunchKind === 'benin' ? 'Relance-moi pour que je te pose une question sur le Bénin.' : 'Relance-moi avec ta question gbaraï.' }],
                         // Couvre aussi la réflexion interne du modèle : 150 pouvait ne laisser
                         // aucune place au texte visible (voir send-message).
                         max_tokens: 800,

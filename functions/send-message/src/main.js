@@ -36,6 +36,8 @@
 // pas configuré ou échoue, le message est envoyé quand même.
 import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
+import { findKnowledgeCandidates, interleave, CANDIDATE_POOL } from './knowledgeSearch.js';
+import { routeConnectors, routingCatalog, shouldSkipRouting, splitTokens, NOTEBOOK_CONNECTOR_ID } from './routing.js';
 
 // Modèle Claude utilisé par défaut pour les réponses de Vanessa : Haiku 4.5 (le moins cher).
 // Sonnet 5 reste plus fidèle au personnage mais consomme bien plus. Pour en changer SANS toucher
@@ -53,8 +55,8 @@ const MAX_CONNECTOR_INSTRUCTIONS_CHARS = 4000;
 
 // Bloc injecté seulement quand un connecteur actif a des instructions. Les consignes de
 // l'équipe cadrent le RÔLE et la démarche, mais restent sous les règles de sécurité.
-function buildConnectorInstructions(partnerLabel, instructions) {
-    const text = String(instructions || '').trim().slice(0, MAX_CONNECTOR_INSTRUCTIONS_CHARS);
+function buildConnectorInstructions(partnerLabel, instructions, maxChars = MAX_CONNECTOR_INSTRUCTIONS_CHARS) {
+    const text = String(instructions || '').trim().slice(0, maxChars);
     if (!text) return '';
     return `\n\nINSTRUCTIONS DU CONNECTEUR « ${partnerLabel} » (rédigées par l'équipe pour CE partenaire — à suivre dans ce cadre) :
 ${text}
@@ -67,7 +69,7 @@ COMMENT APPLIQUER CES INSTRUCTIONS :
 }
 
 // ── Connecteur « Mon cahier » : sa base de connaissances = les notes de LA personne ──
-const NOTEBOOK_CONNECTOR_ID = 'mon-cahier'; // créé automatiquement par manage-vanessa-knowledge
+// (identifiant « mon-cahier » : voir routing.js)
 const NOTEBOOK_MAX_CHARS = 10000; // plafond du texte de notes envoyé à Claude (≈ 3 000 tokens)
 
 // Contexte du mode « Mon cahier » : uniquement les notes de cette personne. Les notes sont
@@ -77,7 +79,7 @@ function buildNotebookContext(notes) {
 RÈGLES DU CAHIER :
 - Réponds seulement avec ce qui est écrit dans le cahier. Si la réponse n'y est pas, dis simplement que tu ne la trouves pas dans son cahier et propose d'ajouter une note.
 - Tu peux rappeler, retrouver, résumer, regrouper ou mettre en ordre ce qu'elle a noté ; cite le titre de la note quand ça aide. Tu n'écris ni ne modifies rien dans son cahier : pour ajouter, changer ou supprimer une note, elle passe par « Mon cahier » (menu de gauche).
-- Si sa question n'a aucun rapport avec son cahier, ne réponds pas dessus : dis-lui que ce connecteur sert à retrouver ses notes, et qu'elle peut re-toucher la pastille « Mon cahier » pour revenir au mode normal, ou choisir un autre connecteur.
+- Si sa question n'a aucun rapport avec son cahier, ne réponds pas dessus : dis-lui simplement que là tu cherches dans ses notes personnelles, et qu'elle peut te reposer sa question autrement (par exemple sans parler de son cahier) pour que tu réponses normalement.
 - Ces notes sont privées : tu ne les mentionnes qu'à elle.`;
 
     if (!notes || notes.length === 0) {
@@ -98,30 +100,6 @@ RÈGLES DU CAHIER :
 <cahier>
 ${blocks.join('\n\n')}
 </cahier>${omitted > 0 ? `\n(${omitted} note(s) plus ancienne(s) ne sont pas affichées ici : si elle cherche quelque chose de plus ancien, dis-lui que tu n'as pas tout sous les yeux et demande-lui un mot-clé.)` : ''}`;
-}
-
-// Orientation entre connecteurs : liste (nom + description) des AUTRES connecteurs actifs,
-// et règle pour proposer le bon quand la question n'est pas du domaine du connecteur actuel.
-async function buildConnectorRouting({ databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, currentId, currentName, log }) {
-    if (!COLLECTION_VANESSA_CONNECTORS) return '';
-    try {
-        const list = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [
-            Query.equal('active', true),
-            Query.limit(50),
-        ]);
-        const others = list.documents.filter((c) =>
-            c.$id !== currentId && !((c.tokensGranted || 0) > 0 && (c.tokensUsed || 0) >= c.tokensGranted));
-        if (others.length === 0) return '';
-        // « Mon cahier » en premier dans la liste, comme dans l'application.
-        others.sort((a, b) => (a.$id === NOTEBOOK_CONNECTOR_ID ? -1 : 0) - (b.$id === NOTEBOOK_CONNECTOR_ID ? -1 : 0));
-        const lines = others.map((c) => `- ${c.icon || '🔗'} « ${c.name} » — ${String(c.description || 'sans description').slice(0, 160)}`);
-        return `\n\nAUTRES CONNECTEURS DISPONIBLES (la personne les choisit avec les pastilles au-dessus du chat) :
-${lines.join('\n')}
-ORIENTATION : tu es dans le connecteur « ${currentName} ». Si la question concerne clairement le domaine d'UN AUTRE connecteur de la liste (et pas celui-ci), ne bluffe pas et ne mélange pas les sources : dis-lui, dans ton style, que ce sujet relève du connecteur « Nom exact », en une phrase sur ce qu'on y traite, et invite-la à toucher cette pastille. Tu peux d'abord répondre brièvement à ce que le connecteur actuel permet vraiment. Propose UN seul connecteur à la fois, avec son nom exact, et ne le répète pas si elle ne l'a pas suivi. Si la question est générale (sans rapport avec un connecteur), explique qu'elle peut re-toucher la pastille active pour revenir au mode normal.`;
-    } catch (err) {
-        log(`⚠️ Liste des connecteurs indisponible pour l'orientation : ${err.message}`);
-        return '';
-    }
 }
 
 async function sendPush(messaging, userId, title, body, url, log) {
@@ -258,7 +236,8 @@ function isClaudeServiceError(err) {
     return /Claude a répondu|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|timeout|network/i.test(String(err?.message || ''));
 }
 
-const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, 19 ans, triple nationalité (béninoise, camerounaise, ivoirienne). Tu es l'IA qui donne son nom à la plateforme — Vanessa héberge aussi "Ça Parle" (ragots et commérages) et "Ça sert" (bons plans locaux). Tu n'es pas un assistant IA classique — tu es une utilisatrice de la plateforme, avec une vraie personnalité, du caractère, et beaucoup d'humour.
+const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, l'IA des Béninois. Tu as 19 ans, une triple nationalité (béninoise, camerounaise, ivoirienne), une vraie personnalité, du caractère et beaucoup d'humour. La plateforme porte ton nom : elle héberge aussi "Ça Parle" (ragots et commérages) et "Ça sert" (bons plans locaux).
+Ta mission première : aider les gens sur le Bénin — démarches et administration, études et concours, santé, économie et emploi, culture, vie pratique, actualité… — grâce aux connaissances rassemblées par l'équipe ASILLIA (les notes qui te sont fournies plus bas). Tu es une IA et tu l'assumes : tu ne prétends jamais être une personne.
 
 TON STYLE :
 - Tu parles en français de rue, à l'africaine — jamais en français littéraire ou soutenu.
@@ -283,8 +262,10 @@ CE QU'IL NE FAUT JAMAIS FAIRE — exemple de ce qui est TROP soutenu/robotique, 
 ✅ "Eh Dieu, raconte-moi ça, qu'est-ce qui s'est passé avant ?"
 
 CE QUE TU FAIS :
-- Tu discutes comme une amie qui adore les ragots, pas comme un chatbot.
-- Tu poses des questions pour faire parler les gens.
+- Quand on fait ta connaissance ou que la conversation démarre, tu te présentes comme l'IA des Béninois et tu invites la personne à te poser ses questions sur le Bénin, dans n'importe quel domaine (études, démarches, santé, argent, culture, bons plans…).
+- Sur un sujet factuel du Bénin, tu t'appuies UNIQUEMENT sur les notes fournies plus bas. Tu n'inventes jamais un chiffre, une date, un prix, une procédure, une adresse ou un nom. Si l'information n'y est pas, tu le dis simplement, dans ton style, et tu proposes de vérifier auprès de la structure concernée (ou de chercher sur Zem).
+- Tu discutes aussi comme une amie qui adore les ragots, pas comme un chatbot : le côté gbaraï est une facette de toi, pas ton seul visage.
+- Face à une vraie question pratique, tu réponds d'abord, tu poses des questions ensuite. Pour une discussion plus légère, tu poses des questions pour faire parler les gens.
 - Si l'histoire ferait un bon "gbairai", tu peux proposer de la transformer en publication — jamais automatiquement. Pour proposer, termine EXACTEMENT par :
 [[SUGGESTION_POST|Titre court et accrocheur|Contenu réécrit dans ton style]]
 
@@ -292,7 +273,7 @@ COMPORTEMENT PROACTIF — sois une vraie utilisatrice active de la plateforme, p
 - Une histoire vraiment bonne mérite une vraie proposition de publication, pas juste une attente passive qu'on te le demande — n'hésite pas à la faire.
 - Si "CE DONT TU TE SOUVIENS" (plus bas) contient un fait qui peut relancer la conversation naturellement, ramène-le à l'occasion ("Au fait, la dernière fois tu m'avais parlé de X, du nouveau ?") — jamais à chaque message, seulement quand ça tombe bien.
 - Si on te demande de l'aide pour écrire quelque chose (légende, post réseaux sociaux, texte d'annonce...), fais-le dans TON style, avec confiance — c'est une vraie capacité que tu as, pas un détournement de ton rôle.
-- Si un connecteur partenaire est actif (voir plus bas) et que la conversation part clairement sur un tout autre sujet sans rapport, signale-le gentiment en une phrase, sans reproche, et rappelle qu'on peut changer de connecteur avec les pastilles en haut du chat pour discuter plus librement.
+- Si la personne change de sujet, suis-la naturellement : elle n'a rien à régler ni à choisir, les bonnes connaissances te sont fournies automatiquement.
 - Si quelqu'un cherche un bon plan/lieu et qu'aucune fiche "[bon plan vérifié]" pertinente n'apparaît dans tes notes ci-dessous, ne prétends JAMAIS en connaître un par toi-même — dis simplement que tu n'as rien de vérifié sous la main pour l'instant, et suggère d'aller voir (ou ajouter) sur "Ça sert".
 
 CE QUE TU NE FAIS JAMAIS :
@@ -302,13 +283,18 @@ CE QUE TU NE FAIS JAMAIS :
 
 🔗 SI UN CONNECTEUR PARTENAIRE EST ACTIF (précisé plus bas dans "MODE PARTENAIRE") :
 Tu relaies des informations d'un partenaire précis (santé, dialogue civique...) — reste rigoureuse et factuellement exacte sur le FOND, ne dénature jamais l'information, ne plaisante pas sur le sujet lui-même. Mais ton STYLE, lui, ne change JAMAIS : tu gardes ton ton et tes expressions de français de rue, tes humeurs, ta personnalité. Le sérieux se joue sur le contenu que tu donnes, jamais sur ta façon de parler — tu ne deviens pas une porte-parole formelle, tu restes toi, juste appliquée sur le fond.
-Au sein d'un connecteur, tu restes dans son domaine : si la question relève plutôt d'un AUTRE connecteur (la liste figure plus bas dans "AUTRES CONNECTEURS DISPONIBLES"), tu orientes la personne vers ce connecteur au lieu de bluffer.
+Les informations d'un partenaire ne servent que pour la question posée : n'en parle pas si elle n'a aucun rapport. Si deux partenaires apparaissent, ne mélange jamais leurs informations (le nom de chacun est indiqué entre parenthèses devant ses notes).
 
 🤍 VANESSA T'ÉCOUTE — règle prioritaire, au-dessus de tout le reste ci-dessus :
 Si le message évoque une détresse réelle (violence physique/sexuelle, grossesse non désirée, idées suicidaires, mal-être psychologique profond, harcèlement grave, agression) : arrête IMMÉDIATEMENT le ton moqueur/gbaraï, même en plein milieu d'une phrase commencée. Dis clairement, dans tes mots, que tu sors du personnage le temps d'un message. Exprime une empathie sincère et brève, sans minimiser.
 Si des ressources vérifiées apparaissent ci-dessous dans "RESSOURCES DISPONIBLES", oriente vers UNE seule ressource pertinente au sujet exact — ne cite JAMAIS un numéro, un nom de structure ou une adresse qui n'est pas dans cette liste, même si tu penses le connaître.
 Si aucune ressource vérifiée n'est fournie pour ce sujet précis, ne cite AUCUN numéro ni AUCUNE structure de mémoire — encourage seulement la personne à en parler à un adulte de confiance (parent, enseignant, grand frère/grande sœur) ou à se rendre dans le centre de santé le plus proche de chez elle.
 Tu ne donnes JAMAIS toi-même de conseil médical, juridique ou psychologique — uniquement de l'écoute et une orientation vers de vraies personnes/structures.`;
+
+// Zem : Vanessa sait qu'il existe et peut y envoyer les gens, mais ne lit JAMAIS son contenu.
+const ZEM_CONTEXT = `
+
+ZEM — le moteur de recherche béninois de la plateforme (page « Zem » de l'app) : il cherche dans des sites béninois fiables (administration, universités, presse, services publics…) et montre les sources. Tu n'en connais PAS le contenu et tu ne promets jamais ce qu'on y trouvera. Mais de temps en temps (jamais à chaque message, jamais deux fois de suite), en une courte phrase, tu peux y orienter la personne : surtout pour une actualité récente, un communiqué ou un document officiel, quand l'information n'est pas dans tes notes, ou quand elle veut vérifier à la source.`;
 
 // Prompt séparé et strict pour l'analyse d'image — la règle sur le
 // physique est répétée et isolée volontairement, pour qu'elle reste
@@ -452,7 +438,7 @@ CE QUE TU SAIS SUR LE FONCTIONNEMENT DE LA PLATEFORME — si on te demande comme
 - Fiches références : chaque histoire peut être liée à des personnes/événements/sujets, regroupés sur une fiche commune.
 - Signalement : bouton "Signaler" sur tout contenu problématique, examiné par la modération.
 - Messagerie privée : possible avec l'auteur d'une histoire non-anonyme.
-- Toi : chat texte/vocal/image, humeurs, mémoire consultable et effaçable depuis le profil, connecteurs partenaires, limite quotidienne d'échanges (annoncée par toi-même si atteinte).
+- Toi : chat texte/vocal/image, humeurs, mémoire consultable et effaçable depuis le profil, limite quotidienne d'échanges (annoncée par toi-même si atteinte).
 - Ça sert : répertoire de bons plans (lieux/services) et prix du moment, affiché par défaut en carte interactive (bascule liste disponible). Ajout via "Balance ton bon plan", validation avant publication, confirmations communautaires, itinéraire routier depuis la position réelle.
 - Notifications en temps réel, newsletter par email désinscriptible.`;
 
@@ -673,125 +659,6 @@ async function selectRelevantKnowledge({ candidates, userMessage, maxResults, AN
     }
 }
 
-// --- Recherche dans TOUT un connecteur (méthodes A + B) ---
-// Avant : seules les 60 notes les plus RÉCENTES du connecteur étaient
-// examinées, quelle que soit la question — une note ancienne mais parfaite
-// n'était jamais vue dès que le connecteur dépassait 60 notes. Maintenant :
-//   1. on extrait les mots utiles de la question (sans mots vides) ;
-//   2. la base cherche chacun de ces mots dans `content` ET dans `keywords`
-//      (mots-clés écrits par Haiku à la création de la note) — sur l'ENSEMBLE
-//      du connecteur, sans rien charger d'autre que les résultats ;
-//   3. les notes sont classées par nombre de mots trouvés ;
-//   4. on complète avec les plus récentes (pour que l'actualité fraîche ne soit
-//      jamais ratée), puis le tri de pertinence existant choisit les 8 finales.
-// Si la recherche ne trouve rien (ou échoue : index manquant...), on retombe
-// sur le comportement d'avant — jamais pire qu'avant.
-const MAX_SEARCH_WORDS = 5;
-const SEARCH_PER_QUERY = 12; // résultats lus par mot et par attribut
-const SEARCH_CANDIDATES = 40; // meilleures notes trouvées par la recherche
-const RECENT_AFTER_SEARCH = 20; // + les plus récentes, quand la recherche a trouvé quelque chose
-const CANDIDATE_POOL = 60; // taille du lot soumis au tri de pertinence (comme avant)
-
-const SEARCH_STOP_WORDS = new Set((
-    'alors,aucun,aussi,autre,autres,avant,avec,avez,avoir,bonjour,bonsoir,cela,celle,celui,ceux,chaque,chose,choses,comme,comment,' +
-    'connais,dans,dire,dis,dites,doit,donc,donne,donner,dont,elle,elles,encore,entre,est,etes,etre,être,été,ete,étaient,était,' +
-    'faire,fait,faut,fois,hello,ici,info,infos,information,informations,juste,leur,leurs,lors,mais,merci,même,meme,moins,mon,' +
-    'notre,nous,nos,parce,pas,peu,peut,peux,please,plus,pour,pourquoi,pourrais,pourriez,pouvez,quand,quel,quelle,quelles,quels,' +
-    'quelque,quelques,question,questions,quoi,renseignement,renseignements,salut,sans,savoir,sais,sera,seulement,ses,sont,sous,' +
-    'stp,suis,sommes,svp,tes,toi,ton,tous,tout,toute,toutes,très,tres,une,vais,vanessa,vas,veux,vers,voudrais,voulais,vos,votre,' +
-    'vous,ces,cet,cette,des,deux,les,que,qui,sur,aux,par,mes,moi,ils,eux,ont,pouvoir,besoin,aller,allez,donnez,dites-moi'
-).split(','));
-
-function tokenizeForSearch(text) {
-    return String(text || '').toLowerCase().replace(/[’'`]/g, ' ').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-}
-
-// Mots utiles d'un message : sans mots vides ni mots du nom du connecteur
-// (« uac » dans le connecteur UAC ne trie rien), les plus longs d'abord.
-function extractSearchWords(text, excludeText = '') {
-    const exclude = new Set(tokenizeForSearch(excludeText));
-    const seen = new Set();
-    const words = [];
-    for (const w of tokenizeForSearch(text)) {
-        if (w.length < 3 || SEARCH_STOP_WORDS.has(w) || exclude.has(w) || seen.has(w)) continue;
-        seen.add(w);
-        words.push(w);
-    }
-    return words.sort((a, b) => b.length - a.length).slice(0, MAX_SEARCH_WORDS);
-}
-
-async function findConnectorCandidates({ databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, connectorName, history, VANESSA_USER_ID, log }) {
-    const base = [
-        Query.equal('active', true),
-        Query.equal('connectorId', connectorId),
-        Query.notEqual('category', PUBLICITE_CATEGORY),
-    ];
-    const recent = (n) => databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.orderDesc('createdAt'), Query.limit(n)]);
-
-    // Mots de la question ; si elle est très courte ("et les frais ?"), on
-    // ajoute ceux du message précédent de la personne, qui porte le sujet.
-    const userMessages = history.filter((m) => m.senderId !== VANESSA_USER_ID).map((m) => m.content || '');
-    const last = userMessages[userMessages.length - 1] || '';
-    const previous = userMessages[userMessages.length - 2] || '';
-    let words = extractSearchWords(last, connectorName);
-    if (words.length < 3 && previous) {
-        words = [...new Set([...words, ...extractSearchWords(previous, connectorName)])].slice(0, MAX_SEARCH_WORDS);
-    }
-    if (words.length === 0) {
-        log('🔎 Recherche connecteur : aucun mot utile dans la question — 60 notes les plus récentes.');
-        return (await recent(CANDIDATE_POOL)).documents;
-    }
-
-    const attributes = ['content', 'keywords'];
-    const [probe, ...found] = await Promise.all([
-        databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.limit(1)]).catch(() => null),
-        ...words.flatMap((w) => attributes.map((attr) =>
-            databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [...base, Query.search(attr, w), Query.limit(SEARCH_PER_QUERY)])
-                .then((r) => ({ w, attr, r }))
-                .catch((err) => ({ w, attr, err })))),
-    ]);
-
-    // Un mot présent dans la moitié des notes du connecteur ne départage rien : ignoré.
-    const connectorTotal = probe?.total || 0;
-    const genericWords = new Set();
-    for (const f of found) {
-        if (f.r && connectorTotal >= 20 && f.r.total >= connectorTotal * 0.5) genericWords.add(f.w);
-    }
-
-    const scored = new Map();
-    const failedAttrs = new Map();
-    const hitsPerWord = {};
-    for (const f of found) {
-        if (f.err) { failedAttrs.set(f.attr, f.err.message || String(f.err)); continue; }
-        if (genericWords.has(f.w)) continue;
-        hitsPerWord[`${f.w}/${f.attr}`] = f.r.total;
-        for (const d of f.r.documents) {
-            const entry = scored.get(d.$id) || { doc: d, score: 0 };
-            entry.score += f.attr === 'keywords' ? 1.5 : 1; // un mot-clé écrit exprès pèse un peu plus
-            scored.set(d.$id, entry);
-        }
-    }
-    for (const [attr, msg] of failedAttrs) {
-        log(`⚠️ Recherche connecteur : échec sur « ${attr} » (${String(msg).slice(0, 140)}) — index fulltext manquant ?`);
-    }
-
-    const searched = [...scored.values()]
-        .sort((a, b) => b.score - a.score || String(b.doc.createdAt).localeCompare(String(a.doc.createdAt)))
-        .slice(0, SEARCH_CANDIDATES)
-        .map((x) => x.doc);
-
-    if (searched.length === 0) {
-        log(`🔎 Recherche connecteur : mots [${words.join(', ')}] — rien trouvé${genericWords.size ? ` (trop courants : ${[...genericWords].join(', ')})` : ''} — repli sur les 60 plus récentes.`);
-        return (await recent(CANDIDATE_POOL)).documents;
-    }
-
-    const recents = (await recent(RECENT_AFTER_SEARCH)).documents;
-    const seen = new Set(searched.map((d) => d.$id));
-    const merged = [...searched, ...recents.filter((d) => !seen.has(d.$id))].slice(0, CANDIDATE_POOL);
-    log(`🔎 Recherche connecteur : mots [${words.join(', ')}]${genericWords.size ? `, ignorés (trop courants) : ${[...genericWords].join(', ')}` : ''} → ${searched.length} note(s) trouvée(s) sur ${connectorTotal} + ${merged.length - searched.length} récente(s) = ${merged.length} candidates. Résultats par mot : ${JSON.stringify(hitsPerWord)}`);
-    return merged;
-}
-
 async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, COLLECTION_USER_NOTES, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, emissionTopic, emissionPosture, callerId, log }) {
     let knowledgeContext = '';
     let publiciteContext = '';
@@ -800,8 +667,10 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     // proprement en mode général plutôt que de planter ou de continuer à
     // consommer un quota mort).
     let effectiveConnectorId = '';
+    let effectiveConnectorIds = []; // connecteurs dont des notes ont RÉELLEMENT servi à la réponse (quotas, compteurs)
+    let contributingDocs = [];
+    let routingTokens = 0; // coût de l'aiguillage : compté dans le quota de la personne, jamais facturé à un partenaire
     let connectorFellBack = false;
-    let connectorDoc = null; // connecteur actif (lu une seule fois : sert aux garde-fous, au nom, aux instructions et au modèle)
 
     // Dernier message RÉEL de l'utilisateur — c'est sur LUI que la
     // pertinence des connaissances est jugée, pas sur tout l'historique.
@@ -823,37 +692,38 @@ Garde ABSOLUMENT ton ton, tes expressions et ta personnalité habituels — rien
 Même dans cette posture : si tu perçois un vrai signe de détresse authentique chez la personne (pas un sujet difficile raconté avec du recul, une vraie détresse en train de se produire), tu sors IMMÉDIATEMENT de la posture demandée et tu appliques tes règles de sécurité habituelles, sans aucune exception.`;
     } else {
     try {
-        let activeConnectorId = connectorId;
-
-        if (connectorId && COLLECTION_VANESSA_CONNECTORS) {
-            // Vérifie que le connecteur demandé est toujours utilisable —
-            // désactivé manuellement, ou quota épuisé (tokensGranted > 0
-            // et tokensUsed >= tokensGranted). Sans ce contrôle, désactiver
-            // un connecteur depuis /moderation ne l'empêchait pas de
-            // continuer à être utilisé par les conversations qui l'avaient
-            // déjà sélectionné.
+        // ── 1. Quels sujets (connecteurs) pour CE message ? Choix AUTOMATIQUE : plus de pastilles. ──
+        // Un petit modèle lit la question et choisit 0, 1 ou 2 connecteurs d'après leur description. Désactiver
+        // un connecteur dans la Console (ou épuiser son quota) suffit à le retirer de ce choix.
+        let routed = [];
+        if (COLLECTION_VANESSA_CONNECTORS) {
+            let usable = [];
             try {
-                const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
-                connectorDoc = connector;
-                const exhausted = (connector.tokensGranted || 0) > 0 && (connector.tokensUsed || 0) >= connector.tokensGranted;
-                if (!connector.active || exhausted) {
-                    log(`⚠️ Connecteur "${connector.name}" ${!connector.active ? 'désactivé' : 'épuisé'} — retour au mode général.`);
-                    activeConnectorId = '';
-                    connectorFellBack = true;
-                    connectorDoc = null;
-                }
-            } catch {
-                // Connecteur supprimé entre-temps — même traitement.
-                activeConnectorId = '';
-                connectorFellBack = true;
+                usable = (await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [Query.equal('active', true), Query.limit(50)])).documents;
+            } catch (err) {
+                log(`⚠️ Liste des connecteurs illisible : ${err.message}`);
+            }
+            if (connectorId) {
+                // Ancien réglage (anciennes versions de l'app qui proposaient encore les pastilles) : respecté tant qu'il est utilisable.
+                const forced = routingCatalog(usable).find((c) => c.doc.$id === connectorId);
+                if (forced) routed = [forced.doc];
+                else { connectorFellBack = true; log(`⚠️ Connecteur ${connectorId} désactivé, épuisé ou supprimé — aiguillage automatique à la place.`); }
+            }
+            if (routed.length === 0 && !shouldSkipRouting(lastUserMessage)) {
+                const r = await routeConnectors({ connectors: usable, history, vanessaId: VANESSA_USER_ID, apiKey: ANTHROPIC_API_KEY, log });
+                routed = r.picked;
+                routingTokens = r.tokens;
             }
         }
 
-        if (activeConnectorId === NOTEBOOK_CONNECTOR_ID) {
+        const notebook = routed.find((c) => c.$id === NOTEBOOK_CONNECTOR_ID);
+        if (notebook) {
             // « Mon cahier » : base de connaissances = uniquement les notes de CETTE personne
             // (filtre strict sur callerId, jamais celles de quelqu'un d'autre). Aucun tri de
             // pertinence par Claude, aucune note de connecteur ni publicité.
-            effectiveConnectorId = activeConnectorId;
+            effectiveConnectorId = NOTEBOOK_CONNECTOR_ID;
+            effectiveConnectorIds = [NOTEBOOK_CONNECTOR_ID];
+            contributingDocs = [notebook];
             let notes = [];
             if (COLLECTION_USER_NOTES && callerId) {
                 try {
@@ -868,91 +738,75 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
             }
             log(`📒 Mode Mon cahier : ${notes.length} note(s) de l'utilisateur`);
             knowledgeContext = buildNotebookContext(notes);
-            knowledgeContext += buildConnectorInstructions('Mon cahier', connectorDoc?.instructions);
-        } else if (activeConnectorId) {
-            effectiveConnectorId = activeConnectorId;
-            // Un connecteur est actif sur cette conversation : Vanessa ne
-            // cherche QUE dans ce bloc de connaissances précis, comme
-            // demandé — jamais mélangé avec les notes générales, les bons
-            // plans Ça sert, ni les autres connecteurs. La pertinence est
-            // calculée DANS ce périmètre isolé, pas en l'élargissant.
-            // Candidats : notes TROUVÉES par la recherche dans tout le connecteur
-            // (mots de la question dans `content` et `keywords`) + les plus
-            // récentes — voir findConnectorCandidates. Le tri de pertinence
-            // fait ensuite le choix final parmi ce lot.
-            const connectorCandidates = await findConnectorCandidates({
-                databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE,
-                connectorId: activeConnectorId, connectorName: connectorDoc?.name || '',
-                history, VANESSA_USER_ID, log,
-            });
+            knowledgeContext += buildConnectorInstructions('Mon cahier', notebook.instructions);
+        } else if (routed.length > 0) {
+            // ── 2. Recherche DANS ces connecteurs seulement, avec un plafond de notes pour l'ensemble. ──
+            // Un seul sujet : lot de 60 candidates. Deux sujets : 30 chacun (alternées), puis UN seul tri de
+            // pertinence garde au plus RELEVANCE_MAX_RESULTS notes en tout.
+            const share = routed.length > 1 ? Math.floor(CANDIDATE_POOL / routed.length) : CANDIDATE_POOL;
+            const groups = await Promise.all(routed.map(async (c) => {
+                const docs = await findKnowledgeCandidates({
+                    databases, DATABASE_ID, COLLECTION: COLLECTION_VANESSA_KNOWLEDGE,
+                    bases: [[Query.equal('active', true), Query.equal('connectorId', c.$id), Query.notEqual('category', PUBLICITE_CATEGORY)]],
+                    excludeText: c.name || '', history, VANESSA_USER_ID, pool: share, label: `« ${c.name || c.$id} »`, log,
+                });
+                return docs.map((d) => ({ ...d, _srcId: c.$id, _srcName: c.name || c.$id }));
+            }));
             const relevant = await selectRelevantKnowledge({
-                candidates: connectorCandidates, userMessage: lastUserMessage,
+                candidates: interleave(groups, CANDIDATE_POOL), userMessage: lastUserMessage,
                 maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
             });
+            const usedIds = new Set(relevant.map((k) => k._srcId));
+            contributingDocs = routed.filter((c) => usedIds.has(c.$id));
 
-            // Infos "publicité" DU CONNECTEUR — séparées du reste, toujours
-            // entièrement incluses (jamais soumises au tri de pertinence :
-            // ce n'est pas optionnel, c'est une obligation contractuelle).
-            try {
-                const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                    Query.equal('active', true),
-                    Query.equal('connectorId', activeConnectorId),
-                    Query.equal('category', PUBLICITE_CATEGORY),
-                    Query.limit(3),
-                ]);
-                if (ads.documents.length > 0) publiciteContext = buildPubliciteInstruction(ads.documents);
-            } catch { /* collection pas encore configurée */ }
+            if (contributingDocs.length > 0) {
+                effectiveConnectorIds = contributingDocs.map((c) => c.$id);
+                effectiveConnectorId = effectiveConnectorIds[0];
+                const multi = contributingDocs.length > 1;
+                const names = contributingDocs.map((c) => c.name || 'un partenaire');
 
-            // Récupère le nom du partenaire pour qu'elle sache
-            // explicitement QUI elle représente en ce moment (utilisé par
-            // la règle "MODE PARTENAIRE" du prompt système).
-            const partnerLabel = connectorDoc?.name || 'un partenaire';
+                // Infos "publicité" DU OU DES CONNECTEURS — séparées du reste, toujours entièrement incluses
+                // (jamais soumises au tri de pertinence : ce n'est pas optionnel, c'est une obligation contractuelle).
+                try {
+                    const adLists = await Promise.all(contributingDocs.map((c) => databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+                        Query.equal('active', true),
+                        Query.equal('connectorId', c.$id),
+                        Query.equal('category', PUBLICITE_CATEGORY),
+                        Query.limit(multi ? 2 : 3),
+                    ]).then((r) => r.documents).catch(() => [])));
+                    const ads = adLists.flat();
+                    if (ads.length > 0) publiciteContext = buildPubliciteInstruction(ads);
+                } catch { /* collection pas encore configurée */ }
 
-            knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${partnerLabel}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
-            knowledgeContext += buildConnectorInstructions(partnerLabel, connectorDoc?.instructions);
-            if (connectorDoc?.instructions) log(`🧭 Instructions du connecteur "${partnerLabel}" injectées (${String(connectorDoc.instructions).length} caractères)`);
-            if (relevant.length > 0) {
-                knowledgeContext += '\n\nNotes internes du connecteur actif, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n' +
-                    relevant.map((k) => `- [${k.category}] ${k.content}`).join('\n');
+                knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${names.join(' et ')}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
+                for (const c of contributingDocs) {
+                    knowledgeContext += buildConnectorInstructions(c.name || 'un partenaire', c.instructions, multi ? 2500 : 4000);
+                    if (c.instructions) log(`🧭 Instructions du connecteur "${c.name}" injectées (${String(c.instructions).length} caractères)`);
+                }
+                knowledgeContext += `\n\nNotes internes ${multi ? 'des connecteurs actifs (le nom de chacun est entre parenthèses : ne mélange pas leurs informations)' : 'du connecteur actif'}, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n` +
+                    relevant.map((k) => `- [${k.category}]${multi ? ` (${k._srcName})` : ''} ${k.content}`).join('\n');
+            } else {
+                log(`🧭 Connecteur(s) choisi(s) (${routed.map((c) => c.name).join(', ')}) sans note utile pour ce message — recherche dans la base générale.`);
             }
-        } else {
-            // Mode général : notes qui n'appartiennent à AUCUN connecteur,
-            // PLUS les bons plans "Ça sert" déjà confirmés par la
-            // communauté — les deux sources sont mélangées dans le même
-            // lot de candidats, et c'est le tri de pertinence qui décide
-            // ce qui aide vraiment à répondre à CE message précis, pas un
-            // simple ordre chronologique.
-            // Filtré par connectorId AU NIVEAU DE LA REQUÊTE, pas après coup
-            // — avec le filtrage après coup, la limite(60) se remplissait
-            // avec les notes de connecteurs les plus récentes (tous les
-            // nouveaux sites branchés : gouv.bj, SGG, Cour
-            // constitutionnelle...), ne laissant plus aucune place pour les
-            // vraies notes générales une fois triées. Deux requêtes
-            // (connectorId vide, ET connectorId absent) pour couvrir aussi
-            // les notes créées avant l'ajout de cet attribut, qui n'ont
-            // aucune valeur dessus — une seule requête stricte les
-            // exclurait silencieusement (même piège déjà rencontré avec
-            // newsletterOptOut).
-            const [knowledgeEmpty, knowledgeNull] = await Promise.all([
-                databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                    Query.equal('active', true),
-                    Query.equal('connectorId', ''),
-                    Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
-                    Query.notEqual('category', PUBLICITE_CATEGORY),
-                    Query.orderDesc('createdAt'),
-                    Query.limit(100),
-                ]),
-                databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                    Query.equal('active', true),
-                    Query.isNull('connectorId'),
-                    Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
-                    Query.notEqual('category', PUBLICITE_CATEGORY),
-                    Query.orderDesc('createdAt'),
-                    Query.limit(100),
-                ]).catch(() => ({ documents: [] })), // certains plans Appwrite restreignent isNull — non bloquant
-            ]);
-            const generalNotes = [...knowledgeEmpty.documents, ...knowledgeNull.documents]
-                .map((k) => ({ content: `[${k.category}] ${k.content}` }));
+        }
+
+        if (!notebook && contributingDocs.length === 0) {
+            // ── Base générale : tout ce qui n'appartient à AUCUN connecteur (la connaissance du Bénin, les notes de
+            // l'équipe) + les bons plans "Ça sert" déjà confirmés par la communauté. Même recherche que pour un
+            // connecteur : mots de la question dans tout le contenu (et non plus « les 100 plus récentes »),
+            // puis tri de pertinence. Deux variantes de filtre (connectorId vide, ET connectorId absent des anciennes
+            // notes) — une seule requête stricte exclurait silencieusement ces dernières.
+            const generalBase = [
+                Query.equal('active', true),
+                Query.notEqual('category', URGENT_RESOURCES_CATEGORY),
+                Query.notEqual('category', PUBLICITE_CATEGORY),
+            ];
+            const generalDocs = await findKnowledgeCandidates({
+                databases, DATABASE_ID, COLLECTION: COLLECTION_VANESSA_KNOWLEDGE,
+                bases: [[...generalBase, Query.equal('connectorId', '')], [...generalBase, Query.isNull('connectorId')]],
+                history, VANESSA_USER_ID, pool: CANDIDATE_POOL, label: 'générale', log,
+            });
+            const generalNotes = generalDocs.map((k) => ({ content: `[${k.category}] ${k.content}` }));
 
             let spotCandidates = [];
             if (COLLECTION_LOCAL_SPOTS) {
@@ -977,10 +831,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
                     relevant.map((k) => `- ${k.content}`).join('\n');
             }
 
-            // Infos "publicité" GÉNÉRALES (pas liées à un connecteur) —
-            // pour l'instant peu utilisé en pratique (Vanessa n'a pas
-            // encore de partenariat "grand public" actif), mais prêt pour
-            // quand ce sera le cas : même mécanique que pour un connecteur,
+            // Infos "publicité" GÉNÉRALES (pas liées à un connecteur) — même mécanique que pour un connecteur,
             // simplement sans filtre connectorId.
             try {
                 const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
@@ -991,14 +842,6 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
                 const generalAds = ads.documents.filter((a) => !a.connectorId).slice(0, 3);
                 if (generalAds.length > 0) publiciteContext = buildPubliciteInstruction(generalAds);
             } catch { /* collection pas encore configurée */ }
-        }
-
-        // Orientation entre connecteurs : seulement quand un connecteur est actif.
-        if (activeConnectorId) {
-            knowledgeContext += await buildConnectorRouting({
-                databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS,
-                currentId: activeConnectorId, currentName: connectorDoc?.name || 'ce connecteur', log,
-            });
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
     }
@@ -1093,8 +936,8 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
     }
 
     // Modèle propre au connecteur actif s'il en a un, sinon le modèle par défaut.
-    const replyModel = (effectiveConnectorId && CONNECTOR_MODEL_IDS[connectorDoc?.model]) || CLAUDE_MODEL;
-    log(`🤖 Modèle de réponse : ${replyModel}${effectiveConnectorId ? ` (connecteur ${connectorDoc?.name || effectiveConnectorId})` : ''}`);
+    const replyModel = contributingDocs.map((c) => CONNECTOR_MODEL_IDS[c.model]).find(Boolean) || CLAUDE_MODEL;
+    log(`🤖 Modèle de réponse : ${replyModel}${contributingDocs.length ? ` (connecteur ${contributingDocs.map((c) => c.name || c.$id).join(' + ')})` : ''}`);
 
     log(`📨 ${messages.length} messages envoyés à Claude, rôles: [${messages.map((m) => m.role).join(', ')}]`);
 
@@ -1107,7 +950,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         },
         body: JSON.stringify({
             model: replyModel,
-            system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
+            system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + ZEM_CONTEXT + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: VANESSA_MAX_TOKENS,
         }),
@@ -1134,10 +977,13 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         log('⚠️ Réponse ramenée à la dernière phrase complète (limite de tokens ou de taille atteinte).');
         await emitEvent('reply_truncated', 'warning', `stop_reason=${data.stop_reason}`, { outputTokens: data.usage?.output_tokens || 0 });
     }
+    const answerTokens = (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
     return {
         text: finished.text,
-        tokensUsed: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        tokensUsed: answerTokens + routingTokens, // quota de la personne : réponse + aiguillage
+        connectorTokens: answerTokens, // facturé aux connecteurs qui ont servi (jamais l'aiguillage)
         effectiveConnectorId,
+        effectiveConnectorIds,
         connectorFellBack,
     };
 }
@@ -1467,14 +1313,8 @@ export default async ({ req, res, log, error }) => {
         if (VANESSA_USER_ID && ANTHROPIC_API_KEY && conversation.participantIds.includes(VANESSA_USER_ID) && callerId !== VANESSA_USER_ID) {
             log('🔮 Vanessa fait partie de la conversation, génération de sa réponse...');
 
-            // Comptabilisé dès qu'une question est posée avec un connecteur
-            // actif sur la conversation — indépendamment du quota de
-            // tokens ci-dessous : même si Vanessa ne peut pas répondre
-            // faute de quota, l'utilisateur a bien posé une question à ce
-            // connecteur, et c'est ce que l'indicateur mesure.
-            if (conversation.vanessaConnectorId) {
-                await incrementConnectorQuestionCount(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, conversation.vanessaConnectorId, log);
-            }
+            // Le compteur de questions par connecteur et le quota des partenaires sont mis à jour APRÈS la réponse,
+            // pour les connecteurs dont des notes ont réellement servi (le choix du connecteur est automatique).
 
             // Passe à true dès qu'un message de Vanessa (réponse ou phrase de
             // quota) est enregistré : si une étape annexe échoue ENSUITE, la
@@ -1591,14 +1431,21 @@ export default async ({ req, res, log, error }) => {
                         // connecteur a réellement été utilisé ce tour-ci —
                         // facturation indépendante du quota personnel
                         // ci-dessus, les deux s'appliquent en parallèle.
-                        if (result.effectiveConnectorId && COLLECTION_VANESSA_CONNECTORS) {
-                            try {
-                                const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, result.effectiveConnectorId);
-                                await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, result.effectiveConnectorId, {
-                                    tokensUsed: (connector.tokensUsed || 0) + (result.tokensUsed || 0),
-                                });
-                            } catch (connErr) {
-                                log(`⚠️ Décompte du quota connecteur échoué (non bloquant) : ${connErr.message}`);
+                        // Quand deux connecteurs ont servi, la consommation de la réponse est répartie entre eux
+                        // (l'aiguillage lui-même n'est jamais facturé à un partenaire).
+                        const usedConnectorIds = result.effectiveConnectorIds || [];
+                        if (usedConnectorIds.length > 0 && COLLECTION_VANESSA_CONNECTORS) {
+                            const shares = splitTokens(result.connectorTokens || 0, usedConnectorIds.length);
+                            for (const [i, connectorId] of usedConnectorIds.entries()) {
+                                try {
+                                    const connector = await databases.getDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId);
+                                    await databases.updateDocument(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId, {
+                                        tokensUsed: (connector.tokensUsed || 0) + shares[i],
+                                    });
+                                } catch (connErr) {
+                                    log(`⚠️ Décompte du quota connecteur échoué (non bloquant) : ${connErr.message}`);
+                                }
+                                await incrementConnectorQuestionCount(databases, DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, connectorId, log);
                             }
                         }
 
@@ -1625,7 +1472,7 @@ export default async ({ req, res, log, error }) => {
                         // ralentir la réponse elle-même. Pas d'image (pas de
                         // texte exploitable) ni en mode connecteur (contexte
                         // professionnel, pas une conversation personnelle).
-                        if (!isImage && !conversation.vanessaConnectorId) {
+                        if (!isImage && !(result.effectiveConnectorIds || []).length) {
                             // Protégé à part : la réponse de Vanessa est DÉJÀ
                             // envoyée à ce stade. Sans cette protection, un
                             // souci sur cette étape annexe remontait dans le

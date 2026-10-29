@@ -3,9 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useNotifications } from '@/features/notifications/hooks/useNotifications';
-import { vanessaKnowledgeService, type VanessaConnector } from '@/features/vanessa/services/vanessaKnowledgeService';
 import { conversationService, type Conversation } from '@/features/messaging/services/conversationService';
-import { monthlyQuestionCount, formatQuestionCount, MONTH_LABELS } from '@/features/vanessa/utils/questionCount';
 import { SuggestExpressionModal } from '@/features/vanessa/components/SuggestExpressionModal';
 import { VANESSA_USER_ID } from '@/api/constants';
 import { EMISSIONS_ENABLED } from '@/config/features';
@@ -111,19 +109,12 @@ export const Sidebar = () => {
     const { unreadCount } = useNotifications();
     const alertSummary = useAlertSummary(!!user?.isModerator);
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [connectors, setConnectors] = useState<VanessaConnector[]>([]);
-    const [activeConnectorId, setActiveConnectorId] = useState('');
-    const [switchingConnector, setSwitchingConnector] = useState<string | null>(null);
     const [showSuggestExpression, setShowSuggestExpression] = useState(false);
     const [vanessaConversations, setVanessaConversations] = useState<Conversation[]>([]);
     const [creatingConversation, setCreatingConversation] = useState(false);
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-
-    useEffect(() => {
-        vanessaKnowledgeService.listActiveConnectors().then(setConnectors).catch(() => {});
-    }, []);
 
     const loadVanessaConversations = () => {
         if (!user?.$id || !VANESSA_USER_ID) return;
@@ -132,14 +123,8 @@ export const Sidebar = () => {
             .catch(() => {});
     };
 
-    // Sait quel connecteur est actif sur la conversation avec Vanessa, pour
-    // pouvoir le surligner ET pour que re-cliquer dessus le désactive au
-    // lieu de le réactiver sans effet visible (c'était le bug).
     useEffect(() => {
         if (!user?.$id || !VANESSA_USER_ID) return;
-        conversationService.findOrCreateDirect(user.$id, VANESSA_USER_ID)
-            .then((conversation) => setActiveConnectorId(conversation.vanessaConnectorId || ''))
-            .catch(() => {});
         loadVanessaConversations();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.$id]);
@@ -198,32 +183,6 @@ export const Sidebar = () => {
             close();
         } finally {
             setCreatingConversation(false);
-        }
-    };
-
-    // Un connecteur peut être choisi depuis N'IMPORTE QUELLE page (pas
-    // seulement depuis la conversation avec Vanessa) — on rejoint (ou
-    // ouvre) sa conversation, on active/désactive le connecteur dessus,
-    // puis on y navigue. findOrCreateDirect ne recrée rien si la
-    // conversation existe déjà, donc cet appel reste sans risque même si
-    // on y est déjà.
-    //
-    // Vraie bascule : re-cliquer sur le connecteur déjà actif le désactive
-    // (retour au mode général) — avant, cliquer l'activait à nouveau à
-    // l'identique, sans aucun changement visible, d'où l'impression que
-    // "ça ne se désactive jamais" même en appuyant plusieurs fois.
-    const handleSelectConnector = async (connectorId: string) => {
-        if (!user?.$id || !VANESSA_USER_ID || switchingConnector) return;
-        const next = activeConnectorId === connectorId ? '' : connectorId;
-        setSwitchingConnector(connectorId);
-        try {
-            const conversation = await conversationService.findOrCreateDirect(user.$id, VANESSA_USER_ID);
-            await conversationService.setVanessaConnector(conversation.$id, next);
-            setActiveConnectorId(next);
-            navigate(`/messages/${conversation.$id}`);
-            close();
-        } finally {
-            setSwitchingConnector(null);
         }
     };
 
@@ -312,52 +271,6 @@ export const Sidebar = () => {
                             <NavLink key={item.to} item={item} onNavigate={close} />
                         ))}
                     </div>
-
-                    {connectors.length > 0 && (
-                        <CollapsibleSection title="Connecteurs" storageKey="connecteurs" count={connectors.length}>
-                            <p className="px-3 pb-1.5 text-xs text-gray-400">Touche à nouveau pour désactiver</p>
-                            <div className="space-y-0.5">
-                                {connectors.map((c) => {
-                                    const count = monthlyQuestionCount(c);
-                                    const isActive = activeConnectorId === c.$id;
-                                    return (
-                                        <button
-                                            key={c.$id}
-                                            onClick={() => handleSelectConnector(c.$id)}
-                                            disabled={switchingConnector === c.$id}
-                                            className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-left disabled:opacity-50 transition-colors"
-                                            style={
-                                                isActive
-                                                    ? { backgroundColor: `${c.color}1A`, color: c.color, fontWeight: 600 }
-                                                    : { color: '#4b5563' }
-                                            }
-                                        >
-                                            <span
-                                                className="w-2 h-2 rounded-full shrink-0"
-                                                style={{ backgroundColor: c.color }}
-                                            />
-                                            <span className="flex-1 truncate">
-                                                {switchingConnector === c.$id ? 'Un instant...' : c.name}
-                                            </span>
-                                            {isActive && !switchingConnector && (
-                                                <span className="text-xs font-bold shrink-0" style={{ color: c.color }}>
-                                                    ACTIF
-                                                </span>
-                                            )}
-                                            {count > 0 && !isActive && (
-                                                <span
-                                                    className="text-xs font-bold rounded-full px-1.5 py-0.5 bg-brand text-ink shrink-0"
-                                                    title={`${count} question(s) en ${MONTH_LABELS[new Date().getMonth()]}`}
-                                                >
-                                                    {formatQuestionCount(count)}
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </CollapsibleSection>
-                    )}
 
                     <CollapsibleSection title="Conversations avec Vanessa" storageKey="conversations" count={vanessaConversations.length}>
                         <div className="space-y-0.5">
