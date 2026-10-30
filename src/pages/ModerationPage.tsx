@@ -20,12 +20,13 @@ import { ConsoleSuggestions } from '@/features/console/components/ConsoleSuggest
 import { ConsoleAgents } from '@/features/console/components/ConsoleAgents';
 import { ConsoleHalte } from '@/features/console/components/ConsoleHalte';
 import { ConsoleZem } from '@/features/console/components/ConsoleZem';
+import { ConsoleUac } from '@/features/console/components/ConsoleUac';
 import { useAlertSummary } from '@/features/console/hooks/useAlertSummary';
 
 type Section =
     | 'overview' | 'alerts' | 'journal' | 'system'
     | 'signalements' | 'ca-sert' | 'avis' | 'connaissances' | 'connecteurs'
-    | 'newsletter' | 'users' | 'zem' | 'suggestions' | 'agents' | 'halte';
+    | 'newsletter' | 'users' | 'zem' | 'suggestions' | 'agents' | 'halte' | 'uac';
 
 interface NavEntry { id: Section; label: string; badge?: number }
 interface NavGroup { title: string; entries: NavEntry[] }
@@ -46,6 +47,7 @@ const SECTION_TITLES: Record<Section, string> = {
     suggestions: 'Propositions des utilisateurs',
     agents: 'Agents commerciaux',
     halte: 'HALTE — alertes et affiches',
+    uac: 'UAC — menu et actualités',
 };
 
 export default function ModerationPage() {
@@ -71,6 +73,7 @@ export default function ModerationPage() {
             { id: 'connecteurs', label: 'Connecteurs' },
             { id: 'suggestions', label: 'Propositions' },
             { id: 'zem', label: 'Zem' },
+            { id: 'uac', label: 'UAC' },
         ] },
         { title: 'Communication', entries: [
             { id: 'users', label: 'Utilisateurs' },
@@ -126,6 +129,7 @@ export default function ModerationPage() {
 
                         {section === 'overview' && <ConsoleOverview onNavigate={go} />}
                         {section === 'alerts' && <ConsoleAlerts />}
+                        {section === 'uac' && <ConsoleUac />}
                         {section === 'journal' && <ConsoleJournal />}
                         {section === 'system' && <ConsoleSystem />}
 

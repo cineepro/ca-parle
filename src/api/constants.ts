@@ -34,6 +34,10 @@ export const COLLECTIONS = {
     LOCAL_SPOTS: import.meta.env.VITE_APPWRITE_COLLECTION_LOCAL_SPOTS || '',
     SPOT_CONFIRMATIONS: import.meta.env.VITE_APPWRITE_COLLECTION_SPOT_CONFIRMATIONS || '',
     MARKET_PRICES: import.meta.env.VITE_APPWRITE_COLLECTION_MARKET_PRICES || '',
+
+    // Espace UAC (onglet « UAC » de Ça Parle)
+    UAC_NEWS: import.meta.env.VITE_APPWRITE_COLLECTION_UAC_NEWS || '',
+    UAC_RESTAURANTS: import.meta.env.VITE_APPWRITE_COLLECTION_UAC_RESTAURANTS || '',
 } as const;
 
 export const BUCKETS = {
@@ -88,4 +92,5 @@ export const FUNCTIONS = {
     MANAGE_COMMUNITY: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_COMMUNITY || '',
     MANAGE_PROFILE: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_PROFILE || '',
     MANAGE_SEARCH_SOURCES: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_SEARCH_SOURCES || '',
+    MANAGE_UAC: import.meta.env.VITE_APPWRITE_FUNCTION_MANAGE_UAC || '',
 } as const;
