@@ -14,7 +14,7 @@
 import { Client, Databases, Query, ID } from 'node-appwrite';
 import { cleanSource, parseBulk } from './validate.js';
 import { cleanCard } from './cards.js';
-import { syncConnectors, CONNECTOR_PREFIX, NOTEBOOK_CONNECTOR_ID } from './syncConnectors.js';
+import { syncConnectors, CONNECTOR_PREFIX, NOTEBOOK_CONNECTOR_ID, GENERAL_CONNECTOR_ID, GENERAL_CONNECTOR } from './syncConnectors.js';
 import { stableId, sha1, purgeBySource } from './store.js';
 
 const PURGE_BATCH = 100;
@@ -199,7 +199,8 @@ export default async ({ req, res, log, error }) => {
                 databases.listDocuments(DATABASE_ID, SOURCES, [Query.limit(200)]),
             ]);
             const byConnector = new Map(rows.documents.filter((r) => String(r.url).startsWith(CONNECTOR_PREFIX)).map((r) => [r.url.slice(CONNECTOR_PREFIX.length), r]));
-            return res.json({ success: true, connectors: conns.documents.filter((c) => c.$id !== NOTEBOOK_CONNECTOR_ID).map((c) => {
+            const everything = [{ $id: GENERAL_CONNECTOR_ID, ...GENERAL_CONNECTOR }, ...conns.documents.filter((c) => c.$id !== NOTEBOOK_CONNECTOR_ID)];
+            return res.json({ success: true, connectors: everything.map((c) => {
                 const r = byConnector.get(c.$id);
                 return {
                     id: c.$id, name: c.name, icon: c.icon, active: !!c.active,
@@ -212,7 +213,7 @@ export default async ({ req, res, log, error }) => {
         if (action === 'set_connector_index') {
             const connectorId = String(body.connectorId || '');
             if (!connectorId || connectorId === NOTEBOOK_CONNECTOR_ID) return res.json({ success: false, error: 'Ce connecteur ne peut pas être indexé.' }, 400);
-            const conn = await databases.getDocument(DATABASE_ID, CONNECTORS, connectorId);
+            const conn = connectorId === GENERAL_CONNECTOR_ID ? GENERAL_CONNECTOR : await databases.getDocument(DATABASE_ID, CONNECTORS, connectorId);
             const rows = await databases.listDocuments(DATABASE_ID, SOURCES, [Query.limit(200)]);
             const row = rows.documents.find((r) => r.url === `${CONNECTOR_PREFIX}${connectorId}`);
             if (!body.enabled) {

@@ -1,6 +1,5 @@
 // src/pages/TermsPage.tsx — Vanessa
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
 
 export default function TermsPage() {
     return (
@@ -8,14 +7,10 @@ export default function TermsPage() {
             <div className="max-w-2xl mx-auto space-y-4">
                 <Link to="/" className="text-gray-400 hover:text-gray-600 text-sm">← Retour</Link>
 
-                <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-sm">
-                    <AlertTriangle className="inline-block w-[1.1em] h-[1.1em] align-[-0.18em] mr-1.5 shrink-0" aria-hidden="true" /> Ce document est une rédaction complète de la dernière mise à jour.
-                </div>
-
                 <div className="bg-white rounded-3xl p-6 space-y-6 text-sm text-gray-700 leading-relaxed">
                     <div>
                         <h1 className="text-xl font-bold text-gray-800">Conditions Générales d'Utilisation</h1>
-                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : — Version 1.0</p>
+                        <p className="text-xs text-gray-400 mt-1">Dernière mise à jour : 31 octobre 2026 — Version 2.0</p>
                     </div>
 
                     <section className="space-y-2">
@@ -36,16 +31,27 @@ export default function TermsPage() {
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">Article 2 — Description du service</h2>
                         <p>
-                            Vanessa est un assistant conversationnel automatisé reposant sur un modèle
-                            d'intelligence artificielle. La Plateforme héberge également "Ça Parle", un
-                            service de réseau social permettant à ses utilisateurs de publier, consulter,
-                            commenter et réagir à des contenus de type témoignages, rumeurs, révélations
-                            et commentaires ("le Contenu"), organisés notamment autour de fiches de
-                            référence (personnes publiques, sujets, événements), ainsi que "Ça sert", un
-                            répertoire local de bons plans. La Plateforme intègre en outre une messagerie
-                            privée et des fonctionnalités de gamification (badges, réputation,
-                            prédictions).
+                            "Vanessa" est une plateforme dont le cœur est un assistant conversationnel
+                            automatisé, « l'IA des Béninois », reposant sur un modèle d'intelligence
+                            artificielle : il aide à s'informer sur le Bénin et peut aussi discuter
+                            librement. La Plateforme comprend en outre :
                         </p>
+                        <ul className="list-disc pl-5 space-y-1">
+                            <li>"Ça Parle", un réseau social où les utilisateurs publient, consultent,
+                                commentent et réagissent à des témoignages, rumeurs, révélations et
+                                commentaires ("le Contenu"), organisés notamment autour de fiches de
+                                référence, avec un onglet « UAC » : menu des restaurants universitaires,
+                                actualités publiées par les utilisateurs (concours, locations, emplois,
+                                soutenances, excursions) et carte du campus de l'Université
+                                d'Abomey-Calavi ;</li>
+                            <li>"Ça sert", un répertoire local de bons plans et de prix ;</li>
+                            <li>"Zem", un moteur de recherche dans une sélection de sites béninois, de
+                                fiches de l'équipe et de connaissances de Vanessa ;</li>
+                            <li>"HALTE", un moyen de demander de l'aide en cas de violence ;</li>
+                            <li>une messagerie privée, un espace de notes personnelles ("Mon cahier")
+                                et des fonctionnalités de gamification (badges, réputation,
+                                prédictions).</li>
+                        </ul>
                     </section>
 
                     <section className="space-y-2">
@@ -60,6 +66,10 @@ export default function TermsPage() {
                             La création d'un compte nécessite une adresse email valide, qui doit être
                             vérifiée avant toute activation. Un même utilisateur ne peut détenir qu'un
                             seul compte, sauf autorisation expresse de l'éditeur.
+                        </p>
+                        <p>
+                            HALTE peut être utilisé sans compte et par toute personne qui a besoin
+                            d'aide.
                         </p>
                     </section>
 
@@ -103,6 +113,19 @@ export default function TermsPage() {
                             la Plateforme. Tu conserves tous tes droits de propriété intellectuelle sur
                             ton Contenu.
                         </p>
+                        <p>
+                            <strong>4.4 Actualités de l'espace UAC.</strong> Les actualités (concours,
+                            locations, emplois, soutenances, excursions) sont publiées sous ton nom et
+                            sous ta responsabilité. Tu t'engages à ce qu'elles soient exactes (dates,
+                            lieux, conditions, contact) et à ne publier ni fausse annonce, ni offre
+                            d'emploi ou de location inexistante, ni demande d'argent sous un faux
+                            prétexte, ni information personnelle d'un tiers. Les actualités ne sont pas
+                            vérifiées avant leur mise en ligne : l'éditeur ne garantit pas leur
+                            exactitude et te recommande, pour une location ou un emploi, de ne jamais
+                            payer avant d'avoir vu le lieu ou rencontré la personne. L'éditeur peut les
+                            masquer ou les supprimer à tout moment, et limite le nombre de publications
+                            par personne et par jour.
+                        </p>
                     </section>
 
                     <section className="space-y-2">
@@ -137,20 +160,30 @@ export default function TermsPage() {
                     <section className="space-y-2">
                         <h2 className="font-bold text-gray-800">Article 7 — Assistant IA ("Vanessa")</h2>
                         <p>
-                            Vanessa est un personnage automatisé généré par un modèle de langage
-                            artificiel. Ses réponses, publications et suggestions sont générées
-                            automatiquement et ne constituent ni un conseil professionnel (juridique,
-                            médical, psychologique ou autre), ni l'expression d'une opinion humaine
-                            engageant l'éditeur. L'utilisateur reconnaît que le contenu généré par
-                            Vanessa peut être imprécis, incomplet ou inapproprié dans certains contextes
-                            et s'engage à l'apprécier avec le recul nécessaire.
+                            Vanessa est une intelligence artificielle, et non une personne. Ses
+                            réponses, publications et suggestions sont générées automatiquement à
+                            partir d'un modèle de langage et des notes que l'équipe et ses partenaires
+                            ont rédigées ; elles ne constituent ni un conseil professionnel
+                            (juridique, médical, psychologique, administratif ou autre), ni
+                            l'expression d'une opinion humaine engageant l'éditeur. Elles peuvent être
+                            imprécises, incomplètes, dépassées ou inappropriées dans certains contextes
+                            : vérifie toujours une information importante (démarche, date, prix,
+                            adresse) auprès de la structure concernée.
+                        </p>
+                        <p>
+                            Vanessa choisit elle-même, selon ta question, les connaissances à utiliser,
+                            y compris celles de partenaires. Une information sponsorisée est toujours
+                            signalée par la mention « PUB : » à la fin de la réponse. Pour que le
+                            service reste disponible pour tous, le nombre d'échanges par jour et par
+                            personne est limité.
                         </p>
                         <p>
                             Aucun contenu confié à Vanessa dans le cadre d'une conversation privée
                             n'est réutilisé pour alimenter les publications ou les échanges avec
                             d'autres utilisateurs, sauf action explicite et volontaire de l'utilisateur
-                            lui-même (fonctionnalité de transformation en publication, nécessitant une
-                            validation manuelle avant toute mise en ligne).
+                            lui-même (transformation en publication, nécessitant une validation
+                            manuelle avant toute mise en ligne). Tes notes de « Mon cahier » ne sont
+                            utilisées par Vanessa que lorsque tu le lui demandes clairement.
                         </p>
                     </section>
 
@@ -175,10 +208,48 @@ export default function TermsPage() {
                             aux présentes conditions et peut entraîner la suppression du contenu et/ou
                             une sanction du compte.
                         </p>
+                        <p>
+                            Le menu des restaurants universitaires et la carte du campus (lieux et
+                            itinéraires) sont fournis à titre indicatif. Un menu peut changer
+                            exceptionnellement, un lieu peut être mal placé ou manquant, et un
+                            itinéraire est une estimation : l'éditeur ne garantit pas leur exactitude.
+                            La géolocalisation n'est utilisée que lorsque tu la demandes.
+                        </p>
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 9 — Comptes et sécurité</h2>
+                        <h2 className="font-bold text-gray-800">Article 9 — Zem</h2>
+                        <p>
+                            Zem affiche des extraits de pages publiées par des tiers et renvoie vers
+                            leur site d'origine. L'éditeur n'est pas l'auteur de ces pages et ne
+                            garantit ni leur exactitude, ni leur mise à jour, ni leur disponibilité.
+                            La « réponse rapide » recopie des passages des pages trouvées ; elle ne
+                            remplace pas la consultation de la source. Si tu édites un site et ne
+                            souhaites pas y figurer, ou si tu constates une erreur, signale-le : nous
+                            examinons la demande.
+                        </p>
+                    </section>
+
+                    <section className="space-y-2">
+                        <h2 className="font-bold text-gray-800">Article 10 — HALTE</h2>
+                        <p>
+                            HALTE permet de demander de l'aide à une cellule d'écoute, qui peut te
+                            rappeler. Il ne remplace en aucun cas les services d'urgence : en cas de
+                            danger immédiat, appelle-les d'abord. Le temps de réponse de la cellule ne
+                            peut pas être garanti, et le service peut ne pas être ouvert dans toutes
+                            les zones.
+                        </p>
+                        <p>
+                            Demande de l'aide de bonne foi. Il est interdit d'accuser volontairement et
+                            à tort une personne ou d'utiliser HALTE pour nuire à quelqu'un. Cette règle
+                            ne vise jamais une personne qui demande de l'aide sincèrement, même si elle
+                            se trompe. La cellule ne transmet une alerte à une autorité qu'après avoir
+                            pris contact avec toi et évalué la situation, sauf obligation légale.
+                        </p>
+                    </section>
+
+                    <section className="space-y-2">
+                        <h2 className="font-bold text-gray-800">Article 11 — Comptes et sécurité</h2>
                         <p>
                             Tu es responsable de la confidentialité de tes identifiants de connexion et
                             de toute activité effectuée depuis ton compte. Tu t'engages à informer
@@ -187,7 +258,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 10 — Limitation de responsabilité</h2>
+                        <h2 className="font-bold text-gray-800">Article 12 — Limitation de responsabilité</h2>
                         <p>
                             Dans les limites autorisées par la loi applicable, l'éditeur ne saurait être
                             tenu responsable des dommages directs ou indirects résultant de
@@ -198,7 +269,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 11 — Résiliation</h2>
+                        <h2 className="font-bold text-gray-800">Article 13 — Résiliation</h2>
                         <p>
                             Tu peux cesser d'utiliser la Plateforme à tout moment. L'éditeur peut
                             suspendre ou résilier ton accès en cas de violation des présentes CGU, sans
@@ -207,7 +278,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 12 — Modification des CGU</h2>
+                        <h2 className="font-bold text-gray-800">Article 14 — Modification des CGU</h2>
                         <p>
                             L'éditeur se réserve le droit de modifier les présentes CGU à tout moment.
                             Les utilisateurs seront informés de toute modification substantielle par un
@@ -218,7 +289,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 13 — Droit applicable et litiges</h2>
+                        <h2 className="font-bold text-gray-800">Article 15 — Droit applicable et litiges</h2>
                         <p>
                             À titre indicatif, les
                             présentes CGU pourraient être soumises au droit international, tout
@@ -228,7 +299,7 @@ export default function TermsPage() {
                     </section>
 
                     <section className="space-y-2">
-                        <h2 className="font-bold text-gray-800">Article 14 — Contact</h2>
+                        <h2 className="font-bold text-gray-800">Article 16 — Contact</h2>
                         <p>Pour toute question relative aux présentes CGU : seriquicinee@gmail.com</p>
                     </section>
                 </div>

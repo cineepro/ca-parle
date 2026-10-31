@@ -30,7 +30,7 @@ export default function ZemAboutPage() {
                 </div>
 
                 <Block title="Zem en bref">
-                    <p>Zem est le moteur de recherche de Vanessa pour le Bénin. Il ne cherche pas sur tout internet : il cherche dans une sélection de sites béninois choisis par l’équipe, plus des fiches écrites à la main et des notes publiques de partenaires.</p>
+                    <p>Zem est le moteur de recherche de Vanessa pour le Bénin. Il ne cherche pas sur tout internet : il cherche dans une sélection de sites béninois choisis par l’équipe, plus des fiches écrites à la main et des connaissances de Vanessa sur le Bénin.</p>
                 </Block>
 
                 <Block title="Zem en chiffres">
@@ -48,7 +48,7 @@ export default function ZemAboutPage() {
                     <ul className="list-disc pl-5 space-y-1">
                         <li><strong>Des sites publics</strong> : un robot visite régulièrement les pages de sites d’information, d’administrations, d’écoles et de services. Il lit le texte et le range dans l’index de Zem.</li>
                         <li><strong>Des fiches de l’équipe</strong> : des informations vérifiées et écrites à la main.</li>
-                        <li><strong>Des notes publiques de partenaires</strong> connectés à Vanessa.</li>
+                        <li><strong>Les connaissances de Vanessa</strong> : ses notes sur le Bénin, validées par l’équipe, et les notes de ses partenaires. Elles sont lisibles par tous les utilisateurs connectés. Tes notes personnelles (« Mon cahier ») n’y sont jamais.</li>
                     </ul>
                     {stats && stats.sources.length > 0 && (
                         <details className="mt-2">

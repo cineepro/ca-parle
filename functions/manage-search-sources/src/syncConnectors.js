@@ -10,6 +10,12 @@ import { sha1, stableId, purgeBySource } from './store.js';
 
 export const CONNECTOR_PREFIX = 'vanessa-connector:';
 export const NOTEBOOK_CONNECTOR_ID = 'mon-cahier';
+// « Connecteur » fictif : la base de connaissances générale de Vanessa (les notes qui n'appartiennent à aucun connecteur).
+export const GENERAL_CONNECTOR_ID = 'general';
+export const GENERAL_CONNECTOR = { name: 'Connaissances générales de Vanessa', icon: '🇧🇯', active: true };
+// Jamais copiées dans Zem : le lexique (façon de parler de Vanessa), les ressources d'urgence (gérées avec HALTE)
+// et les consignes de publicité (des obligations de Vanessa, pas du contenu à lire).
+const GENERAL_EXCLUDED_CATEGORIES = ['lexique', 'ressources_urgence', 'publicite'];
 const MAX_CONTENT = 20000;
 
 // Titre d'une note : sa première phrase (ou ligne), 110 caractères au plus.
@@ -33,6 +39,19 @@ async function listAll(databases, DB, col, queries, max = 5000) {
     return out;
 }
 
+// Filtres des notes « générales » : sans connecteur (vide OU absent sur les anciennes notes), hors catégories exclues.
+// Si la base refuse « isNull », on retombe sur « vide » seulement.
+async function generalFilters(databases, DB, KNOW) {
+    const exclusions = GENERAL_EXCLUDED_CATEGORIES.map((c) => Query.notEqual('category', c));
+    const withNull = [Query.or([Query.equal('connectorId', ''), Query.isNull('connectorId')]), ...exclusions];
+    try {
+        await databases.listDocuments(DB, KNOW, [...withNull, Query.limit(1)]);
+        return withNull;
+    } catch {
+        return [Query.equal('connectorId', ''), ...exclusions];
+    }
+}
+
 export async function syncConnectors({ databases, DB, SOURCES, DOCS, KNOW, CONNECTORS, deadline = Infinity, now = () => Date.now(), onlyConnectorId = '' }) {
     const rows = (await listAll(databases, DB, SOURCES, [])).filter((s) => String(s.url).startsWith(CONNECTOR_PREFIX));
     const summary = { connectors: 0, written: 0, unchanged: 0, removed: 0, done: true, details: [] };
@@ -42,8 +61,10 @@ export async function syncConnectors({ databases, DB, SOURCES, DOCS, KNOW, CONNE
         if (now() > deadline) { summary.done = false; break; }
         summary.connectors += 1;
 
+        const isGeneral = connectorId === GENERAL_CONNECTOR_ID;
         let connector = null;
-        try { connector = await databases.getDocument(DB, CONNECTORS, connectorId); } catch { /* connecteur supprimé */ }
+        if (isGeneral) connector = GENERAL_CONNECTOR;
+        else { try { connector = await databases.getDocument(DB, CONNECTORS, connectorId); } catch { /* connecteur supprimé */ } }
         if (!connector || !connector.active || connectorId === NOTEBOOK_CONNECTOR_ID) {
             const p = await purgeBySource(databases, DB, DOCS, row.$id);
             summary.removed += p.removed;
@@ -57,8 +78,9 @@ export async function syncConnectors({ databases, DB, SOURCES, DOCS, KNOW, CONNE
         const seen = new Set();
         let cursor = null;
         let timedOut = false;
+        const scope = isGeneral ? await generalFilters(databases, DB, KNOW) : [Query.equal('connectorId', connectorId)];
         for (;;) {
-            const q = [Query.equal('connectorId', connectorId), Query.equal('active', true), Query.limit(100), Query.select(['$id', 'content', 'createdAt'])];
+            const q = [...scope, Query.equal('active', true), Query.limit(100), Query.select(['$id', 'content', 'createdAt'])];
             if (cursor) q.push(Query.cursorAfter(cursor));
             const page = await databases.listDocuments(DB, KNOW, q);
             for (const note of page.documents) {
