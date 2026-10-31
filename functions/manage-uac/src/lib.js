@@ -47,3 +47,81 @@ export function validateRestaurant(input) {
         },
     };
 }
+
+// ───────────── Lieux du campus (carte) ─────────────
+export const PLACE_KINDS = ['amphi', 'administration', 'banque', 'commerce', 'restauration', 'sante', 'bibliotheque', 'sport', 'transport', 'autre'];
+
+export function validatePlace(input) {
+    const name = clean(input?.name, 100);
+    if (name.length < 2) return { error: 'Le nom du lieu est obligatoire.' };
+    const kind = String(input?.kind || '');
+    if (!PLACE_KINDS.includes(kind)) return { error: 'Choisis un type de lieu.' };
+    const latitude = Number(input?.latitude);
+    const longitude = Number(input?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+        return { error: 'Position invalide : place le lieu sur la carte.' };
+    }
+    return { value: { name, kind, latitude, longitude, description: cleanMultiline(input?.description, 500), active: input?.active !== false } };
+}
+
+// Correspondance entre nos types et les étiquettes OpenStreetMap (premier jeu raisonnable, à élargir avec l'usage).
+// L'ordre compte : un lieu prend le PREMIER type qui correspond.
+export const OSM_RULES = [
+    { kind: 'banque', match: (t) => t.amenity === 'bank' || t.amenity === 'atm' },
+    { kind: 'bibliotheque', match: (t) => t.amenity === 'library' },
+    { kind: 'sante', match: (t) => ['pharmacy', 'clinic', 'hospital', 'doctors'].includes(t.amenity) },
+    { kind: 'restauration', match: (t) => ['restaurant', 'cafe', 'fast_food', 'canteen', 'bar'].includes(t.amenity) },
+    { kind: 'sport', match: (t) => ['pitch', 'sports_centre', 'stadium'].includes(t.leisure) },
+    { kind: 'administration', match: (t) => ['government', 'administrative'].includes(t.office) || ['townhall', 'post_office', 'police'].includes(t.amenity) },
+    { kind: 'transport', match: (t) => t.amenity === 'bus_station' || t.public_transport === 'station' },
+    { kind: 'commerce', match: (t) => !!t.shop || t.amenity === 'marketplace' },
+    { kind: 'amphi', match: (t) => ['university', 'college', 'school', 'lecture_hall'].includes(t.amenity) || t.building === 'university' },
+    { kind: 'autre', match: (t) => t.amenity === 'place_of_worship' },
+];
+
+export const OSM_FILTERS = [
+    '["amenity"~"^(bank|atm|library|pharmacy|clinic|hospital|doctors|restaurant|cafe|fast_food|canteen|bar|townhall|post_office|police|bus_station|marketplace|university|college|school|lecture_hall|place_of_worship)$"]',
+    '["leisure"~"^(pitch|sports_centre|stadium)$"]',
+    '["office"~"^(government|administrative)$"]',
+    '["building"="university"]',
+    '["shop"]',
+];
+
+export const MAX_OSM_RADIUS_M = 4000;
+export const MAX_OSM_RESULTS = 200;
+
+export function buildOverpassQuery(lat, lng, radius) {
+    const r = Math.min(MAX_OSM_RADIUS_M, Math.max(200, Math.trunc(Number(radius) || 2500)));
+    const clauses = OSM_FILTERS.map((f) => `  node${f}(around:${r},${lat},${lng});\n  way${f}(around:${r},${lat},${lng});`).join('\n');
+    return `[out:json][timeout:30];\n(\n${clauses}\n);\nout center tags ${MAX_OSM_RESULTS};`;
+}
+
+// Un élément OSM → un lieu candidat (ou null : sans nom, sans position ou d'un type qu'on ne garde pas).
+export function mapOsmElement(el) {
+    const tags = el?.tags || {};
+    const name = clean(tags.name || tags['name:fr'], 100);
+    const latitude = el?.lat ?? el?.center?.lat;
+    const longitude = el?.lon ?? el?.center?.lon;
+    if (!name || typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+    const rule = OSM_RULES.find((r) => r.match(tags));
+    if (!rule) return null;
+    return { osmId: `${el.type}/${el.id}`, name, kind: rule.kind, latitude, longitude, description: clean(tags.description || tags.operator || '', 200) };
+}
+
+const metersBetween = (a, b) => {
+    const R = 6371000, rad = (d) => (d * Math.PI) / 180;
+    const dLat = rad(b.latitude - a.latitude), dLng = rad(b.longitude - a.longitude);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+// Écarte les candidats déjà présents (même nom, ou à moins de 25 m d'un lieu de même nom) et les doublons entre eux.
+export function dedupeCandidates(candidates, existing) {
+    const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+    const kept = [];
+    for (const c of candidates) {
+        const same = [...existing, ...kept].some((p) => norm(p.name) === norm(c.name) && metersBetween(p, c) < 200);
+        if (!same) kept.push(c);
+    }
+    return kept;
+}

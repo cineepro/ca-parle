@@ -1,9 +1,10 @@
 // scripts/setupUac.mjs — Ça Parle
 //
 // À exécuter UNE SEULE FOIS (sans danger si relancé : ce qui existe déjà est laissé tel quel).
-// Crée les deux collections de l'espace UAC :
+// Crée les trois collections de l'espace UAC :
 //   uac_restaurants : un restaurant = son menu de la semaine (répété chaque semaine)
 //   uac_news        : les actualités (concours, location, emploi, soutenance, excursion)
+//   uac_places      : les lieux de la carte du campus (amphis, banques, commerces…)
 // Lecture réservée aux utilisateurs connectés ; l'écriture passe UNIQUEMENT par la Function manage-uac.
 //
 //   APPWRITE_ENDPOINT=... APPWRITE_PROJECT_ID=... APPWRITE_API_KEY=... APPWRITE_DATABASE_ID=... \
@@ -67,10 +68,19 @@ await str('uac_news', 'authorName', 80);
 await str('uac_news', 'moderationStatus', 20, true);
 await str('uac_news', 'createdAt', 40, true);
 
+await ensureCollection('uac_places', 'UAC — lieux du campus');
+await str('uac_places', 'name', 100, true);
+await str('uac_places', 'kind', 20, true);
+await attr('uac_places', 'latitude', () => db.createFloatAttribute(DB, 'uac_places', 'latitude', true, -90, 90));
+await attr('uac_places', 'longitude', () => db.createFloatAttribute(DB, 'uac_places', 'longitude', true, -180, 180));
+await str('uac_places', 'description', 500);
+await attr('uac_places', 'active', () => db.createBooleanAttribute(DB, 'uac_places', 'active', false, true));
+
 console.log('Attente de la création des attributs (Appwrite les prépare en arrière-plan)…');
 await wait(8000);
 await index('uac_news', 'idx_status_created', 'key', ['moderationStatus', 'createdAt'], ['ASC', 'DESC']);
 await index('uac_news', 'idx_kind_status_created', 'key', ['kind', 'moderationStatus', 'createdAt'], ['ASC', 'ASC', 'DESC']);
 await index('uac_news', 'idx_author_created', 'key', ['authorId', 'createdAt'], ['ASC', 'DESC']);
 await index('uac_restaurants', 'idx_order', 'key', ['order'], ['ASC']);
+await index('uac_places', 'idx_active_kind', 'key', ['active', 'kind'], ['ASC', 'ASC']);
 console.log('\nTerminé. Si un index a échoué parce que les attributs ne sont pas encore prêts, relance simplement le script.');

@@ -3,9 +3,10 @@
 // et modération des actualités publiées par les étudiants.
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { DAYS, MEALS, NEWS_KINDS } from '@/features/uac/config';
+import { LocationPicker } from '@/features/caSert/components/LocationPicker';
+import { CAMPUS_CENTER, CAMPUS_ZOOM, DAYS, MEALS, NEWS_KINDS, PLACE_KINDS, type PlaceKind } from '@/features/uac/config';
 import { dayLabel, emptyMenu } from '@/features/uac/lib/menu';
-import { uacService, type UacNews, type UacRestaurant } from '@/features/uac/services/uacService';
+import { uacService, type PlaceCandidate, type UacNews, type UacPlace, type UacRestaurant } from '@/features/uac/services/uacService';
 
 const field = 'w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm text-ink focus:outline-none focus:border-ink focus:ring-2 focus:ring-brand';
 const blank = (order: number): UacRestaurant => ({ id: '', name: '', place: '', order, active: true, menu: emptyMenu() });
@@ -66,16 +67,121 @@ const RestaurantEditor = ({ initial, onSaved, onCancel }: { initial: UacRestaura
     );
 };
 
+const KIND_NAME = Object.fromEntries(PLACE_KINDS.map((k) => [k.slug, `${k.icon} ${k.name}`]));
+
+const PlaceEditor = ({ initial, onSaved, onCancel }: { initial: UacPlace | null; onSaved: () => void; onCancel: () => void }) => {
+    const [name, setName] = useState(initial?.name || '');
+    const [kind, setKind] = useState<PlaceKind>(initial?.kind || 'amphi');
+    const [description, setDescription] = useState(initial?.description || '');
+    const [pos, setPos] = useState<{ lat: number; lng: number } | null>(initial ? { lat: initial.latitude, lng: initial.longitude } : null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const save = async () => {
+        if (!pos) return;
+        setBusy(true); setError(null);
+        try { await uacService.savePlace({ id: initial?.$id, name, kind, description, latitude: pos.lat, longitude: pos.lng }); onSaved(); }
+        catch (e) { setError(e instanceof Error ? e.message : 'Enregistrement impossible.'); }
+        finally { setBusy(false); }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+            <div className="grid sm:grid-cols-2 gap-2">
+                <input className={field} placeholder="Nom (ex. Amphi 1000)" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} aria-label="Nom du lieu" />
+                <select className={field} value={kind} onChange={(e) => setKind(e.target.value as PlaceKind)} aria-label="Type de lieu">
+                    {PLACE_KINDS.map((k) => <option key={k.slug} value={k.slug}>{k.icon} {k.name}</option>)}
+                </select>
+            </div>
+            <input className={field} placeholder="Précision utile (facultatif) : horaires, étage, repère…" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} aria-label="Description" />
+            <LocationPicker center={CAMPUS_CENTER} zoom={CAMPUS_ZOOM + 1.5} initial={pos || undefined} onChange={(lat, lng) => setPos({ lat, lng })} />
+            {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+            <div className="flex gap-2">
+                <Button onClick={save} isLoading={busy} disabled={name.trim().length < 2 || !pos}>Enregistrer</Button>
+                <Button variant="ghost" onClick={onCancel}>Annuler</Button>
+            </div>
+        </div>
+    );
+};
+
+const OsmImport = ({ onDone }: { onDone: () => void }) => {
+    const [radius, setRadius] = useState(2500);
+    const [busy, setBusy] = useState(false);
+    const [candidates, setCandidates] = useState<PlaceCandidate[] | null>(null);
+    const [picked, setPicked] = useState<Set<string>>(new Set());
+    const [note, setNote] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const search = async () => {
+        setBusy(true); setError(null); setNote(null);
+        try {
+            const r = await uacService.importOsmPlaces(CAMPUS_CENTER[1], CAMPUS_CENTER[0], radius);
+            setCandidates(r.candidates);
+            setPicked(new Set());
+            setNote(`${r.found} lieu(x) nommé(s) trouvé(s) sur OpenStreetMap, ${r.candidates.length} nouveau(x) (les déjà enregistrés sont écartés).`);
+        } catch (e) { setError(e instanceof Error ? e.message : 'Recherche impossible.'); }
+        finally { setBusy(false); }
+    };
+
+    const toggle = (id: string) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const save = async () => {
+        setBusy(true); setError(null);
+        try {
+            const r = await uacService.savePlaces((candidates || []).filter((c) => picked.has(c.osmId)));
+            setNote(`${r.saved} lieu(x) enregistré(s).`);
+            setCandidates(null);
+            onDone();
+        } catch (e) { setError(e instanceof Error ? e.message : 'Enregistrement impossible.'); }
+        finally { setBusy(false); }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+            <p className="text-sm text-gray-600">Propose des lieux déjà connus d’OpenStreetMap autour du centre du campus. Rien n’est enregistré sans que tu coches. OpenStreetMap est souvent incomplet : complète ensuite à la main.</p>
+            <div className="flex items-center gap-2">
+                <select className={`${field} w-40`} value={radius} onChange={(e) => setRadius(Number(e.target.value))} aria-label="Rayon de recherche">
+                    {[1000, 2000, 2500, 3000, 4000].map((r) => <option key={r} value={r}>Rayon {r / 1000} km</option>)}
+                </select>
+                <Button size="sm" onClick={search} isLoading={busy && !candidates}>Chercher sur OpenStreetMap</Button>
+            </div>
+            {note && <p className="text-sm text-green-700">{note}</p>}
+            {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+            {candidates && candidates.length > 0 && (
+                <>
+                    <div className="flex gap-3 text-sm">
+                        <button className="font-semibold text-ochre" onClick={() => setPicked(new Set(candidates.map((c) => c.osmId)))}>Tout cocher</button>
+                        <button className="text-gray-500" onClick={() => setPicked(new Set())}>Tout décocher</button>
+                    </div>
+                    <ul className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                        {candidates.map((c) => (
+                            <li key={c.osmId}>
+                                <label className="flex items-center gap-3 py-2 text-sm cursor-pointer">
+                                    <input type="checkbox" checked={picked.has(c.osmId)} onChange={() => toggle(c.osmId)} />
+                                    <span className="min-w-0"><span className="block font-semibold text-ink truncate">{c.name}</span><span className="block text-xs text-gray-500">{KIND_NAME[c.kind]}</span></span>
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                    <Button onClick={save} isLoading={busy} disabled={picked.size === 0}>Enregistrer les {picked.size} coché(s)</Button>
+                </>
+            )}
+        </div>
+    );
+};
+
 export const ConsoleUac = () => {
     const [restaurants, setRestaurants] = useState<UacRestaurant[]>([]);
     const [editing, setEditing] = useState<UacRestaurant | null>(null);
     const [news, setNews] = useState<UacNews[]>([]);
+    const [places, setPlaces] = useState<UacPlace[]>([]);
+    const [placeEditing, setPlaceEditing] = useState<UacPlace | 'new' | null>(null);
+    const [importing, setImporting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         try {
-            const [r, n] = await Promise.all([uacService.listRestaurants(true), uacService.listAllNews()]);
-            setRestaurants(r); setNews(n);
+            const [r, n, p] = await Promise.all([uacService.listRestaurants(true), uacService.listAllNews(), uacService.listPlaces(true)]);
+            setRestaurants(r); setNews(n); setPlaces(p);
         } catch (e) { setError(e instanceof Error ? e.message : 'Chargement impossible.'); }
     }, []);
     useEffect(() => { load(); }, [load]);
@@ -105,6 +211,26 @@ export const ConsoleUac = () => {
                     </div>
                 ))}
                 {restaurants.length === 0 && !editing && <p className="text-sm text-gray-500 bg-white rounded-2xl p-4">Aucun restaurant pour l’instant. Ajoute le premier : le bandeau « Au menu aujourd’hui » apparaîtra dans l’onglet UAC.</p>}
+            </section>
+
+            <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-gray-800 mr-auto">Lieux du campus ({places.length})</h3>
+                    <Button size="sm" variant="ghost" onClick={() => { setImporting((v) => !v); setPlaceEditing(null); }}>Importer depuis OpenStreetMap</Button>
+                    <Button size="sm" onClick={() => { setPlaceEditing('new'); setImporting(false); }}>+ Ajouter un lieu</Button>
+                </div>
+                {importing && <OsmImport onDone={load} />}
+                {placeEditing && <PlaceEditor key={placeEditing === 'new' ? 'new' : placeEditing.$id} initial={placeEditing === 'new' ? null : placeEditing} onCancel={() => setPlaceEditing(null)} onSaved={() => { setPlaceEditing(null); load(); }} />}
+                <ul className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+                    {places.map((p) => (
+                        <li key={p.$id} className="flex items-center gap-3 px-4 py-2.5">
+                            <span className="min-w-0 mr-auto"><span className="block text-sm font-semibold text-ink truncate">{p.name}</span><span className="block text-xs text-gray-500">{KIND_NAME[p.kind]}</span></span>
+                            <button className="text-sm font-semibold text-ochre" onClick={() => { setPlaceEditing(p); setImporting(false); }}>Modifier</button>
+                            <button className="text-sm text-red-600" onClick={() => window.confirm(`Supprimer « ${p.name} » ?`) && act(() => uacService.deletePlace(p.$id))}>Supprimer</button>
+                        </li>
+                    ))}
+                    {places.length === 0 && <li className="px-4 py-4 text-sm text-gray-500">Aucun lieu. Commence par l’import OpenStreetMap, puis complète à la main.</li>}
+                </ul>
             </section>
 
             <section className="space-y-3">

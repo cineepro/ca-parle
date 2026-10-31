@@ -38,6 +38,7 @@ export const COLLECTIONS = {
     // Espace UAC (onglet « UAC » de Ça Parle)
     UAC_NEWS: import.meta.env.VITE_APPWRITE_COLLECTION_UAC_NEWS || '',
     UAC_RESTAURANTS: import.meta.env.VITE_APPWRITE_COLLECTION_UAC_RESTAURANTS || '',
+    UAC_PLACES: import.meta.env.VITE_APPWRITE_COLLECTION_UAC_PLACES || '',
 } as const;
 
 export const BUCKETS = {

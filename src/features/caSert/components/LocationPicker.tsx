@@ -12,11 +12,15 @@ interface Props {
     // ajoute un lieu ailleurs (Togo, Sénégal...).
     country?: string;
     onChange: (lat: number, lng: number) => void;
+    // Facultatifs (espace UAC) : ouvrir la carte sur un point précis, avec un repère déjà posé.
+    center?: [number, number];
+    zoom?: number;
+    initial?: { lat: number; lng: number };
 }
 
 const BENIN_CENTER: [number, number] = [2.42, 6.38];
 
-export const LocationPicker = ({ country, onChange }: Props) => {
+export const LocationPicker = ({ country, onChange, center, zoom, initial }: Props) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<maplibregl.Map | null>(null);
     const markerRef = useRef<maplibregl.Marker | null>(null);
@@ -53,14 +57,15 @@ export const LocationPicker = ({ country, onChange }: Props) => {
         const map = new maplibregl.Map({
             container: containerRef.current,
             style: 'https://tiles.openfreemap.org/styles/liberty',
-            center: start?.center || BENIN_CENTER,
-            zoom: start?.zoom ?? 12,
+            center: initial ? [initial.lng, initial.lat] : (center || start?.center || BENIN_CENTER),
+            zoom: zoom ?? (initial ? 17 : (start?.zoom ?? 12)),
             attributionControl: { compact: true },
         });
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
         mapRef.current = map;
 
         map.on('click', (e: maplibregl.MapMouseEvent) => placeMarker(e.lngLat.lng, e.lngLat.lat));
+        if (initial) map.once('load', () => placeMarker(initial.lng, initial.lat));
 
         return () => {
             map.remove();

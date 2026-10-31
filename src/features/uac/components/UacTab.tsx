@@ -8,6 +8,7 @@ import { uacService, type UacNews } from '../services/uacService';
 import { MenuStrip } from './MenuStrip';
 import { NewsCard } from './NewsCard';
 import { PublishNewsSheet } from './PublishNewsSheet';
+import { CampusMap } from './CampusMap';
 
 const PAGE = 15;
 
@@ -19,6 +20,7 @@ export const UacTab = () => {
     const [hasMore, setHasMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [publishing, setPublishing] = useState(false);
+    const [mapOpen, setMapOpen] = useState(false);
 
     const load = useCallback(async (reset: boolean, after?: string) => {
         setLoading(true);
@@ -45,6 +47,17 @@ export const UacTab = () => {
     return (
         <div className="h-full overflow-y-auto pt-[72px] pb-24">
             <MenuStrip />
+
+            <div className="mt-3 px-4">
+                <button type="button" onClick={() => setMapOpen(true)} className="w-full flex items-center gap-3 rounded-2xl bg-white border border-gray-200 px-4 py-3 text-left hover:bg-sand">
+                    <span className="text-2xl" aria-hidden="true">🗺️</span>
+                    <span className="min-w-0 mr-auto">
+                        <span className="block text-sm font-bold text-ink">Carte du campus</span>
+                        <span className="block text-xs text-gray-500">Amphis, administration, banques, commerces… et le chemin pour y aller</span>
+                    </span>
+                    <span className="text-ochre font-bold" aria-hidden="true">›</span>
+                </button>
+            </div>
 
             <div className="mt-4 px-4 flex items-center gap-2">
                 <h2 className="text-sm font-bold text-ink mr-auto">📢 Actualités de l’UAC</h2>
@@ -80,6 +93,8 @@ export const UacTab = () => {
                     </button>
                 )}
             </div>
+
+            {mapOpen && <CampusMap onClose={() => setMapOpen(false)} />}
 
             {publishing && (
                 <PublishNewsSheet defaultKind={kind === 'tout' ? 'autre' : kind} onClose={() => setPublishing(false)} onPublished={(n) => setItems((p) => [n, ...p])} />

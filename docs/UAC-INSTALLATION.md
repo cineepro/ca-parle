@@ -1,6 +1,6 @@
 # Espace UAC — installation pas à pas
 
-L'onglet **UAC** de « Ça parle » (menu du jour + actualités) a besoin de **2 collections**, **1 fonction** et **3 variables Netlify**. Compte 15 minutes.
+L'onglet **UAC** de « Ça parle » (menu du jour, actualités, carte du campus) a besoin de **3 collections**, **1 fonction** et **4 variables Netlify**. Compte 15 minutes.
 
 ## 1. Créer les deux collections (script)
 
@@ -15,7 +15,7 @@ APPWRITE_DATABASE_ID=<ta base> \
 node scripts/setupUac.mjs
 ```
 
-Il crée `uac_restaurants` et `uac_news` avec leurs attributs et index. Tu peux le relancer sans risque. Si un index échoue (les attributs n'étaient pas encore prêts), relance-le.
+Il crée `uac_restaurants`, `uac_news` et `uac_places` avec leurs attributs et index. Tu peux le relancer sans risque. Si un index échoue (les attributs n'étaient pas encore prêts), relance-le.
 Contrôle dans la Console Appwrite → Databases : les deux collections existent, onglet *Settings* → *Permissions* : **Users → Read** uniquement (personne ne peut écrire directement : tout passe par la fonction).
 
 ## 2. Créer la fonction `manage-uac`
@@ -32,6 +32,7 @@ Contrôle dans la Console Appwrite → Databases : les deux collections existent
 | `COLLECTION_USERS` | l'ID de la collection des utilisateurs |
 | `COLLECTION_UAC_NEWS` | `uac_news` |
 | `COLLECTION_UAC_RESTAURANTS` | `uac_restaurants` |
+| `COLLECTION_UAC_PLACES` | `uac_places` |
 
 5. Déploie, puis note l'**ID de la fonction** (Settings → Function ID).
 
@@ -43,6 +44,7 @@ Site settings → Environment variables, puis redéploie le site :
 |---|---|
 | `VITE_APPWRITE_COLLECTION_UAC_NEWS` | `uac_news` |
 | `VITE_APPWRITE_COLLECTION_UAC_RESTAURANTS` | `uac_restaurants` |
+| `VITE_APPWRITE_COLLECTION_UAC_PLACES` | `uac_places` |
 | `VITE_APPWRITE_FUNCTION_MANAGE_UAC` | l'ID de la fonction `manage-uac` |
 
 ## 4. Remplir le menu et tester
@@ -57,5 +59,14 @@ Site settings → Environment variables, puis redéploie le site :
 - Un auteur supprime ses propres actualités ; un modérateur supprime ou masque n'importe laquelle.
 - Au maximum 5 restaurants (l'éditeur n'en propose pas plus).
 
+## 5. La carte du campus
+1. **Collection `uac_places`** (si tu la crées à la main) : Users → Read seulement ; attributs `name` (String 100, requis), `kind` (String 20, requis), `latitude` (Float, -90 à 90, requis), `longitude` (Float, -180 à 180, requis), `description` (String 500), `active` (Boolean, défaut true) ; index `idx_active_kind` (Key, `active` ASC puis `kind` ASC).
+2. **Mise à jour de la fonction `get-route`** : redéploie-la (elle sait maintenant calculer un trajet à pied). Elle utilise ta clé `OPENROUTESERVICE_API_KEY` déjà en place.
+3. **Remplir les lieux** : Console → UAC → « Lieux du campus ».
+   - **Importer depuis OpenStreetMap** : cherche les amphis, banques, commerces, etc. connus autour du campus ; tu coches ceux que tu gardes. OpenStreetMap est souvent incomplet à Abomey-Calavi.
+   - **+ Ajouter un lieu** : nom, type, puis touche la carte à l'endroit exact.
+4. **Centre de la carte** : le point d'ouverture est dans `src/features/uac/config.ts` (`CAMPUS_CENTER`, en [longitude, latitude]). C'est une valeur approximative : ajuste-la si la carte s'ouvre à côté du campus.
+5. Dans l'onglet UAC, le bouton **Carte du campus** ouvre la carte : recherche, filtres par type, et **Y aller** (trajet à pied depuis la position de l'étudiant, ou en voiture s'il est à plus de 6 km).
+
 ## Pas encore fait
-La **carte du campus** (étape 2) et le **guide de l'UAC** (étape 4).
+Le **guide de l'UAC** (étape 4).

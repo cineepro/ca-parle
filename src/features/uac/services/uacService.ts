@@ -4,7 +4,7 @@ import { DATABASE_ID, COLLECTIONS, FUNCTIONS } from '@/api/constants';
 import { callFunction } from '@/api/functionsClient';
 import { Query } from 'appwrite';
 import type { Models } from 'appwrite';
-import type { NewsKind, WeekMenu } from '../config';
+import type { NewsKind, PlaceKind, WeekMenu } from '../config';
 import { parseSchedule } from '../lib/menu';
 
 export interface UacNews extends Models.Document {
@@ -41,6 +41,24 @@ const toRestaurant = (d: UacRestaurantDoc): UacRestaurant => ({
     id: d.$id, name: d.name, place: d.place || '', order: d.order ?? 0, active: d.active !== false, menu: parseSchedule(d.schedule),
 });
 
+export interface UacPlace extends Models.Document {
+    name: string;
+    kind: PlaceKind;
+    latitude: number;
+    longitude: number;
+    description?: string;
+    active: boolean;
+}
+
+export interface PlaceCandidate {
+    osmId: string;
+    name: string;
+    kind: PlaceKind;
+    latitude: number;
+    longitude: number;
+    description?: string;
+}
+
 export interface NewsInput {
     kind: NewsKind;
     title: string;
@@ -51,6 +69,20 @@ export interface NewsInput {
 }
 
 export const uacService = {
+    async listPlaces(includeInactive = false): Promise<UacPlace[]> {
+        if (!COLLECTIONS.UAC_PLACES) return [];
+        const queries = [Query.orderAsc('name'), Query.limit(500)];
+        if (!includeInactive) queries.unshift(Query.equal('active', true));
+        const r = await databases.listDocuments<UacPlace>(DATABASE_ID, COLLECTIONS.UAC_PLACES, queries);
+        return r.documents;
+    },
+    savePlace: (p: { id?: string; name: string; kind: PlaceKind; latitude: number; longitude: number; description?: string; active?: boolean }) =>
+        callFunction(FUNCTIONS.MANAGE_UAC, { action: 'save_place', ...p }),
+    deletePlace: (id: string) => callFunction(FUNCTIONS.MANAGE_UAC, { action: 'delete_place', id }),
+    savePlaces: (places: PlaceCandidate[]) => callFunction<{ saved: number }>(FUNCTIONS.MANAGE_UAC, { action: 'save_places', places }),
+    importOsmPlaces: (latitude: number, longitude: number, radius: number) =>
+        callFunction<{ candidates: PlaceCandidate[]; found: number }>(FUNCTIONS.MANAGE_UAC, { action: 'import_osm_places', latitude, longitude, radius }),
+
     async listRestaurants(includeInactive = false): Promise<UacRestaurant[]> {
         if (!COLLECTIONS.UAC_RESTAURANTS) return [];
         const queries = [Query.orderAsc('order'), Query.limit(10)];

@@ -17,12 +17,14 @@ export default async ({ req, res, error }) => {
     try {
         const body = req.bodyJson ?? JSON.parse(req.body || '{}');
         const { fromLat, fromLng, toLat, toLng } = body;
+        // Profil facultatif : « driving-car » par défaut (comportement d'origine) ; la carte du campus demande « foot-walking ».
+        const profile = ['driving-car', 'foot-walking', 'cycling-regular'].includes(body.profile) ? body.profile : 'driving-car';
 
         if ([fromLat, fromLng, toLat, toLng].some((v) => typeof v !== 'number' || Number.isNaN(v))) {
             return res.json({ success: false, error: 'Coordonnées manquantes ou invalides.' }, 400);
         }
 
-        const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${fromLng},${fromLat}&end=${toLng},${toLat}`;
+        const url = `https://api.openrouteservice.org/v2/directions/${profile}?api_key=${ORS_API_KEY}&start=${fromLng},${fromLat}&end=${toLng},${toLat}`;
         const response = await fetch(url);
 
         if (!response.ok) {

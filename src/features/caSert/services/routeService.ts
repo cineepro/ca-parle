@@ -10,7 +10,7 @@ export interface RouteResult {
 }
 
 export const routeService = {
-    async getRoute(fromLat: number, fromLng: number, toLat: number, toLng: number): Promise<RouteResult> {
-        return callFunction(FUNCTIONS.GET_ROUTE, { fromLat, fromLng, toLat, toLng });
+    async getRoute(fromLat: number, fromLng: number, toLat: number, toLng: number, profile: 'driving-car' | 'foot-walking' = 'driving-car'): Promise<RouteResult> {
+        return callFunction(FUNCTIONS.GET_ROUTE, { fromLat, fromLng, toLat, toLng, profile });
     },
 };
