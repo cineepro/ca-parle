@@ -9,11 +9,12 @@
 //     { action: 'save_restaurant', id?, name, place, order, active, schedule }
 //     { action: 'delete_restaurant', id }
 //     { action: 'save_place', id?, name, kind, latitude, longitude, description, active }   (lieu du campus)
+//     { action: 'resolve_map_links', items: [{ key, url }] }   (liens Google Maps → coordonnées, 15 maximum par appel)
 //     { action: 'save_places', places: [...] } / { action: 'delete_place', id }
 //     { action: 'import_osm_places', latitude, longitude, radius }   (propose des lieux depuis OpenStreetMap)
 // La lecture du menu et des actualités visibles se fait directement depuis l'app (permission de lecture « utilisateurs »).
 import { Client, Databases, ID, Query } from 'node-appwrite';
-import { MAX_NEWS_PER_DAY, validateNews, validateRestaurant, validatePlace, buildOverpassQuery, mapOsmElement, dedupeCandidates, MAX_OSM_RESULTS } from './lib.js';
+import { MAX_NEWS_PER_DAY, validateNews, validateRestaurant, validatePlace, resolveMapLink, buildOverpassQuery, mapOsmElement, dedupeCandidates, MAX_OSM_RESULTS } from './lib.js';
 
 export default async ({ req, res, error }) => {
     const callerId = req.headers['x-appwrite-user-id'];
@@ -111,6 +112,21 @@ export default async ({ req, res, error }) => {
                     saved += 1;
                 }
                 return res.json({ success: true, saved });
+            }
+
+            case 'resolve_map_links': {
+                // Transforme des liens Google Maps en coordonnées (rien n'est enregistré ici).
+                const denied = needMod(); if (denied) return denied;
+                const items = (Array.isArray(body.items) ? body.items : []).slice(0, 15);
+                const out = [];
+                for (let i = 0; i < items.length; i += 5) {
+                    const batch = items.slice(i, i + 5);
+                    out.push(...await Promise.all(batch.map(async (it) => {
+                        const r = await resolveMapLink(String(it?.url || ''));
+                        return { key: String(it?.key ?? ''), ...r };
+                    })));
+                }
+                return res.json({ success: true, results: out });
             }
 
             case 'delete_place': {

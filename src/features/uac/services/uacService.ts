@@ -79,7 +79,15 @@ export const uacService = {
     savePlace: (p: { id?: string; name: string; kind: PlaceKind; latitude: number; longitude: number; description?: string; active?: boolean }) =>
         callFunction(FUNCTIONS.MANAGE_UAC, { action: 'save_place', ...p }),
     deletePlace: (id: string) => callFunction(FUNCTIONS.MANAGE_UAC, { action: 'delete_place', id }),
-    savePlaces: (places: PlaceCandidate[]) => callFunction<{ saved: number }>(FUNCTIONS.MANAGE_UAC, { action: 'save_places', places }),
+    async resolveMapLinks(items: { key: string; url: string }[]): Promise<{ key: string; latitude?: number; longitude?: number; error?: string }[]> {
+        const all: { key: string; latitude?: number; longitude?: number; error?: string }[] = [];
+        for (let i = 0; i < items.length; i += 15) { // la fonction en accepte 15 par appel
+            const r = await callFunction<{ results: typeof all }>(FUNCTIONS.MANAGE_UAC, { action: 'resolve_map_links', items: items.slice(i, i + 15) });
+            all.push(...r.results);
+        }
+        return all;
+    },
+    savePlaces: (places: Omit<PlaceCandidate, 'osmId'>[]) => callFunction<{ saved: number }>(FUNCTIONS.MANAGE_UAC, { action: 'save_places', places }),
     importOsmPlaces: (latitude: number, longitude: number, radius: number) =>
         callFunction<{ candidates: PlaceCandidate[]; found: number }>(FUNCTIONS.MANAGE_UAC, { action: 'import_osm_places', latitude, longitude, radius }),
 

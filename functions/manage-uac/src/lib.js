@@ -125,3 +125,65 @@ export function dedupeCandidates(candidates, existing) {
     }
     return kept;
 }
+
+// ───────────── Liens Google Maps → coordonnées ─────────────
+const COORD = '(-?\\d{1,3}\\.\\d{3,})';
+const inRange = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+
+// Cherche des coordonnées dans une adresse ou un texte. Ordre : épingle exacte (!3d…!4d…), puis centre de la vue (@lat,lng),
+// puis paramètres (q=, ll=, destination=, center=).
+export function extractCoords(text) {
+    const s = decodeURIComponent(String(text || '').replace(/%(?![0-9a-fA-F]{2})/g, '%25'));
+    const patterns = [
+        new RegExp(`!3d${COORD}!4d${COORD}`),
+        new RegExp(`@${COORD},${COORD}`),
+        new RegExp(`[?&](?:q|ll|destination|center|query)=${COORD}[,+ ]\\s*${COORD}`),
+    ];
+    for (const re of patterns) {
+        const m = s.match(re);
+        if (m && inRange(Number(m[1]), Number(m[2]))) return { latitude: Number(m[1]), longitude: Number(m[2]) };
+    }
+    return null;
+}
+
+// Seuls les domaines Google Maps sont suivis : la fonction ne doit pas pouvoir servir à visiter n'importe quel site.
+export function isAllowedMapsUrl(raw) {
+    let u;
+    try { u = new URL(raw); } catch { return false; }
+    if (u.protocol !== 'https:') return false;
+    const h = u.hostname.toLowerCase();
+    if (h === 'goo.gl' || h === 'maps.app.goo.gl') return true;
+    if (h === 'consent.google.com') return true;
+    if (/^(www\.)?google\.[a-z.]{2,6}$/.test(h)) return u.pathname.startsWith('/maps');
+    return h === 'maps.google.com';
+}
+
+// Suit les redirections à la main (5 maximum), en restant sur les domaines autorisés.
+export async function resolveMapLink(url, fetchImpl = fetch) {
+    let current = String(url || '').trim();
+    const direct = extractCoords(current);
+    if (direct && isAllowedMapsUrl(current)) return direct;
+    for (let hop = 0; hop < 6; hop += 1) {
+        if (!isAllowedMapsUrl(current)) return { error: 'Lien non reconnu (attendu : un lien Google Maps).' };
+        let res;
+        try {
+            res = await fetchImpl(current, { redirect: 'manual', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VanessaUAC/1.0)', 'Accept-Language': 'fr' }, signal: AbortSignal.timeout(6000) });
+        } catch { return { error: 'Le lien ne répond pas.' }; }
+        const loc = res.headers?.get?.('location');
+        if (res.status >= 300 && res.status < 400 && loc) {
+            const next = new URL(loc, current).toString();
+            let target = next;
+            // Page de consentement : la vraie adresse est dans le paramètre « continue ».
+            const u = new URL(next);
+            if (u.hostname === 'consent.google.com' && u.searchParams.get('continue')) target = u.searchParams.get('continue');
+            const found = extractCoords(target);
+            if (found) return found;
+            current = target;
+            continue;
+        }
+        // Pas de redirection : dernier recours, chercher dans le contenu de la page.
+        const body = (await res.text().catch(() => '')).slice(0, 400000);
+        return extractCoords(body) || { error: 'Coordonnées introuvables dans ce lien.' };
+    }
+    return { error: 'Trop de redirections.' };
+}

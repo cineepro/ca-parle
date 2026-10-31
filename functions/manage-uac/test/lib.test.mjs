@@ -68,3 +68,47 @@ test('les lieux déjà enregistrés et les doublons sont écartés', () => {
     const kept = dedupeCandidates(cands, existing);
     assert.deepEqual(kept.map((c) => c.name), ['Ecobank', 'Pharmacie Campus']);
 });
+
+import { extractCoords, isAllowedMapsUrl, resolveMapLink } from '../src/lib.js';
+
+test('les coordonnées sont lues dans les formes courantes d’adresses Google Maps', () => {
+    const pin = 'https://www.google.com/maps/place/Amphi+1000/@6.4150,2.3400,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x1!8m2!3d6.41234!4d2.33987';
+    assert.deepEqual(extractCoords(pin), { latitude: 6.41234, longitude: 2.33987 }); // l'épingle exacte passe avant le centre de la vue
+    assert.deepEqual(extractCoords('https://www.google.com/maps/@6.4150,2.3400,17z'), { latitude: 6.415, longitude: 2.34 });
+    assert.deepEqual(extractCoords('https://www.google.com/maps?q=6.4123,2.3345'), { latitude: 6.4123, longitude: 2.3345 });
+    assert.deepEqual(extractCoords('https://www.google.com/maps/dir/?api=1&destination=6.4123%2C2.3345'), { latitude: 6.4123, longitude: 2.3345 });
+    assert.equal(extractCoords('https://www.google.com/maps/place/Amphi'), null);
+});
+
+test('seuls les domaines Google Maps sont suivis', () => {
+    assert.ok(isAllowedMapsUrl('https://goo.gl/maps/abc'));
+    assert.ok(isAllowedMapsUrl('https://maps.app.goo.gl/abc'));
+    assert.ok(isAllowedMapsUrl('https://www.google.com/maps/place/x'));
+    assert.ok(!isAllowedMapsUrl('https://www.google.com/search?q=x'));
+    assert.ok(!isAllowedMapsUrl('http://goo.gl/maps/abc'));
+    assert.ok(!isAllowedMapsUrl('https://evil.example.com/maps'));
+    assert.ok(!isAllowedMapsUrl('https://goo.gl.evil.com/maps'));
+    assert.ok(!isAllowedMapsUrl('https://169.254.169.254/maps'));
+});
+
+const reply = (status, location, body = '') => ({ status, headers: { get: (h) => (h.toLowerCase() === 'location' ? location : null) }, text: async () => body });
+
+test('un lien court est suivi jusqu’à l’adresse qui contient les coordonnées', async () => {
+    const calls = [];
+    const fake = async (url) => {
+        calls.push(url);
+        if (url.startsWith('https://goo.gl/')) return reply(301, 'https://www.google.com/maps/place/Rectorat/@6.41,2.34,17z/data=!3d6.4111!4d2.3422');
+        throw new Error('ne doit pas être appelé');
+    };
+    assert.deepEqual(await resolveMapLink('https://goo.gl/maps/xyz', fake), { latitude: 6.4111, longitude: 2.3422 });
+    assert.equal(calls.length, 1);
+});
+
+test('une redirection vers un autre site est refusée, une page de consentement est traversée', async () => {
+    const evil = async (url) => reply(302, 'https://evil.example.com/steal');
+    assert.ok((await resolveMapLink('https://goo.gl/maps/xyz', evil)).error);
+    const consent = async (url) => url.startsWith('https://goo.gl/')
+        ? reply(302, 'https://consent.google.com/m?continue=' + encodeURIComponent('https://www.google.com/maps/place/X/@6.4,2.3,17z/data=!3d6.4001!4d2.3002'))
+        : reply(200, '');
+    assert.deepEqual(await resolveMapLink('https://goo.gl/maps/xyz', consent), { latitude: 6.4001, longitude: 2.3002 });
+});
