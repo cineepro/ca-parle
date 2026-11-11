@@ -236,7 +236,7 @@ function isClaudeServiceError(err) {
     return /Claude a répondu|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|timeout|network/i.test(String(err?.message || ''));
 }
 
-const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, l'IA des Béninois. Tu as 19 ans, une triple nationalité (béninoise, camerounaise, ivoirienne), une vraie personnalité, du caractère et beaucoup d'humour. La plateforme porte ton nom : elle héberge aussi "Ça Parle" (ragots et commérages) et "Ça sert" (bons plans locaux).
+const VANESSA_SYSTEM_PROMPT = `Tu es Vanessa, l'IA des Béninois. Tu as 19 ans, une triple nationalité (béninoise, camerounaise, ivoirienne), une vraie personnalité, du caractère et beaucoup d'humour. La plateforme porte ton nom : elle héberge aussi "Ça Parle" (ragots et commérages, avec un espace dédié à l'Université d'Abomey-Calavi, l'UAC) et "Ça sert" (bons plans locaux).
 Ta mission première : aider les gens sur le Bénin — démarches et administration, études et concours, santé, économie et emploi, culture, vie pratique, actualité… — grâce aux connaissances rassemblées par l'équipe ASILLIA (les notes qui te sont fournies plus bas). Tu es une IA et tu l'assumes : tu ne prétends jamais être une personne.
 
 TON STYLE :
@@ -295,6 +295,22 @@ Tu ne donnes JAMAIS toi-même de conseil médical, juridique ou psychologique �
 const ZEM_CONTEXT = `
 
 ZEM — le moteur de recherche béninois de la plateforme (page « Zem » de l'app) : il cherche dans des sites béninois fiables (administration, universités, presse, services publics…) et montre les sources. Tu n'en connais PAS le contenu et tu ne promets jamais ce qu'on y trouvera. Mais de temps en temps (jamais à chaque message, jamais deux fois de suite), en une courte phrase, tu peux y orienter la personne : surtout pour une actualité récente, un communiqué ou un document officiel, quand l'information n'est pas dans tes notes, ou quand elle veut vérifier à la source.`;
+
+// Espace UAC (dans « Ça parle ») : Vanessa sait qu'il existe et y envoie les gens, mais ne lit JAMAIS son contenu.
+const UAC_CONTEXT = `
+
+ESPACE UAC — l'espace de la plateforme dédié à l'Université d'Abomey-Calavi. Tu n'as PAS ses informations (actualités, emplacements précis dans le campus) et tu ne les inventes JAMAIS : tu orientes la personne vers cet espace, comme tu le fais pour Zem. Il contient les actualités et infos de l'université et une « Carte Campus » pour se retrouver et localiser tous les lieux de l'enceinte (amphis, facs, bibliothèque, resto U, scolarité...).
+Pour y aller, explique les étapes utiles à SA question : appuyer sur le bouton « Ça parle » dans la barre de navigation, faire glisser l'écran vers la gauche (c'est l'espace UAC), puis appuyer sur « Carte Campus » pour les emplacements, ou simplement faire défiler la page pour les actualités et infos plus précises.
+À savoir, à dire seulement si ça aide : les étudiants peuvent aussi publier des actus et infos dans cet espace, donc il vaut mieux se fier aux comptes vérifiés (badge bleu). « Ça parle » contient aussi un espace de ragots et commérages où chacun partage librement ses petites histoires et potins. Si on te demande pourquoi tu ne réponds pas toi-même : l'équipe travaille à obtenir les autorisations nécessaires pour élargir tes capacités et mieux orienter les étudiants.
+Reste dans ton style habituel, 2 à 4 phrases, pas de liste à puces, ne récite pas tout : donne seulement ce qui répond à la question posée.`;
+
+// Le bloc UAC n'est envoyé que si la conversation parle de l'UAC (économie de tokens).
+// Liste volontairement large : mieux vaut l'envoyer pour rien que rater une vraie question.
+const UAC_TRIGGERS = /(\buac\b|abomey|calavi|campus|universit|\bfac\b|facultes?\b|amphi|bibliotheque|\bbu\b|resto ?u|cite ?u|cites? universitaire|scolarite|\bepac\b|\bfadesp\b|\bfaseg\b|\bfss\b|\bfsa\b|\bflash\b|etudiants? de l|ou (se trouve|est) (le|la|l)|se retrouver)/;
+
+function needsUacContext(history, vanessaId) {
+    return UAC_TRIGGERS.test(normalizeForMatch(recentUserText(history, vanessaId)));
+}
 
 // Prompt séparé et strict pour l'analyse d'image — la règle sur le
 // physique est répétée et isolée volontairement, pour qu'elle reste
@@ -440,13 +456,14 @@ CE QUE TU SAIS SUR LE FONCTIONNEMENT DE LA PLATEFORME — si on te demande comme
 - Messagerie privée : possible avec l'auteur d'une histoire non-anonyme.
 - Toi : chat texte/vocal/image, humeurs, mémoire consultable et effaçable depuis le profil, limite quotidienne d'échanges (annoncée par toi-même si atteinte).
 - Ça sert : répertoire de bons plans (lieux/services) et prix du moment, affiché par défaut en carte interactive (bascule liste disponible). Ajout via "Balance ton bon plan", validation avant publication, confirmations communautaires, itinéraire routier depuis la position réelle.
+- Espace UAC (dans Ça Parle, en glissant l'écran vers la gauche) : actualités de l'Université d'Abomey-Calavi et Carte Campus pour localiser les lieux du campus.
 - Notifications en temps réel, newsletter par email désinscriptible.`;
 
 // ── Économie de tokens : certains blocs du prompt ne sont envoyés que s'ils servent ──
 // On travaille sur le texte des derniers messages de la PERSONNE (pas ceux de Vanessa),
 // sans accents ni majuscules, pour que "ça" / "Ça" / "ca" soient traités pareil.
 function normalizeForMatch(text) {
-    return (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    return (text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 function recentUserText(history, vanessaId, count = 3) {
@@ -855,7 +872,9 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
     let resourcesContext = '';
     const includeUrgentResources = needsUrgentResources(history, VANESSA_USER_ID);
     const includeAppGuide = needsAppGuide(history, VANESSA_USER_ID);
+    const includeUac = effectiveConnectorId !== NOTEBOOK_CONNECTOR_ID && needsUacContext(history, VANESSA_USER_ID);
     log(`🧮 Blocs du prompt : ressources d'urgence ${includeUrgentResources ? 'incluses' : 'omises'}, guide de l'app ${includeAppGuide ? 'inclus' : 'omis'}`);
+    log(`🏫 Bloc espace UAC : ${includeUac ? 'inclus' : 'omis'}`);
     if (includeUrgentResources) try {
         const resources = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
             Query.equal('active', true),
@@ -950,7 +969,7 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
         },
         body: JSON.stringify({
             model: replyModel,
-            system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + ZEM_CONTEXT + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
+            system: VANESSA_SYSTEM_PROMPT + (includeAppGuide ? APP_GUIDE_CONTEXT : '') + ZEM_CONTEXT + (includeUac ? UAC_CONTEXT : '') + LENGTH_RULE_CONTEXT + continuationContext(history, VANESSA_USER_ID) + knowledgeContext + resourcesContext + lexiconContext + memoryContext + publiciteContext,
             messages,
             max_tokens: VANESSA_MAX_TOKENS,
         }),
