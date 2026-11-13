@@ -30,6 +30,10 @@ export const COLLECTIONS = {
     MESSAGES: import.meta.env.VITE_APPWRITE_COLLECTION_MESSAGES || '',
     VANESSA_KNOWLEDGE: import.meta.env.VITE_APPWRITE_COLLECTION_VANESSA_KNOWLEDGE || '',
 
+    // Pop-ups d'information affichés à l'ouverture d'une conversation avec Vanessa
+    // (messages écrits à la main depuis la Console Appwrite). Vide = aucun pop-up.
+    VANESSA_POPUPS: import.meta.env.VITE_APPWRITE_COLLECTION_VANESSA_POPUPS || '',
+
     // "Ça sert" — répertoire local et prix du marché
     LOCAL_SPOTS: import.meta.env.VITE_APPWRITE_COLLECTION_LOCAL_SPOTS || '',
     SPOT_CONFIRMATIONS: import.meta.env.VITE_APPWRITE_COLLECTION_SPOT_CONFIRMATIONS || '',

@@ -18,10 +18,15 @@
 // ingérée doit être activée manuellement dans /moderation après relecture,
 // exactement comme le principe déjà en place pour le lexique et les
 // ressources d'urgence. Cette Function ne fait que PROPOSER, jamais publier.
+//
+// 🧹 Anti-doublons : avant de créer un brouillon, on compare le texte du résumé aux notes déjà présentes du même
+// connecteur (actives ou non). Une information déjà connue n'est PAS recréée (voir dedupe.js). Sans cela, la même
+// actualité reparaissant sous une autre adresse était résumée à nouveau, avec d'autres mots.
 import { Client, Databases, Query, ID } from 'node-appwrite';
 import { createHash } from 'crypto';
 import Parser from 'rss-parser';
 import { convert as htmlToText } from 'html-to-text';
+import { tokensOf, similarity, looksLikeFailedSummary, cleanSummary, NEAR_DUPLICATE_THRESHOLD } from './dedupe.js';
 
 const FETCH_USER_AGENT = 'VanessaConnecteurs/1.0 (kinemaplus.com)';
 
@@ -142,15 +147,58 @@ async function createKnowledgeDoc(databases, DATABASE_ID, COLLECTION_VANESSA_KNO
     return databases.createDocument(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, ID.unique(), data);
 }
 
-async function saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, content, ANTHROPIC_API_KEY) {
+// Notes déjà connues PAR CONNECTEUR (actives ou en attente), chargées une seule fois par exécution puis
+// complétées au fil des créations : c'est ce qui permet de repérer une information déjà présente.
+const knownNotesByConnector = new Map();
+
+async function loadKnownNotes(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId) {
+    if (knownNotesByConnector.has(connectorId)) return knownNotesByConnector.get(connectorId);
+    let notes = [];
+    try {
+        const result = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+            Query.equal('connectorId', connectorId),
+            Query.orderDesc('createdAt'),
+            Query.limit(500),
+            Query.select(['content']),
+        ]);
+        notes = result.documents.map((d) => ({ id: d.$id, tokens: tokensOf(d.content) }));
+    } catch {
+        // Lecture impossible : on continue SANS vérification plutôt que de bloquer toute la synchronisation.
+    }
+    knownNotesByConnector.set(connectorId, notes);
+    return notes;
+}
+
+// Renvoie true si une note a été créée, false si le résumé a été écarté (inutilisable ou déjà connu).
+async function saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId, rawContent, ANTHROPIC_API_KEY, log) {
+    const content = cleanSummary(rawContent);
+    if (!content || looksLikeFailedSummary(content)) {
+        log('    ⚠️ Résumé inutilisable (refus de l\'IA ou code collé) — note non créée.');
+        return false;
+    }
+
+    const known = await loadKnownNotes(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, connectorId);
+    const tokens = tokensOf(content);
+    let best = null;
+    for (const k of known) {
+        const s = similarity(k.tokens, tokens);
+        if (s >= NEAR_DUPLICATE_THRESHOLD && (!best || s > best.s)) best = { id: k.id, s };
+    }
+    if (best) {
+        log(`    ♻️ Information déjà présente (note ${best.id}, ressemblance ${best.s.toFixed(2)}) — note non créée.`);
+        return false;
+    }
+
     const keywords = await generateKeywords(content, ANTHROPIC_API_KEY);
-    await createKnowledgeDoc(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, {
+    const created = await createKnowledgeDoc(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, {
         category: 'actualite',
         content,
         connectorId,
         active: false, // ⚠️ toujours désactivé à la création — relecture humaine obligatoire
         createdAt: new Date().toISOString(),
     }, keywords);
+    known.push({ id: created.$id, tokens });
+    return true;
 }
 
 // Persiste IMMÉDIATEMENT le hash d'un item traité avec succès, au lieu
@@ -211,11 +259,11 @@ async function syncRss(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COL
 
             const summary = await summarizeForKnowledge(`${item.title}\n\n${text}`, sourceName, ANTHROPIC_API_KEY);
             if (summary) {
-                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
-                newEntries++;
+                const created = await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY, log);
+                if (created) newEntries++;
             }
             // Persisté immédiatement, item par item — plus d'attente de
-            // fin de boucle.
+            // fin de boucle. (Aussi quand le résumé a été écarté comme doublon : inutile de le retenter.)
             await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, source, hashOf(item.link));
         } catch (err) {
             log(`    Échec sur ${item.link} : ${err.message}`);
@@ -254,8 +302,8 @@ async function syncSinglePage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLED
     const summary = await summarizeForKnowledge(text, sourceName, ANTHROPIC_API_KEY);
     let newEntries = 0;
     if (summary) {
-        await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
-        newEntries = 1;
+        const created = await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY, log);
+        if (created) newEntries = 1;
     }
     await databases.updateDocument(DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, source.$id, {
         processedItemHashes: appendHashes(source.processedItemHashes, [contentHash]),
@@ -339,8 +387,8 @@ async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLE
 
             const summary = await summarizeForKnowledge(text, sourceName, ANTHROPIC_API_KEY);
             if (summary) {
-                await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY);
-                newEntries++;
+                const created = await saveDraftKnowledge(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, source.connectorId, summary, ANTHROPIC_API_KEY, log);
+                if (created) newEntries++;
             }
             await persistHashIncrementally(databases, DATABASE_ID, COLLECTION_CONNECTOR_SOURCES, source, hashOf(link));
         } catch (err) {
@@ -358,6 +406,7 @@ async function syncListingPage(databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLE
 
 export default async ({ req, res, log, error }) => {
     log('🚀 Function démarrée.');
+    knownNotesByConnector.clear(); // une exécution peut réutiliser le processus de la précédente : on repart de zéro
 
     const client = new Client()
         .setEndpoint(process.env.APPWRITE_FUNCTION_API_ENDPOINT)

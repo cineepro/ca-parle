@@ -16,6 +16,7 @@ import { VANESSA_USER_ID } from '@/api/constants';
 import { VOICE_MESSAGES_ENABLED, LIVE_CALL_ENABLED } from '@/config/features';
 import { Camera, Sparkles } from 'lucide-react';
 import { UserName } from '@/features/profile/components/UserName';
+import { VanessaInfoPopup } from '@/features/vanessa/components/VanessaInfoPopup';
 
 export default function ConversationPage() {
     const { id } = useParams<{ id: string }>();
@@ -219,6 +220,10 @@ export default function ConversationPage() {
 
     return (
         <div className="max-w-2xl mx-auto flex flex-col relative" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
+            {/* Pop-up d'information tiré au hasard à chaque ouverture d'une conversation
+                avec Vanessa (messages écrits depuis la collection vanessa_popups). */}
+            {isVanessaConversation && <VanessaInfoPopup conversationId={id!} />}
+
             <div className="bg-white border-b border-gray-100 sticky top-14 md:top-0 z-10">
                 <div className="flex items-center gap-3 px-4 py-3">
                     <Link to="/messages" className="text-gray-400 hover:text-gray-600">←</Link>
