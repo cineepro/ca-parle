@@ -1,0 +1,43 @@
+— QUESTIONS AVEC BONNE NOTE —
+✅ rang 2 | sens 0.86 | mots 10.15 | doublons retirés 0 | 866 ms | c'est qui qui a gagné la présidentielle d'avril 2026 ?
+✅ rang 3 | sens 0.85 | mots 15.05 | doublons retirés 0 | 215 ms | le président élu prend fonction quand ?
+✅ rang 1 | sens 0.87 | mots 10.71 | doublons retirés 0 | 215 ms | il y a des bus pour les étudiants ? c'est combien le ticket ?
+✅ rang 1 | sens 0.87 | mots 7.53 | doublons retirés 0 | 195 ms | c'est quoi le SEMO 2 ?
+✅ rang 1 | sens 0.84 | mots 10.79 | doublons retirés 0 | 211 ms | le Luxembourg va financer quoi chez nous ?
+✅ rang 2 | sens 0.84 | mots 10.61 | doublons retirés 0 | 187 ms | les recrutements des enseignants ça en est où ?
+✅ rang 1 | sens 0.89 | mots 22.68 | doublons retirés 0 | 218 ms | la distribution des kits scolaires cette année
+✅ rang 1 | sens 0.88 | mots 25.10 | doublons retirés 0 | 209 ms | la liste des admis au concours des douanes
+✅ rang 1 | sens 0.87 | mots 23.46 | doublons retirés 0 | 196 ms | les travaux de la route Dassa-Zoumè coûtent combien ?
+✅ rang 2 | sens 0.82 | mots 14.23 | doublons retirés 0 | 214 ms | où avoir un acte de naissance gratuit pour mon petit frère ?
+✅ rang 1 | sens 0.88 | mots 18.43 | doublons retirés 0 | 201 ms | comment postuler pour les restaurants de la route des pêches ?
+✅ rang 1 | sens 0.88 | mots 13.44 | doublons retirés 0 | 294 ms | pourquoi le policier a brûlé son commissariat ?
+✅ rang 2 | sens 0.87 | mots 13.54 | doublons retirés 0 | 213 ms | c'est quoi les six pôles de développement ?
+❌ absente | sens 0.87 | mots 8.60 | doublons retirés 0 | 195 ms | Azannaï est toujours en prison ?
+✅ rang 2 | sens 0.91 | mots 27.09 | doublons retirés 0 | 208 ms | médicaments contrefaits saisis à Kétonou
+✅ rang 2 | sens 0.85 | mots 17.43 | doublons retirés 0 | 207 ms | je veux faire l'examen spécial d'entrée à l'UAC, ça se passe comment ?
+✅ rang 1 | sens 0.88 | mots 16.26 | doublons retirés 0 | 202 ms | c'est quoi le programme ARES à l'UAC ?
+✅ rang 1 | sens 0.86 | mots 19.64 | doublons retirés 0 | 206 ms | les étudiants handicapés sont accompagnés à l'UAC ?
+✅ rang 1 | sens 0.86 | mots 13.07 | doublons retirés 0 | 205 ms | Vanessa elle a été créée par qui ?
+✅ rang 1 | sens 0.87 | mots 21.17 | doublons retirés 0 | 200 ms | est-ce que je peux gagner de l'argent avec Ça Parle ?
+✅ rang 1 | sens 0.90 | mots 12.99 | doublons retirés 0 | 188 ms | comment intégrer Vanessa dans mon application ?
+
+— QUESTIONS HORS SUJET (rien de pertinent attendu) —
+   sens 0.81 | mots 5.93 | quelle est la recette du gâteau au chocolat ?
+   sens 0.82 | mots 14.49 | qui a gagné la ligue des champions ?
+   sens 0.81 | mots 6.10 | comment réparer l'écran de mon téléphone ?
+   sens 0.81 | mots 0.00 | raconte-moi une blague
+   sens 0.80 | mots 4.93 | c'est quoi le bitcoin ?
+   sens 0.79 | mots 7.30 | quel temps fera-t-il demain à Paris ?
+   sens 0.78 | mots 4.86 | comment apprendre à jouer de la guitare ?
+   sens 0.83 | mots 7.80 | donne-moi des conseils pour maigrir
+   sens 0.82 | mots 8.53 | comment faire un CV pour un emploi en France ?
+   sens 0.81 | mots 8.86 | qui est le président des États-Unis ?
+
+📊 Bonne note (doublons compris) dans le top 1 : 13/21, top 3 : 20/21, top 8 : 20/21 (0 doublons retirés au total)
+
+Scores du MEILLEUR résultat de chaque question :
+  AVEC bonne note   → sens : min 0.82 · médiane 0.87 · max 0.91   |   mots : min 7.53 · médiane 14.23 · max 27.09
+  HORS SUJET        → sens : min 0.78 · médiane 0.81 · max 0.83   |   mots : min 0.00 · médiane 7.30 · max 14.49
+
+Seuil « sens » : les deux groupes se chevauchent (le sens seul ne suffit pas)
+Seuil « mots » : les deux groupes se chevauchent (les mots seuls ne suffisent pas)

@@ -1,0 +1,161 @@
+{
+  "threshold": 0.55,
+  "duplicates": [
+    {
+      "id": "6ac33d57002a1c909ec5",
+      "connectorId": "6aab0549003c2616c932",
+      "keptId": "6ab60e28002955c4f3b1",
+      "similarity": 0.6,
+      "snippet": "Louis Philippe Houndégnon, ancien directeur général de la Police nationale béninoise, a comparu devant la Cour",
+      "keptSnippet": "Louis Philippe Houndégnon, ancien directeur général de la Police nationale du Bénin, a comparu devant la Cour "
+    },
+    {
+      "id": "6ab60e2b00371aa45835",
+      "connectorId": "6aab0549003c2616c932",
+      "keptId": "6ac48ec7002b1a1b465b",
+      "similarity": 0.61,
+      "snippet": "La Chambre d'appel des libertés et de la détention de la CRIET a rejeté la demande de mise en liberté provisoi",
+      "keptSnippet": "La Chambre d'appel des libertés et de la détention de la CRIET a rejeté la demande de mise en liberté provisoi"
+    },
+    {
+      "id": "6ab60e250023a6efe41e",
+      "connectorId": "6aab0549003c2616c932",
+      "keptId": "6ac33d550019202050fb",
+      "similarity": 0.59,
+      "snippet": "Un jeune homme déguisé en «fou» a agressé trois policiers à Agonli-Covè, au Bénin, le 23 septembre 2026. Lors ",
+      "keptSnippet": "Un jeune homme déguisé en « fou » a été interpellé le 23 septembre 2026 à Agonli-Covè après avoir agressé des "
+    },
+    {
+      "id": "6abf06d800375d1e11ef",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06ad000f7c4d74f9",
+      "similarity": 0.57,
+      "snippet": "La loi n°2001-28 du 11 décembre 2001 de la République du Bénin fixe le traitement, les indemnités et les avant",
+      "keptSnippet": "La loi n°2001-28 du 11 décembre 2001 de la République du Bénin détermine le traitement, les indemnités et avan"
+    },
+    {
+      "id": "6abf076800191558132f",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf075b000c07f48803",
+      "similarity": 0.55,
+      "snippet": "En 2022, la Cour constitutionnelle du Bénin a connu une année marquée par des activités juridictionnelles inte",
+      "keptSnippet": "La Cour constitutionnelle du Bénin publie son rapport d'activité 2022, couvrant ses fonctions juridictionnelle"
+    },
+    {
+      "id": "6abf0713000657153cfa",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06ec000e28dd6fe1",
+      "similarity": 0.59,
+      "snippet": "La Cour constitutionnelle proclame définitivement élus Patrice Athanase Guillaume Talon et Mariam Chabi Talata",
+      "keptSnippet": "La Cour constitutionnelle proclame définitivement élus Patrice Athanase Guillaume Talon comme président de la "
+    },
+    {
+      "id": "6abf070e002613ab10ed",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06f9001f536566a1",
+      "similarity": 0.78,
+      "snippet": "La Cour constitutionnelle proclame les résultats provisoires de l'élection présidentielle du 11 avril 2021 au ",
+      "keptSnippet": "La Cour constitutionnelle du Bénin proclame les résultats provisoires de l'élection présidentielle du 11 avril"
+    },
+    {
+      "id": "6abf06c1001db0bedeed",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06a6002e6bf29702",
+      "similarity": 0.63,
+      "snippet": "L'ordonnance n°2018-042/CC/SG de la Cour constitutionnelle du Bénin, datée du 13 juin 2018, crée deux chambres",
+      "keptSnippet": "Cette ordonnance de la Cour constitutionnelle béninoise crée deux chambres de mise en état chargées de recevoi"
+    },
+    {
+      "id": "6abf06fe00014c765f52",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06ec000e28dd6fe1",
+      "similarity": 0.67,
+      "snippet": "La Cour constitutionnelle proclame définitivement élus président de la République et vice-président Patrice At",
+      "keptSnippet": "La Cour constitutionnelle proclame définitivement élus Patrice Athanase Guillaume Talon comme président de la "
+    },
+    {
+      "id": "6abf06cc00044820aa5f",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf067c0003f83fc33f",
+      "similarity": 0.66,
+      "snippet": "La Cour constitutionnelle du Bénin proclame définitivement élus président et vice-président de la République, ",
+      "keptSnippet": "La Cour constitutionnelle du Bénin proclame définitivement élus le duo Kossi Mbueke Romuald Wadagni (président"
+    },
+    {
+      "id": "6abf06d30036ac3663ab",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf06a6002e6bf29702",
+      "similarity": 0.72,
+      "snippet": "L'ordonnance n°2018-042/CC/SG crée deux chambres de mise en état auprès de la Cour constitutionnelle du Bénin,",
+      "keptSnippet": "Cette ordonnance de la Cour constitutionnelle béninoise crée deux chambres de mise en état chargées de recevoi"
+    },
+    {
+      "id": "6abf071e002eacdd6f7c",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf072a0013df331fb4",
+      "similarity": 0.63,
+      "snippet": "La Cour constitutionnelle du Bénin proclame définitivement élu Président de la République Patrice Athanase Gui",
+      "keptSnippet": "La Cour constitutionnelle du Bénin proclame définitivement élu Président de la République Patrice Athanase Gui"
+    },
+    {
+      "id": "6abf06dc00158f845ecf",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf067c0003f83fc33f",
+      "similarity": 0.83,
+      "snippet": "La Cour constitutionnelle du Bénin proclame définitivement élus le duo Kossi Mbueke Romuald Wadagni (président",
+      "keptSnippet": "La Cour constitutionnelle du Bénin proclame définitivement élus le duo Kossi Mbueke Romuald Wadagni (président"
+    },
+    {
+      "id": "6abf069a001b7d471285",
+      "connectorId": "6abec8550002be988a4e",
+      "keptId": "6abf068900087c7ee67f",
+      "similarity": 0.61,
+      "snippet": "La Cour constitutionnelle du Bénin a examiné la loi n°2026-04 modifiant la loi organique sur le Conseil économ",
+      "keptSnippet": "La Cour constitutionnelle du Bénin, saisie le 12 février 2026 par le Président de la République, a examiné la "
+    },
+    {
+      "id": "6ad755510016f8b713d5",
+      "connectorId": "6ad7543b0014da39f8e6",
+      "keptId": "6ad7553c003375be9856",
+      "similarity": 0.73,
+      "snippet": "Du 18 au 30 juin 2026, le Centre de Recherche et d'Accompagnement Pédagogique des Étudiants Handicapés (CRAPEH",
+      "keptSnippet": "Du 18 au 30 juin 2026, le Centre de Recherche et d'Accompagnement Pédagogique des Étudiants Handicapés (CRAPEH"
+    },
+    {
+      "id": "6ad75542001f5788d30f",
+      "connectorId": "6ad7543b0014da39f8e6",
+      "keptId": "6ad755560038a67d37ee",
+      "similarity": 0.8,
+      "snippet": "Le Recteur de l'Université d'Abomey-Calavi a reçu le 7 juillet 2026 une délégation de l'Université Paris Cité,",
+      "keptSnippet": "Le Recteur de l'Université d'Abomey-Calavi a reçu le 7 juillet 2026 une délégation de l'Université Paris Cité "
+    },
+    {
+      "id": "6ad7556e0035e7bd9dc2",
+      "connectorId": "6ad7543b0014da39f8e6",
+      "keptId": "6ad75547002e7d93bde0",
+      "similarity": 0.61,
+      "snippet": "L'Université d'Abomey-Calavi (UAC) a mis en ligne le Cinquième Programme d'Appui Institutionnel (ARES-UAC), ac",
+      "keptSnippet": "L'Université d'Abomey-Calavi (UAC) au Bénin a lancé le Cinquième Programme d'Appui Institutionnel (ARES-UAC), "
+    },
+    {
+      "id": "6ad7555b00323c47e818",
+      "connectorId": "6ad7543b0014da39f8e6",
+      "keptId": "6ad75547002e7d93bde0",
+      "similarity": 0.61,
+      "snippet": "L'Université d'Abomey-Calavi (UAC) a mis en ligne le Cinquième Programme d'Appui Institutionnel (ARES-UAC), ac",
+      "keptSnippet": "L'Université d'Abomey-Calavi (UAC) au Bénin a lancé le Cinquième Programme d'Appui Institutionnel (ARES-UAC), "
+    },
+    {
+      "id": "6ad7558e0018b91e4cd7",
+      "connectorId": "6ad7543b0014da39f8e6",
+      "keptId": "6ad7557d001f95fb49bc",
+      "similarity": 0.61,
+      "snippet": "Le 27 avril 2026, une délégation d'universitaires italiens menée par la Professeure Bianca Gasparrini s'est re",
+      "keptSnippet": "Le 27 avril 2026, une délégation d'universitaires italiens menée par la Professeure Bianca Gasparrini a visité"
+    }
+  ],
+  "suspicious": [
+    "6ac33d45003a2fdd99bf",
+    "6ac33d48003ab7478591"
+  ]
+}

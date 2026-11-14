@@ -34,10 +34,21 @@
 // — jamais pour les réponses de Vanessa (déjà exclues des notifications
 // tout court, voir plus bas). Non bloquant : si Appwrite Messaging n'est
 // pas configuré ou échoue, le message est envoyé quand même.
+//
+// 🔎 RECHERCHE DES CONNAISSANCES — deux moteurs, choisis par la variable QDRANT_SEARCH_MODE de la Function :
+//   - off (défaut) : ancien moteur (aiguillage par IA, puis mots-clés Appwrite, puis tri par IA).
+//   - shadow       : l'ancien moteur répond ; Qdrant cherche en parallèle et la comparaison est écrite dans les
+//                    logs (jamais le texte des questions) — sert à régler les seuils sans aucun risque.
+//   - on           : Qdrant (sens + mots, doublons écartés). Le connecteur est déduit des meilleures notes
+//                    trouvées. Si Qdrant ne répond pas, repli automatique sur l'ancien moteur.
+//   Autres variables (toutes facultatives) : QDRANT_URL, QDRANT_API_KEY, QDRANT_COLLECTION (obligatoires dès que
+//   le mode n'est pas « off »), QDRANT_CANDIDATES (12), QDRANT_TIMEOUT_MS (4000), QDRANT_MIN_DENSE et
+//   QDRANT_MIN_BM25 (seuils de pertinence, voir isPlausibleHit).
 import { Client, Databases, Storage, Messaging, ID, Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 import { findKnowledgeCandidates, interleave, CANDIDATE_POOL } from './knowledgeSearch.js';
-import { routeConnectors, routingCatalog, shouldSkipRouting, splitTokens, NOTEBOOK_CONNECTOR_ID } from './routing.js';
+import { routeConnectors, routingCatalog, shouldSkipRouting, splitTokens, NOTEBOOK_CONNECTOR_ID, MAX_ROUTED } from './routing.js';
+import { searchKnowledge, rankConnectors, GENERAL_CONNECTOR } from './qdrantSearch.js';
 
 // Modèle Claude utilisé par défaut pour les réponses de Vanessa : Haiku 4.5 (le moins cher).
 // Sonnet 5 reste plus fidèle au personnage mais consomme bien plus. Pour en changer SANS toucher
@@ -52,6 +63,14 @@ const CONNECTOR_MODEL_IDS = {
 };
 // Plafond de sécurité (la Function d'écriture applique déjà le même).
 const MAX_CONNECTOR_INSTRUCTIONS_CHARS = 4000;
+
+// ── Réglages de la recherche Qdrant (voir l'en-tête du fichier) ──
+const QDRANT_MODE = String(process.env.QDRANT_SEARCH_MODE || 'off').toLowerCase(); // off | shadow | on
+const QDRANT_CANDIDATES = Math.max(4, parseInt(process.env.QDRANT_CANDIDATES || '12', 10) || 12); // notes demandées à Qdrant
+const QDRANT_TIMEOUT_MS = parseInt(process.env.QDRANT_TIMEOUT_MS || '4000', 10) || 4000;
+const QDRANT_MIN_DENSE = parseFloat(process.env.QDRANT_MIN_DENSE); // NaN si absent : pas de seuil
+const QDRANT_MIN_BM25 = parseFloat(process.env.QDRANT_MIN_BM25); // NaN si absent : pas de seuil
+const SECOND_CONNECTOR_RATIO = 0.6; // un 2e connecteur est retenu s'il pèse au moins 60 % du premier
 
 // Bloc injecté seulement quand un connecteur actif a des instructions. Les consignes de
 // l'équipe cadrent le RÔLE et la démarche, mais restent sous les règles de sécurité.
@@ -676,6 +695,240 @@ async function selectRelevantKnowledge({ candidates, userMessage, maxResults, AN
     }
 }
 
+// ── Briques communes aux deux moteurs de recherche (ancien et Qdrant) ──
+
+// « Mon cahier » : uniquement les notes de CETTE personne (filtre strict sur callerId, jamais celles de quelqu'un
+// d'autre). Aucun tri de pertinence par Claude, aucune note de connecteur ni publicité.
+async function buildNotebookKnowledge({ notebook, databases, DATABASE_ID, COLLECTION_USER_NOTES, callerId, log }) {
+    let notes = [];
+    if (COLLECTION_USER_NOTES && callerId) {
+        try {
+            const result = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_NOTES, [
+                Query.equal('userId', callerId),
+                Query.limit(300),
+            ]);
+            notes = result.documents.sort((a, b) => String(b.updatedAt || b.$updatedAt).localeCompare(String(a.updatedAt || a.$updatedAt)));
+        } catch (err) {
+            log(`⚠️ Cahier de notes illisible : ${err.message}`);
+        }
+    }
+    log(`📒 Mode Mon cahier : ${notes.length} note(s) de l'utilisateur`);
+    return buildNotebookContext(notes) + buildConnectorInstructions('Mon cahier', notebook.instructions);
+}
+
+// Contexte « MODE PARTENAIRE » : instructions des connecteurs, notes sélectionnées (avec le nom du connecteur
+// quand il y en a plusieurs) et infos « publicité » du ou des connecteurs (toujours entièrement incluses :
+// jamais soumises au tri de pertinence, c'est une obligation contractuelle).
+async function buildPartnerKnowledge({ contributingDocs, relevant, databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, log }) {
+    const multi = contributingDocs.length > 1;
+    const names = contributingDocs.map((c) => c.name || 'un partenaire');
+
+    let publiciteContext = '';
+    try {
+        const adLists = await Promise.all(contributingDocs.map((c) => databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+            Query.equal('active', true),
+            Query.equal('connectorId', c.$id),
+            Query.equal('category', PUBLICITE_CATEGORY),
+            Query.limit(multi ? 2 : 3),
+        ]).then((r) => r.documents).catch(() => [])));
+        const ads = adLists.flat();
+        if (ads.length > 0) publiciteContext = buildPubliciteInstruction(ads);
+    } catch { /* collection pas encore configurée */ }
+
+    let knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${names.join(' et ')}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
+    for (const c of contributingDocs) {
+        knowledgeContext += buildConnectorInstructions(c.name || 'un partenaire', c.instructions, multi ? 2500 : 4000);
+        if (c.instructions) log(`🧭 Instructions du connecteur "${c.name}" injectées (${String(c.instructions).length} caractères)`);
+    }
+    knowledgeContext += `\n\nNotes internes ${multi ? 'des connecteurs actifs (le nom de chacun est entre parenthèses : ne mélange pas leurs informations)' : 'du connecteur actif'}, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n` +
+        relevant.map((k) => `- [${k.category}]${multi ? ` (${k._srcName})` : ''} ${k.content}`).join('\n');
+
+    return { knowledgeContext, publiciteContext };
+}
+
+// Bons plans « Ça sert » déjà confirmés par la communauté : candidats de la base générale.
+async function loadLocalSpots({ databases, DATABASE_ID, COLLECTION_LOCAL_SPOTS }) {
+    if (!COLLECTION_LOCAL_SPOTS) return [];
+    try {
+        const spots = await databases.listDocuments(DATABASE_ID, COLLECTION_LOCAL_SPOTS, [
+            Query.equal('moderationStatus', 'visible'),
+            Query.orderDesc('confirmCount'),
+            Query.limit(30),
+        ]);
+        return spots.documents.map((s) => ({
+            content: `[bon plan vérifié] ${s.name} — ${s.category}${s.quartier ? `, ${s.quartier}` : ''}${s.country ? `, ${s.country}` : ''}. ${s.description || ''} (confirmé ${s.confirmCount || 0} fois par la communauté)`,
+        }));
+    } catch {
+        return []; /* collection pas encore configurée */
+    }
+}
+
+// Contexte de la base générale (notes de l'équipe + bons plans vérifiés), déjà triées par pertinence.
+function buildGeneralKnowledgeContext(relevant) {
+    if (relevant.length === 0) return '';
+    return '\n\nNotes internes, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot ; les lignes "[bon plan vérifié]" sont de vraies fiches Ça sert confirmées par la communauté — tu peux les mentionner par leur nom si ça aide, jamais en inventer d\'autres) :\n' +
+        relevant.map((k) => `- ${k.content}`).join('\n');
+}
+
+// Infos "publicité" GÉNÉRALES (pas liées à un connecteur) — même mécanique que pour un connecteur,
+// simplement sans filtre connectorId.
+async function loadGeneralAds({ databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE }) {
+    try {
+        const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
+            Query.equal('active', true),
+            Query.equal('category', PUBLICITE_CATEGORY),
+            Query.limit(20),
+        ]);
+        const generalAds = ads.documents.filter((a) => !a.connectorId).slice(0, 3);
+        return generalAds.length > 0 ? buildPubliciteInstruction(generalAds) : '';
+    } catch {
+        return ''; /* collection pas encore configurée */
+    }
+}
+
+// ── Recherche Qdrant ──
+
+// Message qui parle (peut-être) du cahier de notes de la personne : seul cas où l'aiguillage par IA est encore utilisé.
+const NOTEBOOK_HINTS = /(cahier|carnet|mes notes|ma note|j.?ai (note|ecrit|enregistre|sauvegarde)|ce que j.?ai (note|ecrit)|que j.?avais (note|ecrit)|rappelle.?moi ce que)/;
+function mentionsNotebook(text) {
+    return NOTEBOOK_HINTS.test(normalizeForMatch(text));
+}
+
+// Texte envoyé à Qdrant : la dernière question ; si elle est très courte (« et les frais ? »), on ajoute le message
+// précédent de la personne, qui porte le sujet.
+function buildSearchQuery(history, vanessaId) {
+    const userMessages = history.filter((m) => m.senderId !== vanessaId).map((m) => String(m.content || '').trim()).filter(Boolean);
+    const last = userMessages[userMessages.length - 1] || '';
+    const previous = userMessages[userMessages.length - 2] || '';
+    const significant = last.split(/\s+/).filter((w) => w.length >= 4).length;
+    const query = significant < 3 && previous ? `${previous}\n${last}` : last;
+    return query.slice(0, 600);
+}
+
+// Une note est « plausible » si le sens OU les mots la jugent assez proche. Sans seuil configuré
+// (QDRANT_MIN_DENSE / QDRANT_MIN_BM25), tout est plausible et le tri par Haiku fait le travail.
+function isPlausibleHit(h) {
+    const hasDense = !Number.isNaN(QDRANT_MIN_DENSE);
+    const hasBm25 = !Number.isNaN(QDRANT_MIN_BM25);
+    if (!hasDense && !hasBm25) return true;
+    return (hasDense && (h.dense ?? 0) >= QDRANT_MIN_DENSE) || (hasBm25 && (h.bm25 ?? 0) >= QDRANT_MIN_BM25);
+}
+
+// Moteur Qdrant. Renvoie le contexte de connaissances (même forme que l'ancien moteur) ; lève une erreur si
+// Qdrant est injoignable — l'appelant se replie alors sur l'ancien moteur.
+async function retrieveWithQdrant({ history, lastUserMessage, databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_USER_NOTES, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log }) {
+    const out = { knowledgeContext: '', publiciteContext: '', effectiveConnectorId: '', effectiveConnectorIds: [], contributingDocs: [], routingTokens: 0, connectorFellBack: false };
+
+    // Connecteurs utilisables : actifs et dont le quota n'est pas épuisé. Un connecteur désactivé ou épuisé ne doit
+    // JAMAIS fournir de notes (même règle que l'ancien aiguillage).
+    let usable = [];
+    if (COLLECTION_VANESSA_CONNECTORS) {
+        try {
+            usable = (await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_CONNECTORS, [Query.equal('active', true), Query.limit(50)])).documents;
+        } catch (err) {
+            log(`⚠️ Liste des connecteurs illisible : ${err.message}`);
+        }
+    }
+    const docById = new Map(routingCatalog(usable).map((c) => [c.doc.$id, c.doc]));
+    const nameOf = (id) => (id === GENERAL_CONNECTOR ? 'générale' : (docById.get(id)?.name || id));
+
+    // Ancien réglage (anciennes versions de l'app qui proposaient encore les pastilles) : respecté tant qu'il est utilisable.
+    let forcedDoc = null;
+    if (connectorId) {
+        forcedDoc = docById.get(connectorId) || null;
+        if (!forcedDoc) { out.connectorFellBack = true; log(`⚠️ Connecteur ${connectorId} désactivé, épuisé ou supprimé — recherche automatique à la place.`); }
+    }
+
+    // « Mon cahier » : imposé, ou détecté (mots-clés puis aiguillage par IA limité à ce seul connecteur).
+    let notebook = forcedDoc && forcedDoc.$id === NOTEBOOK_CONNECTOR_ID ? forcedDoc : null;
+    if (!notebook && !forcedDoc && docById.has(NOTEBOOK_CONNECTOR_ID) && mentionsNotebook(lastUserMessage)) {
+        const r = await routeConnectors({ connectors: [docById.get(NOTEBOOK_CONNECTOR_ID)], history, vanessaId: VANESSA_USER_ID, apiKey: ANTHROPIC_API_KEY, log });
+        out.routingTokens = r.tokens;
+        notebook = r.picked.find((c) => c.$id === NOTEBOOK_CONNECTOR_ID) || null;
+    }
+    if (notebook) {
+        out.effectiveConnectorId = NOTEBOOK_CONNECTOR_ID;
+        out.effectiveConnectorIds = [NOTEBOOK_CONNECTOR_ID];
+        out.contributingDocs = [notebook];
+        out.knowledgeContext = await buildNotebookKnowledge({ notebook, databases, DATABASE_ID, COLLECTION_USER_NOTES, callerId, log });
+        return out;
+    }
+
+    // Recherche : la base générale + tous les connecteurs utilisables (ou le seul connecteur imposé).
+    const query = buildSearchQuery(history, VANESSA_USER_ID);
+    const sourceIds = forcedDoc ? [forcedDoc.$id] : [GENERAL_CONNECTOR, ...[...docById.keys()].filter((id) => id !== NOTEBOOK_CONNECTOR_ID)];
+    const search = await searchKnowledge(query, { connectorIds: sourceIds, limit: QDRANT_CANDIDATES, timeoutMs: QDRANT_TIMEOUT_MS });
+    const hits = search.hits.filter(isPlausibleHit);
+    const ranked = rankConnectors(hits);
+    log(`🔎 Qdrant : ${search.hits.length} note(s) en ${search.ms} ms (${search.dropped.length} doublon(s) écarté(s)), ${hits.length} plausible(s) ; sources : ${ranked.slice(0, 3).map((s) => `${nameOf(s.connectorId)}=${s.score.toFixed(3)}`).join(', ') || 'aucune'}`);
+
+    // Le connecteur est DÉDUIT des meilleures notes trouvées (au plus MAX_ROUTED).
+    let chosen = [];
+    if (forcedDoc) {
+        chosen = [forcedDoc];
+    } else if (ranked[0] && ranked[0].connectorId !== GENERAL_CONNECTOR) {
+        chosen = [docById.get(ranked[0].connectorId)];
+        const second = ranked.slice(1).find((s) => s.connectorId !== GENERAL_CONNECTOR && s.score >= ranked[0].score * SECOND_CONNECTOR_RATIO);
+        if (second && chosen.length < MAX_ROUTED) chosen.push(docById.get(second.connectorId));
+    }
+    chosen = chosen.filter(Boolean);
+
+    if (chosen.length > 0) {
+        const candidates = hits
+            .filter((h) => chosen.some((c) => c.$id === h.connectorId))
+            .map((h) => ({ ...h, _srcId: h.connectorId, _srcName: nameOf(h.connectorId) }));
+        const relevant = await selectRelevantKnowledge({
+            candidates, userMessage: lastUserMessage, maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
+        });
+        const usedIds = new Set(relevant.map((k) => k._srcId));
+        const contributing = chosen.filter((c) => usedIds.has(c.$id));
+        if (contributing.length > 0) {
+            const built = await buildPartnerKnowledge({ contributingDocs: contributing, relevant, databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, log });
+            out.knowledgeContext = built.knowledgeContext;
+            out.publiciteContext = built.publiciteContext;
+            out.contributingDocs = contributing;
+            out.effectiveConnectorIds = contributing.map((c) => c.$id);
+            out.effectiveConnectorId = out.effectiveConnectorIds[0];
+            return out;
+        }
+        log(`🧭 Connecteur(s) retenu(s) (${chosen.map((c) => c.name).join(', ')}) sans note utile pour ce message — base générale.`);
+    }
+
+    // Base générale : notes de l'équipe sans connecteur + bons plans « Ça sert » confirmés.
+    let generalHits = hits;
+    if (forcedDoc) {
+        // La recherche était limitée au connecteur imposé : on cherche aussi dans la base générale.
+        const g = await searchKnowledge(query, { connectorIds: [GENERAL_CONNECTOR], limit: QDRANT_CANDIDATES, timeoutMs: QDRANT_TIMEOUT_MS });
+        generalHits = g.hits.filter(isPlausibleHit);
+    }
+    const generalNotes = generalHits
+        .filter((h) => h.connectorId === GENERAL_CONNECTOR)
+        .map((h) => ({ $id: h.noteId, content: `[${h.category}] ${h.content}` }));
+    const spotCandidates = await loadLocalSpots({ databases, DATABASE_ID, COLLECTION_LOCAL_SPOTS });
+    const relevant = await selectRelevantKnowledge({
+        candidates: [...generalNotes, ...spotCandidates], userMessage: lastUserMessage,
+        maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
+    });
+    out.knowledgeContext = buildGeneralKnowledgeContext(relevant);
+    out.publiciteContext = await loadGeneralAds({ databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE });
+    return out;
+}
+
+// Mode « shadow » : après l'ancien moteur, Qdrant cherche aussi et on journalise la comparaison.
+// Jamais le texte de la question — seulement des identifiants de notes et des scores. Sans aucun effet sur la réponse.
+async function runQdrantShadow({ query, legacyIds, legacyRoutedNames, log }) {
+    try {
+        const { hits, dropped, ms } = await searchKnowledge(query, { limit: RELEVANCE_MAX_RESULTS, timeoutMs: Math.min(QDRANT_TIMEOUT_MS, 3000) });
+        const common = hits.filter((h) => legacyIds.includes(h.noteId)).length;
+        const topDense = Math.max(0, ...hits.map((h) => h.dense ?? 0));
+        const topBm25 = Math.max(0, ...hits.map((h) => h.bm25 ?? 0));
+        log(`🔬 [shadow Qdrant] ${ms} ms | ancien moteur : ${legacyIds.length} note(s), connecteurs [${legacyRoutedNames.join(', ') || 'générale'}] | Qdrant : ${hits.length} note(s) dont ${common} en commun, ${dropped.length} doublon(s) écarté(s) | meilleur score sens ${topDense.toFixed(2)}, mots ${topBm25.toFixed(1)} | longueur question ${query.length}`);
+        log(`🔬 [shadow Qdrant] top 5 : ${hits.slice(0, 5).map((h) => `${h.noteId}@${h.connectorId}(sens ${h.dense == null ? '-' : h.dense.toFixed(2)} / mots ${h.bm25 == null ? '-' : h.bm25.toFixed(1)})`).join(' ; ')}`);
+    } catch (err) {
+        log(`🔬 [shadow Qdrant] échec (sans effet sur la réponse) : ${err.message}`);
+    }
+}
+
 async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS, COLLECTION_LOCAL_SPOTS, COLLECTION_VANESSA_MEMORY, COLLECTION_USER_NOTES, databases, DATABASE_ID, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, emissionTopic, emissionPosture, callerId, log }) {
     let knowledgeContext = '';
     let publiciteContext = '';
@@ -688,6 +941,8 @@ async function generateVanessaReply({ history, COLLECTION_VANESSA_KNOWLEDGE, COL
     let contributingDocs = [];
     let routingTokens = 0; // coût de l'aiguillage : compté dans le quota de la personne, jamais facturé à un partenaire
     let connectorFellBack = false;
+    let legacyRelevantIds = []; // identifiants des notes retenues par l'ancien moteur (comparaison du mode « shadow »)
+    let legacyRoutedNames = [];
 
     // Dernier message RÉEL de l'utilisateur — c'est sur LUI que la
     // pertinence des connaissances est jugée, pas sur tout l'historique.
@@ -708,6 +963,29 @@ Dans ce cadre précis, tu n'es PAS limitée à tes notes de connaissances habitu
 Garde ABSOLUMENT ton ton, tes expressions et ta personnalité habituels — rien ne change de qui tu es, seulement ta façon de mener l'échange.
 Même dans cette posture : si tu perçois un vrai signe de détresse authentique chez la personne (pas un sujet difficile raconté avec du recul, une vraie détresse en train de se produire), tu sors IMMÉDIATEMENT de la posture demandée et tu appliques tes règles de sécurité habituelles, sans aucune exception.`;
     } else {
+    // ── Nouveau moteur (Qdrant), si activé. En cas d'échec : repli sur l'ancien moteur ci-dessous. ──
+    let handledByQdrant = false;
+    if (QDRANT_MODE === 'on') {
+        try {
+            const q = await retrieveWithQdrant({
+                history, lastUserMessage, databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, COLLECTION_VANESSA_CONNECTORS,
+                COLLECTION_LOCAL_SPOTS, COLLECTION_USER_NOTES, ANTHROPIC_API_KEY, VANESSA_USER_ID, connectorId, callerId, log,
+            });
+            knowledgeContext = q.knowledgeContext;
+            publiciteContext = q.publiciteContext;
+            effectiveConnectorId = q.effectiveConnectorId;
+            effectiveConnectorIds = q.effectiveConnectorIds;
+            contributingDocs = q.contributingDocs;
+            routingTokens = q.routingTokens;
+            connectorFellBack = q.connectorFellBack;
+            handledByQdrant = true;
+        } catch (err) {
+            log(`⚠️ Recherche Qdrant indisponible (${err.message}) — repli sur l'ancien moteur.`);
+            await emitEvent('qdrant_search_failed', 'warning', err.message);
+        }
+    }
+
+    if (!handledByQdrant) {
     try {
         // ── 1. Quels sujets (connecteurs) pour CE message ? Choix AUTOMATIQUE : plus de pastilles. ──
         // Un petit modèle lit la question et choisit 0, 1 ou 2 connecteurs d'après leur description. Désactiver
@@ -732,30 +1010,14 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
                 routingTokens = r.tokens;
             }
         }
+        legacyRoutedNames = routed.map((c) => c.name || c.$id);
 
         const notebook = routed.find((c) => c.$id === NOTEBOOK_CONNECTOR_ID);
         if (notebook) {
-            // « Mon cahier » : base de connaissances = uniquement les notes de CETTE personne
-            // (filtre strict sur callerId, jamais celles de quelqu'un d'autre). Aucun tri de
-            // pertinence par Claude, aucune note de connecteur ni publicité.
             effectiveConnectorId = NOTEBOOK_CONNECTOR_ID;
             effectiveConnectorIds = [NOTEBOOK_CONNECTOR_ID];
             contributingDocs = [notebook];
-            let notes = [];
-            if (COLLECTION_USER_NOTES && callerId) {
-                try {
-                    const result = await databases.listDocuments(DATABASE_ID, COLLECTION_USER_NOTES, [
-                        Query.equal('userId', callerId),
-                        Query.limit(300),
-                    ]);
-                    notes = result.documents.sort((a, b) => String(b.updatedAt || b.$updatedAt).localeCompare(String(a.updatedAt || a.$updatedAt)));
-                } catch (err) {
-                    log(`⚠️ Cahier de notes illisible : ${err.message}`);
-                }
-            }
-            log(`📒 Mode Mon cahier : ${notes.length} note(s) de l'utilisateur`);
-            knowledgeContext = buildNotebookContext(notes);
-            knowledgeContext += buildConnectorInstructions('Mon cahier', notebook.instructions);
+            knowledgeContext = await buildNotebookKnowledge({ notebook, databases, DATABASE_ID, COLLECTION_USER_NOTES, callerId, log });
         } else if (routed.length > 0) {
             // ── 2. Recherche DANS ces connecteurs seulement, avec un plafond de notes pour l'ensemble. ──
             // Un seul sujet : lot de 60 candidates. Deux sujets : 30 chacun (alternées), puis UN seul tri de
@@ -773,35 +1035,16 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
                 candidates: interleave(groups, CANDIDATE_POOL), userMessage: lastUserMessage,
                 maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
             });
+            legacyRelevantIds = relevant.map((k) => k.$id).filter(Boolean);
             const usedIds = new Set(relevant.map((k) => k._srcId));
             contributingDocs = routed.filter((c) => usedIds.has(c.$id));
 
             if (contributingDocs.length > 0) {
                 effectiveConnectorIds = contributingDocs.map((c) => c.$id);
                 effectiveConnectorId = effectiveConnectorIds[0];
-                const multi = contributingDocs.length > 1;
-                const names = contributingDocs.map((c) => c.name || 'un partenaire');
-
-                // Infos "publicité" DU OU DES CONNECTEURS — séparées du reste, toujours entièrement incluses
-                // (jamais soumises au tri de pertinence : ce n'est pas optionnel, c'est une obligation contractuelle).
-                try {
-                    const adLists = await Promise.all(contributingDocs.map((c) => databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                        Query.equal('active', true),
-                        Query.equal('connectorId', c.$id),
-                        Query.equal('category', PUBLICITE_CATEGORY),
-                        Query.limit(multi ? 2 : 3),
-                    ]).then((r) => r.documents).catch(() => [])));
-                    const ads = adLists.flat();
-                    if (ads.length > 0) publiciteContext = buildPubliciteInstruction(ads);
-                } catch { /* collection pas encore configurée */ }
-
-                knowledgeContext = `\n\nMODE PARTENAIRE ACTIF : ${names.join(' et ')}. Applique la règle "SI UN CONNECTEUR PARTENAIRE EST ACTIF" ci-dessus.`;
-                for (const c of contributingDocs) {
-                    knowledgeContext += buildConnectorInstructions(c.name || 'un partenaire', c.instructions, multi ? 2500 : 4000);
-                    if (c.instructions) log(`🧭 Instructions du connecteur "${c.name}" injectées (${String(c.instructions).length} caractères)`);
-                }
-                knowledgeContext += `\n\nNotes internes ${multi ? 'des connecteurs actifs (le nom de chacun est entre parenthèses : ne mélange pas leurs informations)' : 'du connecteur actif'}, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot) :\n` +
-                    relevant.map((k) => `- [${k.category}]${multi ? ` (${k._srcName})` : ''} ${k.content}`).join('\n');
+                const built = await buildPartnerKnowledge({ contributingDocs, relevant, databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, log });
+                knowledgeContext = built.knowledgeContext;
+                publiciteContext = built.publiciteContext;
             } else {
                 log(`🧭 Connecteur(s) choisi(s) (${routed.map((c) => c.name).join(', ')}) sans note utile pour ce message — recherche dans la base générale.`);
             }
@@ -823,44 +1066,24 @@ Même dans cette posture : si tu perçois un vrai signe de détresse authentique
                 bases: [[...generalBase, Query.equal('connectorId', '')], [...generalBase, Query.isNull('connectorId')]],
                 history, VANESSA_USER_ID, pool: CANDIDATE_POOL, label: 'générale', log,
             });
-            const generalNotes = generalDocs.map((k) => ({ content: `[${k.category}] ${k.content}` }));
-
-            let spotCandidates = [];
-            if (COLLECTION_LOCAL_SPOTS) {
-                try {
-                    const spots = await databases.listDocuments(DATABASE_ID, COLLECTION_LOCAL_SPOTS, [
-                        Query.equal('moderationStatus', 'visible'),
-                        Query.orderDesc('confirmCount'),
-                        Query.limit(30),
-                    ]);
-                    spotCandidates = spots.documents.map((s) => ({
-                        content: `[bon plan vérifié] ${s.name} — ${s.category}${s.quartier ? `, ${s.quartier}` : ''}${s.country ? `, ${s.country}` : ''}. ${s.description || ''} (confirmé ${s.confirmCount || 0} fois par la communauté)`,
-                    }));
-                } catch { /* collection pas encore configurée */ }
-            }
+            const generalNotes = generalDocs.map((k) => ({ $id: k.$id, content: `[${k.category}] ${k.content}` }));
+            const spotCandidates = await loadLocalSpots({ databases, DATABASE_ID, COLLECTION_LOCAL_SPOTS });
 
             const relevant = await selectRelevantKnowledge({
                 candidates: [...generalNotes, ...spotCandidates], userMessage: lastUserMessage,
                 maxResults: RELEVANCE_MAX_RESULTS, ANTHROPIC_API_KEY, log,
             });
-            if (relevant.length > 0) {
-                knowledgeContext = '\n\nNotes internes, sélectionnées pour leur pertinence par rapport à ce message précis (contexte, ne jamais citer mot pour mot ; les lignes "[bon plan vérifié]" sont de vraies fiches Ça sert confirmées par la communauté — tu peux les mentionner par leur nom si ça aide, jamais en inventer d\'autres) :\n' +
-                    relevant.map((k) => `- ${k.content}`).join('\n');
-            }
-
-            // Infos "publicité" GÉNÉRALES (pas liées à un connecteur) — même mécanique que pour un connecteur,
-            // simplement sans filtre connectorId.
-            try {
-                const ads = await databases.listDocuments(DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE, [
-                    Query.equal('active', true),
-                    Query.equal('category', PUBLICITE_CATEGORY),
-                    Query.limit(20),
-                ]);
-                const generalAds = ads.documents.filter((a) => !a.connectorId).slice(0, 3);
-                if (generalAds.length > 0) publiciteContext = buildPubliciteInstruction(generalAds);
-            } catch { /* collection pas encore configurée */ }
+            legacyRelevantIds = relevant.map((k) => k.$id).filter(Boolean);
+            knowledgeContext = buildGeneralKnowledgeContext(relevant);
+            publiciteContext = await loadGeneralAds({ databases, DATABASE_ID, COLLECTION_VANESSA_KNOWLEDGE });
         }
     } catch { /* collection pas encore configurée, on continue sans */ }
+
+    // Mode « shadow » : comparaison journalisée avec Qdrant, sans effet sur la réponse.
+    if (QDRANT_MODE === 'shadow') {
+        await runQdrantShadow({ query: buildSearchQuery(history, VANESSA_USER_ID), legacyIds: legacyRelevantIds, legacyRoutedNames, log });
+    }
+    }
     }
 
     // Ressources d'urgence — catégorie dédiée, TOUJOURS entièrement
