@@ -46,7 +46,8 @@ export default function HomePage() {
 
     return (
         // Hauteur = écran moins la barre du haut sur mobile (h-14 = 3.5rem).
-        <div className="relative mx-auto w-full max-w-[480px] h-[calc(100dvh-3.5rem)] md:h-[100dvh] bg-cream md:border-x md:border-gray-200">
+        // overflow-hidden : rien ne peut déborder de la page et la décaler sur mobile.
+        <div className="relative mx-auto w-full max-w-[480px] h-[calc(100dvh-3.5rem)] md:h-[100dvh] overflow-hidden bg-cream md:border-x md:border-gray-200">
             <div ref={scroller} onScroll={onScroll} className="flex h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide">
                 <section className="relative h-full w-full shrink-0 snap-start snap-always" aria-label="Ragots" aria-hidden={tab !== 'ragots'}>
                     <ReelFeed categorySlug={category} countrySlug={country} />
@@ -57,9 +58,10 @@ export default function HomePage() {
             </div>
 
             {/* Barre flottante : onglets, pays et publier (ragots), catégories (ragots) */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-cream via-cream/95 to-transparent px-4 pt-3 pb-6">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-cream via-cream/95 to-transparent px-3 sm:px-4 pt-3 pb-6">
                 <div className="pointer-events-auto flex items-center gap-2">
-                    <div role="tablist" aria-label="Sections de Ça Parle" className="mr-auto flex rounded-full bg-sand p-1">
+                    {/* Onglets : taille fixe, jamais écrasés */}
+                    <div role="tablist" aria-label="Sections de Ça Parle" className="mr-auto flex shrink-0 rounded-full bg-sand p-1">
                         {TABS.map((t) => (
                             <button
                                 key={t.id}
@@ -67,7 +69,7 @@ export default function HomePage() {
                                 type="button"
                                 aria-selected={tab === t.id}
                                 onClick={() => goTo(t.id)}
-                                className={`rounded-full px-4 py-1.5 text-sm font-bold transition-colors ${tab === t.id ? 'bg-brand text-ink' : 'text-gray-600'}`}
+                                className={`rounded-full px-3 sm:px-4 py-1.5 text-sm font-bold transition-colors ${tab === t.id ? 'bg-brand text-ink' : 'text-gray-600'}`}
                             >
                                 {t.label}
                             </button>
@@ -77,11 +79,12 @@ export default function HomePage() {
                     {tab === 'ragots' && (
                         <>
                             <label className="sr-only" htmlFor="reel-country">Pays</label>
+                            {/* Le sélecteur est le seul élément qui peut rétrécir (min-w-0 + max-w) */}
                             <select
                                 id="reel-country"
                                 value={country}
                                 onChange={(e) => setCountry(e.target.value)}
-                                className="rounded-full border border-gray-300 bg-white px-3 py-2 text-sm text-ink focus:outline-none focus:border-ink focus:ring-2 focus:ring-brand"
+                                className="min-w-0 max-w-[6.5rem] sm:max-w-[10rem] truncate rounded-full border border-gray-300 bg-white pl-2.5 pr-1 py-2 text-sm text-ink focus:outline-none focus:border-ink focus:ring-2 focus:ring-brand"
                             >
                                 {COUNTRIES.map((c) => (
                                     <option key={c.slug} value={c.slug} className="text-ink">
@@ -90,12 +93,13 @@ export default function HomePage() {
                                 ))}
                             </select>
 
+                            {/* Bouton Publier : toujours visible, jamais écrasé (shrink-0) */}
                             <Link
                                 to="/publier"
                                 aria-label="Publier une histoire"
-                                className="w-10 h-10 rounded-full bg-brand text-ink flex items-center justify-center hover:bg-brand-hover transition-colors"
+                                className="shrink-0 w-11 h-11 rounded-full bg-brand text-ink flex items-center justify-center shadow-md ring-2 ring-white hover:bg-brand-hover transition-colors"
                             >
-                                <Plus className="w-5 h-5" aria-hidden="true" />
+                                <Plus className="w-6 h-6" strokeWidth={2.5} aria-hidden="true" />
                             </Link>
                         </>
                     )}
